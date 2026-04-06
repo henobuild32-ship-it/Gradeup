@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useAppStore } from '@/lib/store';
+import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,8 +21,9 @@ import {
   Shield,
   Building2,
   CheckCircle2,
+  Loader2,
+  LogOut,
 } from 'lucide-react';
-import { toast } from 'sonner';
 
 const roleLabels: Record<string, string> = {
   ADMIN: 'Administrateur',
@@ -31,7 +33,8 @@ const roleLabels: Record<string, string> = {
 };
 
 export default function ProfilePage() {
-  const { user, setUser } = useAppStore();
+  const { user, setUser, setCurrentPage } = useAppStore();
+  const { toast } = useToast();
 
   const [name, setName] = useState(user?.fullName || '');
   const [email, setEmail] = useState(user?.email || '');
@@ -58,9 +61,15 @@ export default function ProfilePage() {
     .toUpperCase()
     .slice(0, 2);
 
+  const handleLogout = () => {
+    setUser(null);
+    setCurrentPage('auth');
+    toast({ title: 'Déconnexion', description: 'Vous avez été déconnecté.' });
+  };
+
   const handleSaveProfile = async () => {
     if (!name.trim() || !email.trim()) {
-      toast.error('Veuillez remplir tous les champs obligatoires.');
+      toast({ title: 'Erreur', description: 'Veuillez remplir tous les champs obligatoires.', variant: 'destructive' });
       return;
     }
 
@@ -74,17 +83,17 @@ export default function ProfilePage() {
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Erreur lors de la mise à jour');
+        toast({ title: 'Erreur', description: err.error || 'Erreur lors de la mise à jour', variant: 'destructive' });
+        return;
       }
 
       const updated = await res.json();
       if (updated.user) {
         setUser({ ...user, fullName: updated.user.fullName, email: updated.user.email });
       }
-      toast.success('Profil mis à jour avec succès !');
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Erreur inconnue';
-      toast.error(message);
+      toast({ title: 'Succès', description: 'Profil mis à jour avec succès !' });
+    } catch {
+      toast({ title: 'Erreur', description: 'Impossible de se connecter au serveur.', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -92,15 +101,15 @@ export default function ProfilePage() {
 
   const handleChangePassword = async () => {
     if (!oldPassword || !newPassword || !confirmPassword) {
-      toast.error('Veuillez remplir tous les champs du mot de passe.');
+      toast({ title: 'Erreur', description: 'Veuillez remplir tous les champs du mot de passe.', variant: 'destructive' });
       return;
     }
-    if (newPassword.length < 6) {
-      toast.error('Le nouveau mot de passe doit contenir au moins 6 caractères.');
+    if (newPassword.length < 4) {
+      toast({ title: 'Erreur', description: 'Le nouveau mot de passe doit contenir au moins 4 caractères.', variant: 'destructive' });
       return;
     }
     if (newPassword !== confirmPassword) {
-      toast.error('La confirmation du mot de passe ne correspond pas.');
+      toast({ title: 'Erreur', description: 'La confirmation du mot de passe ne correspond pas.', variant: 'destructive' });
       return;
     }
 
@@ -114,16 +123,16 @@ export default function ProfilePage() {
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Erreur lors du changement de mot de passe');
+        toast({ title: 'Erreur', description: err.error || 'Erreur lors du changement de mot de passe', variant: 'destructive' });
+        return;
       }
 
-      toast.success('Mot de passe modifié avec succès !');
+      toast({ title: 'Succès', description: 'Mot de passe modifié avec succès !' });
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Erreur inconnue';
-      toast.error(message);
+    } catch {
+      toast({ title: 'Erreur', description: 'Impossible de se connecter au serveur.', variant: 'destructive' });
     } finally {
       setSavingPassword(false);
     }
@@ -131,7 +140,7 @@ export default function ProfilePage() {
 
   const handleSaveConfig = async () => {
     if (!schoolName.trim()) {
-      toast.error('Le nom de l\'école est obligatoire.');
+      toast({ title: 'Erreur', description: "Le nom de l'école est obligatoire.", variant: 'destructive' });
       return;
     }
 
@@ -145,7 +154,8 @@ export default function ProfilePage() {
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Erreur lors de la mise à jour');
+        toast({ title: 'Erreur', description: err.error || 'Erreur lors de la mise à jour', variant: 'destructive' });
+        return;
       }
 
       const updated = await res.json();
@@ -155,10 +165,9 @@ export default function ProfilePage() {
           school: { ...user.school!, name: updated.school.name, currency: updated.school.currency },
         });
       }
-      toast.success('Configuration de l\'école mise à jour !');
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Erreur inconnue';
-      toast.error(message);
+      toast({ title: 'Succès', description: "Configuration de l'école mise à jour !" });
+    } catch {
+      toast({ title: 'Erreur', description: 'Impossible de se connecter au serveur.', variant: 'destructive' });
     } finally {
       setSavingConfig(false);
     }
@@ -169,25 +178,35 @@ export default function ProfilePage() {
       {/* User Info Card */}
       <Card className="overflow-hidden transition-all duration-300 hover:shadow-lg">
         <div className="bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600 p-6 text-white">
-          <div className="flex items-center gap-4">
-            <Avatar className="h-20 w-20 ring-4 ring-white/30 shadow-lg">
-              <AvatarFallback className="text-2xl bg-white/20 text-white font-bold">
-                {initials}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <h2 className="text-2xl font-bold">{user.fullName}</h2>
-              <div className="flex items-center gap-2 mt-1">
-                <Badge className="bg-white/20 text-white hover:bg-white/30 border-0">
-                  <Shield className="h-3 w-3 mr-1" />
-                  {roleLabels[user.role]}
-                </Badge>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Avatar className="h-20 w-20 ring-4 ring-white/30 shadow-lg">
+                <AvatarFallback className="text-2xl bg-white/20 text-white font-bold">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <h2 className="text-2xl font-bold">{user.fullName}</h2>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge className="bg-white/20 text-white hover:bg-white/30 border-0">
+                    <Shield className="h-3 w-3 mr-1" />
+                    {roleLabels[user.role]}
+                  </Badge>
+                </div>
+                <p className="text-blue-100 text-sm mt-1 flex items-center gap-1.5">
+                  <Mail className="h-3.5 w-3.5" />
+                  {user.email}
+                </p>
               </div>
-              <p className="text-blue-100 text-sm mt-1 flex items-center gap-1.5">
-                <Mail className="h-3.5 w-3.5" />
-                {user.email}
-              </p>
             </div>
+            <Button
+              onClick={handleLogout}
+              variant="ghost"
+              className="text-white/80 hover:text-white hover:bg-white/10 border border-white/20"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Déconnexion
+            </Button>
           </div>
         </div>
       </Card>
@@ -197,7 +216,7 @@ export default function ProfilePage() {
         <Card className="transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-blue-50">
+              <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/30">
                 <School className="h-4 w-4 text-blue-600" />
               </div>
               Informations de l&apos;école
@@ -235,7 +254,7 @@ export default function ProfilePage() {
       <Card className="transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-blue-50">
+            <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/30">
               <User className="h-4 w-4 text-blue-600" />
             </div>
             Modifier le profil
@@ -275,10 +294,10 @@ export default function ProfilePage() {
           <Button
             onClick={handleSaveProfile}
             disabled={saving}
-            className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md shadow-blue-500/20"
+            className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md shadow-blue-500/20 transition-all duration-200 hover:scale-[1.02] active:scale-[0.97]"
           >
             {saving ? (
-              <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
             ) : (
               <Save className="h-4 w-4 mr-2" />
             )}
@@ -291,7 +310,7 @@ export default function ProfilePage() {
       <Card className="transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-amber-50">
+            <div className="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/30">
               <Lock className="h-4 w-4 text-amber-600" />
             </div>
             Changer le mot de passe
@@ -359,7 +378,7 @@ export default function ProfilePage() {
                   onClick={() => setShowConfirm(!showConfirm)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 h-4" />}
                 </button>
               </div>
               {confirmPassword && newPassword !== confirmPassword && (
@@ -378,10 +397,10 @@ export default function ProfilePage() {
             onClick={handleChangePassword}
             disabled={savingPassword}
             variant="outline"
-            className="border-amber-200 text-amber-700 hover:bg-amber-50"
+            className="border-amber-200 text-amber-700 hover:bg-amber-50 transition-all duration-200 hover:scale-[1.02] active:scale-[0.97]"
           >
             {savingPassword ? (
-              <div className="h-4 w-4 border-2 border-amber-300 border-t-amber-600 rounded-full animate-spin mr-2" />
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
             ) : (
               <Lock className="h-4 w-4 mr-2" />
             )}
@@ -392,10 +411,10 @@ export default function ProfilePage() {
 
       {/* Admin Only: School Config */}
       {user.role === 'ADMIN' && (
-        <Card className="transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 border-blue-200">
+        <Card className="transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 border-blue-200 dark:border-blue-800">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-emerald-50">
+              <div className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30">
                 <Building2 className="h-4 w-4 text-emerald-600" />
               </div>
               Configuration de l&apos;école
@@ -435,10 +454,10 @@ export default function ProfilePage() {
             <Button
               onClick={handleSaveConfig}
               disabled={savingConfig}
-              className="bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white shadow-md shadow-emerald-500/20"
+              className="bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white shadow-md shadow-emerald-500/20 transition-all duration-200 hover:scale-[1.02] active:scale-[0.97]"
             >
               {savingConfig ? (
-                <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : (
                 <Save className="h-4 w-4 mr-2" />
               )}

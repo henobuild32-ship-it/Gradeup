@@ -8,6 +8,7 @@ export interface SchoolInfo {
   name: string;
   email: string;
   currency: string;
+  inviteCode?: string;
 }
 
 export interface UserInfo {
@@ -18,6 +19,8 @@ export interface UserInfo {
   role: UserRole;
   photoUrl: string;
   parentId?: string;
+  parentCode?: string;
+  active?: boolean;
   school?: SchoolInfo;
   classEnrollments?: EnrolledClassInfo[];
   children?: UserInfo[];

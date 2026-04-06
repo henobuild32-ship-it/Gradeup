@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useAppStore } from '@/lib/store';
 import type { PageView, UserRole } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -20,6 +20,24 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   LayoutDashboard,
   Users,
@@ -100,6 +118,13 @@ const roleLabels: Record<UserRole, string> = {
   TEACHER: 'Professeur',
   STUDENT: 'Élève',
   PARENT: 'Parent',
+};
+
+const roleBadgeColors: Record<UserRole, string> = {
+  ADMIN: 'bg-blue-100 text-blue-700',
+  TEACHER: 'bg-emerald-100 text-emerald-700',
+  STUDENT: 'bg-violet-100 text-violet-700',
+  PARENT: 'bg-amber-100 text-amber-700',
 };
 
 const pageTitles: Record<PageView, string> = {
@@ -305,12 +330,18 @@ function SidebarContent({
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const { user, currentPage, setCurrentPage, sidebarOpen, setSidebarOpen, setUser } = useAppStore();
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
   if (!user) return null;
 
   const handleLogout = () => {
+    setShowLogoutDialog(true);
+  };
+
+  const confirmLogout = () => {
     setUser(null);
     setCurrentPage('auth');
+    setShowLogoutDialog(false);
   };
 
   const handleNavigate = (page: PageView) => {
@@ -320,6 +351,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
       setSidebarOpen(false);
     }
   };
+
+  const initials = user.fullName
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -396,7 +434,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {/* Notification bell */}
             <Tooltip>
               <TooltipTrigger asChild>
@@ -417,18 +455,51 @@ export default function AppLayout({ children }: AppLayoutProps) {
               <TooltipContent>Notifications</TooltipContent>
             </Tooltip>
 
-            {/* User avatar */}
-            <Avatar className="h-8 w-8 ring-2 ring-blue-100 transition-all duration-200 hover:ring-blue-300">
-              {user.photoUrl && <AvatarImage src={user.photoUrl} alt={user.fullName} />}
-              <AvatarFallback className="text-xs bg-primary text-primary-foreground">
-                {user.fullName
-                  .split(' ')
-                  .map((n) => n[0])
-                  .join('')
-                  .toUpperCase()
-                  .slice(0, 2)}
-              </AvatarFallback>
-            </Avatar>
+            {/* User dropdown menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="flex items-center gap-2 h-8 px-2 rounded-full hover:bg-muted transition-all duration-200">
+                  <Avatar className="h-7 w-7 ring-2 ring-blue-100 transition-all duration-200">
+                    {user.photoUrl && <AvatarImage src={user.photoUrl} alt={user.fullName} />}
+                    <AvatarFallback className="text-[10px] bg-primary text-primary-foreground">
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="hidden sm:inline text-sm font-medium text-foreground max-w-[120px] truncate">
+                    {user.fullName}
+                  </span>
+                  <ChevronDown className="w-3 h-3 text-muted-foreground hidden sm:block" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium">{user.fullName}</p>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${roleBadgeColors[user.role]}`}>
+                        {roleLabels[user.role]}
+                      </Badge>
+                      {user.school && (
+                        <span className="text-[10px] text-muted-foreground truncate">{user.school.name}</span>
+                      )}
+                    </div>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleNavigate('profile')} className="cursor-pointer">
+                  <User className="mr-2 h-4 w-4" />
+                  Mon profil
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handleLogout}
+                  className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/30"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Déconnexion
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 
@@ -450,6 +521,28 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </div>
         </footer>
       </div>
+
+      {/* Logout confirmation dialog */}
+      <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Se déconnecter ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vous êtes sur le point de vous déconnecter de votre compte {roleLabels[user.role].toLowerCase()}.
+              Voulez-vous continuer ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmLogout}
+              className="bg-red-600 hover:bg-red-700 text-white focus:ring-red-300"
+            >
+              Se déconnecter
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

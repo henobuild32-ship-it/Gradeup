@@ -24,9 +24,9 @@ interface AppState {
 export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
-      // Auth
+      // Auth - do NOT override currentPage when setting user
       user: null,
-      setUser: (user) => set({ user, currentPage: user ? ('auth' as PageView) : 'auth' }),
+      setUser: (user) => set({ user }),
       
       // Navigation
       currentPage: 'auth' as PageView,

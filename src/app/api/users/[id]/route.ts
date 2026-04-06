@@ -38,11 +38,33 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { fullName, email, password, role, photoUrl, parentId } = body;
+    const { fullName, email, password, newPassword, oldPassword, role, photoUrl, parentId } = body;
 
     const existing = await db.user.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Password change: validate old password
+    if (newPassword !== undefined) {
+      if (!oldPassword) {
+        return NextResponse.json(
+          { error: 'L\'ancien mot de passe est requis.' },
+          { status: 400 }
+        );
+      }
+      if (oldPassword !== existing.password) {
+        return NextResponse.json(
+          { error: 'L\'ancien mot de passe est incorrect.' },
+          { status: 401 }
+        );
+      }
+      if (newPassword.length < 4) {
+        return NextResponse.json(
+          { error: 'Le nouveau mot de passe doit contenir au moins 4 caractères.' },
+          { status: 400 }
+        );
+      }
     }
 
     const user = await db.user.update({
@@ -50,7 +72,8 @@ export async function PUT(
       data: {
         ...(fullName !== undefined && { fullName }),
         ...(email !== undefined && { email }),
-        ...(password !== undefined && { password }),
+        ...(newPassword !== undefined && { password: newPassword }),
+        ...(password !== undefined && newPassword === undefined && { password }),
         ...(role !== undefined && { role }),
         ...(photoUrl !== undefined && { photoUrl }),
         ...(parentId !== undefined && { parentId: parentId || null }),

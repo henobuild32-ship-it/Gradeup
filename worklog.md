@@ -419,3 +419,91 @@ GradeUp platform is fully functional. The registration page was rebuilt from scr
 4. **Rate limiting**: Prevent brute-force attempts on invite codes
 5. **Data export improvements**: Export student lists with parent codes
 6. **Bulk user import**: CSV upload for creating multiple students at once
+
+---
+## Task ID: r6-bugfix-auth
+Agent: Main Orchestrator
+Task: Fix broken registration, add logout/profile/save, ensure login works with invite code
+
+### Current Project Status Assessment
+GradeUp platform had a critical bug where registration and login were broken due to the Zustand store's `setUser` function always resetting `currentPage` to `'auth'`, overriding the post-auth redirect. Additionally, TypeScript types were missing fields returned by APIs (`inviteCode`, `parentCode`, `active`), and the password change API lacked old password validation.
+
+### Work Summary
+
+#### 1. Fixed Store `setUser` Bug (`src/lib/store.ts`)
+- **Root cause**: `setUser: (user) => set({ user, currentPage: user ? ('auth' as PageView) : 'auth' })` always reset currentPage to 'auth' when setting a user
+- **Fix**: Changed to `setUser: (user) => set({ user })` — no longer overrides currentPage
+- This was the primary reason registration appeared "broken" — the user was set correctly but the page was redirected back to auth
+
+#### 2. Updated TypeScript Types (`src/lib/types.ts`)
+- Added `inviteCode?: string` to `SchoolInfo` interface
+- Added `parentCode?: string` to `UserInfo` interface
+- Added `active?: boolean` to `UserInfo` interface
+- Ensures type safety with API responses that include these fields
+
+#### 3. Fixed Password Change API (`src/app/api/users/[id]/route.ts`)
+- Added `oldPassword` validation: returns 400 if missing, 401 if incorrect
+- Now accepts `{ oldPassword, newPassword }` body (previously only accepted `{ password }`)
+- Validates minimum password length (4 characters)
+- Error messages in French
+
+#### 4. Rebuilt Auth Page (`src/components/gradeup/auth-page.tsx`)
+- Fixed registration form: both "Créer une école" and "Rejoindre une école" modes work correctly
+- Added `useEffect` redirect: if user is already logged in, redirect to appropriate dashboard
+- Improved invite code verification with loading spinner during verification
+- Added invalid code error message display
+- Added dismiss button on created school banner
+- Removed unused `ArrowLeft` and `BookOpen` import (now using them in the form)
+- Consistent toast notifications using `useToast` hook
+
+#### 5. Rebuilt Profile Page (`src/components/gradeup/profile-page.tsx`)
+- Switched from `sonner` toast to `useToast` hook for consistency with rest of app
+- Added **logout button** in the profile header card (gradient banner)
+- All save operations properly update the Zustand store (user object)
+- Password change uses `oldPassword` + `newPassword` fields matching the updated API
+- Proper loading states with `Loader2` spinner on all save buttons
+- Hover/active micro-interactions on all buttons (`hover:scale-[1.02] active:scale-[0.97]`)
+- Dark mode support on all cards
+
+#### 6. Enhanced App Layout (`src/components/gradeup/app-layout.tsx`)
+- **Added user dropdown menu** in header (DropdownMenu from shadcn/ui):
+  - Shows user name, role badge (color-coded), and school name
+  - "Mon profil" menu item navigates to profile page
+  - "Déconnexion" menu item in red color
+- **Added logout confirmation dialog** (AlertDialog from shadcn/ui):
+  - Shows role-specific message ("Se déconnecter de votre compte administrateur ?")
+  - "Annuler" and "Se déconnexion" buttons
+  - Red styling on confirm button
+- Added role badge colors: ADMIN=blue, TEACHER=emerald, STUDENT=violet, PARENT=amber
+- User avatar now shows in a pill-shaped button with name on desktop
+- Logout from sidebar and header both use the confirmation dialog
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `src/lib/store.ts` | Fixed setUser to not override currentPage |
+| `src/lib/types.ts` | Added inviteCode, parentCode, active to types |
+| `src/app/api/users/[id]/route.ts` | Added oldPassword validation for password changes |
+| `src/components/gradeup/auth-page.tsx` | Rebuilt with proper form handling and redirect |
+| `src/components/gradeup/profile-page.tsx` | Rebuilt with consistent toast, logout button, proper save |
+| `src/components/gradeup/app-layout.tsx` | Added user dropdown, logout confirmation dialog |
+
+### Verification
+- Zero ESLint errors
+- Dev server compiles successfully, homepage returns 200
+- All auth flows work: create school, join school (all 3 roles), login with invite code
+- Logout works with confirmation dialog
+- Profile modification and password change work correctly
+
+### Known Issues
+1. Dev server stability: Server may become unresponsive under heavy concurrent API calls (environment limitation)
+2. No real-time sync: Changes require page refresh to reflect
+3. Toast library inconsistency: Some components use `useToast` hook, others used `sonner` (now fixed for auth + profile)
+
+### Priority Recommendations for Next Phase
+1. **Internal messaging system**: Real-time messaging between all role combinations
+2. **WebSocket real-time updates**: Live notifications, account status changes
+3. **QR code generation**: For invite codes and parent codes
+4. **Email integration**: Send invite codes via email
+5. **Bulk user import**: CSV upload for creating multiple students
+6. **Data export improvements**: Export with parent codes, filtered by role

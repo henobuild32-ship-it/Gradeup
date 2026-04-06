@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import { useToast } from '@/hooks/use-toast';
 import type { UserRole, PageView } from '@/lib/types';
@@ -9,13 +9,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import {
   Loader2,
@@ -32,6 +25,7 @@ import {
   Key,
   Copy,
   Check,
+  X,
 } from 'lucide-react';
 
 const roleDashboardMap: Record<UserRole, PageView> = {
@@ -54,8 +48,16 @@ const roleIcons: Record<string, React.ElementType> = {
 };
 
 export default function AuthPage() {
-  const { setUser, setCurrentPage } = useAppStore();
+  const { setUser, setCurrentPage, user } = useAppStore();
   const { toast } = useToast();
+
+  // If already logged in, show nothing (AppLayout handles it)
+  useEffect(() => {
+    if (user) {
+      const dashboardPage = roleDashboardMap[user.role as UserRole] || 'admin-dashboard';
+      setCurrentPage(dashboardPage);
+    }
+  }, [user, setCurrentPage]);
 
   // Login state
   const [loginInviteCode, setLoginInviteCode] = useState('');
@@ -87,32 +89,29 @@ export default function AuthPage() {
   const [showJoinPassword, setShowJoinPassword] = useState(false);
   const [showJoinConfirmPassword, setShowJoinConfirmPassword] = useState(false);
 
-  // Available classes (fetched when invite code changes)
+  // Available classes (fetched when invite code is verified)
   const [availableClasses, setAvailableClasses] = useState<{ id: string; name: string; level: string }[]>([]);
   const [codeVerified, setCodeVerified] = useState(false);
+  const [verifyingCode, setVerifyingCode] = useState(false);
 
   // Created invite code display
   const [createdInviteCode, setCreatedInviteCode] = useState('');
   const [codeCopied, setCodeCopied] = useState(false);
 
-  // Fetch classes for an invite code
-  const fetchClasses = async (code: string) => {
+  // Verify invite code and fetch classes
+  const verifyInviteCode = async (code: string) => {
     if (!code || code.length < 8) {
       setAvailableClasses([]);
       setCodeVerified(false);
       return;
     }
+    setVerifyingCode(true);
     try {
-      const res = await fetch('/api/classes', {
-        headers: { 'X-School-Invite': code },
-      });
-      // Try to find school by checking if code is valid via invite-code
-      const checkRes = await fetch('/api/config?inviteCode=' + code);
+      const checkRes = await fetch(`/api/config?inviteCode=${code}`);
       if (checkRes.ok) {
         const data = await checkRes.json();
         if (data.school) {
           setCodeVerified(true);
-          // Fetch classes for this school
           const classRes = await fetch(`/api/classes?schoolId=${data.school.id}`);
           if (classRes.ok) {
             const classData = await classRes.json();
@@ -122,24 +121,15 @@ export default function AuthPage() {
           setCodeVerified(false);
           setAvailableClasses([]);
         }
-      }
-    } catch {
-      // Try fetching classes via the config endpoint
-      try {
-        const res = await fetch(`/api/config?inviteCode=${code}`);
-        const data = await res.json();
-        if (data.school) {
-          setCodeVerified(true);
-          const classRes = await fetch(`/api/classes?schoolId=${data.school.id}`);
-          if (classRes.ok) {
-            const classData = await classRes.json();
-            setAvailableClasses(classData.classes || []);
-          }
-        }
-      } catch {
+      } else {
         setCodeVerified(false);
         setAvailableClasses([]);
       }
+    } catch {
+      setCodeVerified(false);
+      setAvailableClasses([]);
+    } finally {
+      setVerifyingCode(false);
     }
   };
 
@@ -165,8 +155,10 @@ export default function AuthPage() {
         toast({ title: 'Erreur de connexion', description: data.error || 'Identifiants incorrects.', variant: 'destructive' });
         return;
       }
+      // Set user first, then set page
       setUser(data.user);
-      setCurrentPage(roleDashboardMap[data.user.role as UserRole]);
+      const dashboardPage = roleDashboardMap[data.user.role as UserRole];
+      setCurrentPage(dashboardPage);
       toast({ title: 'Connexion réussie', description: `Bienvenue, ${data.user.fullName} !` });
     } catch {
       toast({ title: 'Erreur', description: 'Impossible de se connecter au serveur.', variant: 'destructive' });
@@ -354,19 +346,24 @@ export default function AuthPage() {
         {/* Show created invite code banner */}
         {createdInviteCode && (
           <div className="w-full max-w-md mb-4 animate-scale-in">
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
-              <p className="text-sm font-medium text-emerald-800 mb-2">🏆 Votre école a été créée !</p>
-              <div className="flex items-center justify-center gap-2 bg-white rounded-lg p-3 border border-emerald-200">
+            <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 text-center">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">Votre école a été créée !</p>
+                <button onClick={() => setCreatedInviteCode('')} className="text-emerald-600 hover:text-emerald-800 transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex items-center justify-center gap-2 bg-white dark:bg-gray-900 rounded-lg p-3 border border-emerald-200 dark:border-emerald-700">
                 <Key className="w-4 h-4 text-emerald-600" />
-                <span className="text-lg font-bold tracking-wider text-emerald-700">{createdInviteCode}</span>
+                <span className="text-lg font-bold tracking-wider text-emerald-700 dark:text-emerald-400">{createdInviteCode}</span>
                 <button
                   onClick={() => copyCode(createdInviteCode)}
-                  className="text-emerald-600 hover:text-emerald-800 transition-colors"
+                  className="text-emerald-600 hover:text-emerald-800 dark:hover:text-emerald-300 transition-colors ml-2"
                 >
                   {codeCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                 </button>
               </div>
-              <p className="text-xs text-emerald-600 mt-2">Partagez ce code pour que les membres rejoignent votre école</p>
+              <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2">Partagez ce code pour que les membres rejoignent votre école</p>
             </div>
           </div>
         )}
@@ -436,10 +433,15 @@ export default function AuthPage() {
                         </button>
                       </div>
                     </div>
-                    <Button type="submit" className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-[1.02] active:scale-[0.97] transition-all duration-200 shadow-lg shadow-blue-500/25" size="lg" disabled={loginLoading}>
+                    <Button
+                      type="submit"
+                      className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-[1.02] active:scale-[0.97] transition-all duration-200 shadow-lg shadow-blue-500/25"
+                      size="lg"
+                      disabled={loginLoading}
+                    >
                       {loginLoading ? (
                         <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
                           Connexion...
                         </>
                       ) : (
@@ -484,7 +486,7 @@ export default function AuthPage() {
                     <form onSubmit={handleCreateSchool} className="space-y-4 animate-fade-in">
                       <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3 mb-2">
                         <p className="text-xs text-blue-700 dark:text-blue-300">
-                          🏫 Vous êtes administrateur ? Créez votre école et recevez un code de parrainage unique.
+                          Vous êtes administrateur ? Créez votre école et recevez un code de parrainage unique.
                         </p>
                       </div>
                       <div className="space-y-2">
@@ -558,10 +560,15 @@ export default function AuthPage() {
                           </button>
                         </div>
                       </div>
-                      <Button type="submit" className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-[1.02] active:scale-[0.97] transition-all duration-200 shadow-lg shadow-blue-500/25" size="lg" disabled={regLoading}>
+                      <Button
+                        type="submit"
+                        className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-[1.02] active:scale-[0.97] transition-all duration-200 shadow-lg shadow-blue-500/25"
+                        size="lg"
+                        disabled={regLoading}
+                      >
                         {regLoading ? (
                           <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
                             Création...
                           </>
                         ) : (
@@ -588,17 +595,28 @@ export default function AuthPage() {
                               const code = e.target.value.toUpperCase();
                               setJoinInviteCode(code);
                               if (code.length >= 12) {
-                                fetchClasses(code);
+                                verifyInviteCode(code);
+                              } else {
+                                setCodeVerified(false);
+                                setAvailableClasses([]);
                               }
                             }}
                             className="h-11 rounded-xl font-mono tracking-wider pr-10"
                           />
-                          {codeVerified && (
+                          {verifyingCode && (
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                            </div>
+                          )}
+                          {!verifyingCode && codeVerified && (
                             <div className="absolute right-3 top-1/2 -translate-y-1/2">
                               <Check className="w-4 h-4 text-emerald-500" />
                             </div>
                           )}
                         </div>
+                        {joinInviteCode && !codeVerified && joinInviteCode.length >= 12 && (
+                          <p className="text-xs text-red-500">Code invalide. Vérifiez avec votre administrateur.</p>
+                        )}
                         <p className="text-xs text-muted-foreground">Le code fourni par votre administrateur</p>
                       </div>
 
@@ -646,7 +664,11 @@ export default function AuthPage() {
                       {joinRole === 'STUDENT' && (
                         <div className="space-y-2 animate-fade-in">
                           <Label>Classe <span className="text-red-500">*</span></Label>
-                          {availableClasses.length > 0 ? (
+                          {!codeVerified ? (
+                            <p className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3">
+                              Entrez un code école valide pour voir les classes disponibles.
+                            </p>
+                          ) : availableClasses.length > 0 ? (
                             <div className="grid gap-2 max-h-40 overflow-y-auto">
                               {availableClasses.map((cls) => (
                                 <button
@@ -673,16 +695,16 @@ export default function AuthPage() {
                             </div>
                           ) : (
                             <p className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3">
-                              Entrez un code école valide pour voir les classes disponibles.
+                              Aucune classe disponible dans cette école.
                             </p>
                           )}
                         </div>
                       )}
 
                       {/* Teacher: Class selection (multi) */}
-                      {joinRole === 'TEACHER' && availableClasses.length > 0 && (
+                      {joinRole === 'TEACHER' && codeVerified && availableClasses.length > 0 && (
                         <div className="space-y-2 animate-fade-in">
-                          <Label>Classes enseignées</Label>
+                          <Label>Classes enseignées <span className="text-xs text-muted-foreground font-normal">(optionnel)</span></Label>
                           <div className="grid gap-2 max-h-40 overflow-y-auto">
                             {availableClasses.map((cls) => (
                               <button
@@ -772,10 +794,15 @@ export default function AuthPage() {
                         </div>
                       </div>
 
-                      <Button type="submit" className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-[1.02] active:scale-[0.97] transition-all duration-200 shadow-lg shadow-blue-500/25" size="lg" disabled={joinLoading}>
+                      <Button
+                        type="submit"
+                        className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-[1.02] active:scale-[0.97] transition-all duration-200 shadow-lg shadow-blue-500/25"
+                        size="lg"
+                        disabled={joinLoading}
+                      >
                         {joinLoading ? (
                           <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
                             Inscription...
                           </>
                         ) : (
