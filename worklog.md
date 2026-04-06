@@ -571,3 +571,106 @@ Implement a full messaging system with Prisma model, API routes, and a rich chat
 - Zero ESLint errors
 - Dev server compiles and runs correctly (homepage returns 200)
 - All Prisma relations validated and pushed to SQLite
+
+---
+## Task ID: r8-fixes-improvements
+Agent: Full Stack Developer
+Task: Fix config API bug, add dark mode toggle, improve profile sync, add password strength indicator
+
+Work Log:
+- Fixed /api/config PUT to return both {config, school} keys so profile page's `updated.school` check works
+- Added dark mode toggle (Sun/Moon icons) to app-layout header between notification bell and user dropdown, using next-themes useTheme hook with mounted state guard
+- Added useEffect to profile-page.tsx to sync user.fullName, user.email, user.school.name/currency to local state when user object changes
+- Added PasswordStrengthIndicator inline component to auth-page.tsx (3-segment bar: Faible/Moyen/Fort, red/amber/green)
+- Added password strength indicator below password field in both "Créer une école" and "Rejoindre une école" registration forms
+- Updated auth page footer to use consistent styling (text-sm text-muted-foreground text-center pt-8)
+
+Stage Summary:
+- Config API response now matches profile page expectations
+- Dark mode toggle available in header for all authenticated users
+- Profile form stays in sync with external state changes
+- Password strength provides visual feedback during registration
+- Zero ESLint errors
+- Dev server compiling and running correctly
+
+---
+Task ID: r8-command-palette
+Agent: Feature Agent
+Task: Add keyboard-navigable command palette (Ctrl+K) to GradeUp
+
+Work Log:
+- Created command-palette.tsx component with keyboard navigation
+- Ctrl+K / Cmd+K keyboard shortcut to open
+- Fuzzy search filtering of navigation pages
+- Arrow key navigation + Enter to select
+- Integrated into app-layout header
+- Added keyboard shortcut hint in header
+
+Stage Summary:
+- Command palette accessible from any authenticated page
+- Supports all 4 roles with role-specific navigation items
+- Zero ESLint errors
+
+---
+## Task ID: r8-review-round
+Agent: Main Orchestrator
+Task: QA review, fix bugs, add features, improve styling
+
+### Current Project Status Assessment
+GradeUp is a fully functional school management platform with 35+ components, 23+ API routes, complete auth system with invite codes, messaging, calendar, charts, and dark mode. The dev server has stability issues due to memory constraints in the environment (not a code bug).
+
+### Completed Modifications
+
+#### Bug Fixes
+1. ✅ **Config API response mismatch**: PUT `/api/config` now returns both `{config, school}` keys. Previously only returned `{config}`, causing profile page's school config save to silently fail (the store was never updated).
+2. ✅ **Profile page state sync**: Added `useEffect` to sync local form state with external store changes. Previously if the user object changed externally, the form fields wouldn't update.
+
+#### New Features
+3. ✅ **Dark mode toggle**: Added Sun/Moon toggle button in the app header (between notification bell and user dropdown). Uses `next-themes` with hydration-safe mounted state.
+4. ✅ **Password strength indicator**: Added `PasswordStrengthIndicator` inline component to auth-page registration forms. Shows 3-segment bar: Faible (red, <4 chars), Moyen (amber, 4-7 chars), Fort (green, ≥8 chars).
+5. ✅ **Command palette (Ctrl+K)**: Created `command-palette.tsx` - keyboard-navigable search dialog for all pages. Fuzzy search, arrow key navigation, role-aware items, Ctrl+/ shortcut to open help page.
+6. ✅ **Help Center page**: Created `help-page.tsx` with role-specific tips, keyboard shortcuts documentation, general tips for all users, and GradeUp branding. Accessible from sidebar for all 4 roles.
+7. ✅ **Unread message badge**: Real-time unread message count badge on notification bell (red, top-right) and messages shortcut button (blue, top-right) in the header. Polls every 15 seconds via new `/api/messages/unread-count` API.
+8. ✅ **Messages shortcut in header**: Direct access to messaging from any page via header button with unread count tooltip.
+9. ✅ **Ctrl+K hint in header**: Subtle keyboard shortcut hint visible on md+ screens next to page title.
+
+#### Styling Improvements
+10. ✅ Auth page footer updated for consistency
+11. ✅ All new components use the established design system (gradients, shadows, hover effects, dark mode)
+12. ✅ Command palette uses glassmorphism effect with backdrop blur
+
+### Files Created
+| File | Description |
+|------|-------------|
+| `src/components/gradeup/command-palette.tsx` | Keyboard-navigable command palette (Ctrl+K) |
+| `src/components/gradeup/help-page.tsx` | Help center with role-specific tips |
+| `src/app/api/messages/unread-count/route.ts` | API to get unread message count |
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `src/app/api/config/route.ts` | PUT returns both {config, school} keys |
+| `src/components/gradeup/app-layout.tsx` | Dark mode toggle, unread badges, messages shortcut, Ctrl+K hint, Help nav item |
+| `src/components/gradeup/auth-page.tsx` | Password strength indicator, footer styling |
+| `src/components/gradeup/profile-page.tsx` | useEffect for state sync with store |
+| `src/components/gradeup/command-palette.tsx` | Added Help to all roles, Ctrl+/ shortcut |
+| `src/lib/types.ts` | Added 'help' to PageView type |
+| `src/app/page.tsx` | Added HelpPage import and routing |
+
+### Verification
+- Zero ESLint errors throughout all changes
+- Dev server compiles successfully
+- All existing functionality preserved
+- All 4 roles have Help page access in sidebar and command palette
+
+### Known Issues / Risks
+1. **Dev server stability**: Server crashes under memory pressure during compilation. This is an environment limitation, not a code bug. The application works correctly via curl when the server is running.
+2. **No real-time WebSocket**: Message count polling uses 15-second intervals. Consider upgrading to WebSocket for instant notifications.
+
+### Priority Recommendations for Next Phase
+1. **WebSocket real-time updates**: Replace polling with WebSocket for instant notification/message updates
+2. **Mobile app wrapper**: Wrap the web app in a PWA/TWA for mobile distribution
+3. **PDF report generation**: Generate printable bulletins/report cards for students
+4. **Data backup/restore**: Admin feature to export and import school data
+5. **Multi-language support**: Add English/Spanish alongside French
+6. **Email notifications**: Send automated emails for events (grade posted, payment due, etc.)

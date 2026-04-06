@@ -83,7 +83,7 @@ export async function PUT(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ config: school });
+    return NextResponse.json({ config: school, school });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -51,6 +51,17 @@ export default function ProfilePage() {
   const [schoolName, setSchoolName] = useState(user?.school?.name || '');
   const [currency, setCurrency] = useState(user?.school?.currency || '');
   const [savingConfig, setSavingConfig] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setName(user.fullName);
+      setEmail(user.email);
+      if (user.school) {
+        setSchoolName(user.school.name);
+        setCurrency(user.school.currency);
+      }
+    }
+  }, [user]);
 
   if (!user) return null;
 

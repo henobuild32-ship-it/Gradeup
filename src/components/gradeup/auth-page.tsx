@@ -47,6 +47,34 @@ const roleIcons: Record<string, React.ElementType> = {
   PARENT: Users,
 };
 
+function PasswordStrengthIndicator({ password }: { password: string }) {
+  if (!password) return null;
+
+  const strength = password.length < 4 ? 1 : password.length < 8 ? 2 : 3;
+  const labels = ['Faible', 'Moyen', 'Fort'];
+  const colors = ['bg-red-500', 'bg-amber-500', 'bg-emerald-500'];
+  const textColors = ['text-red-500', 'text-amber-500', 'text-emerald-500'];
+  const emptyColors = ['bg-red-100 dark:bg-red-950/50', 'bg-amber-100 dark:bg-amber-950/50', 'bg-emerald-100 dark:bg-emerald-950/50'];
+
+  return (
+    <div className="space-y-1.5 animate-fade-in">
+      <div className="flex gap-1.5">
+        {[1, 2, 3].map((level) => (
+          <div
+            key={level}
+            className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
+              level <= strength ? colors[strength - 1] : emptyColors[strength - 1]
+            }`}
+          />
+        ))}
+      </div>
+      <p className={`text-xs font-medium ${textColors[strength - 1]}`}>
+        {labels[strength - 1]}
+      </p>
+    </div>
+  );
+}
+
 export default function AuthPage() {
   const { setUser, setCurrentPage, user } = useAppStore();
   const { toast } = useToast();
@@ -539,6 +567,7 @@ export default function AuthPage() {
                             {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
                         </div>
+                        <PasswordStrengthIndicator password={regPassword} />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="create-confirm">Confirmer le mot de passe</Label>
@@ -771,6 +800,7 @@ export default function AuthPage() {
                             {showJoinPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
                         </div>
+                        <PasswordStrengthIndicator password={joinPassword} />
                       </div>
 
                       <div className="space-y-2">
@@ -825,7 +855,7 @@ export default function AuthPage() {
             </CardContent>
           </Card>
 
-          <p className="text-center text-xs text-muted-foreground mt-6">
+          <p className="text-sm text-muted-foreground text-center pt-8">
             © GradeUp – Créé par Axions Labs
           </p>
         </div>

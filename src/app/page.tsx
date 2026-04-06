@@ -35,6 +35,7 @@ import ProfilePage from '@/components/gradeup/profile-page';
 import MessageCenter from '@/components/gradeup/message-center';
 import ChatPage from '@/components/gradeup/chat-page';
 import SchoolCalendar from '@/components/gradeup/school-calendar';
+import HelpPage from '@/components/gradeup/help-page';
 
 function PageRouter({ page }: { page: PageView }) {
   if (page === 'auth' || page === 'register') return <AuthPage />;
@@ -67,6 +68,7 @@ function PageRouter({ page }: { page: PageView }) {
   if (page === 'profile') return <ProfilePage />;
   if (page === 'messages') return <ChatPage />;
   if (page === 'calendar') return <SchoolCalendar />;
+  if (page === 'help') return <HelpPage />;
   return <AuthPage />;
 }
 

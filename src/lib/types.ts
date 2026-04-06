@@ -169,7 +169,8 @@ export type PageView =
   | 'parent-notifications'
   | 'profile'
   | 'messages'
-  | 'calendar';
+  | 'calendar'
+  | 'help';
 
 export interface ChatMessage {
   id: string;

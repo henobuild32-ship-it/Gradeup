@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import type { PageView, UserRole } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -38,6 +38,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { useTheme } from 'next-themes';
+import CommandPalette from './command-palette';
 import {
   LayoutDashboard,
   Users,
@@ -59,6 +61,9 @@ import {
   CalendarDays,
   ChevronDown,
   School,
+  Sun,
+  Moon,
+  Lightbulb,
 } from 'lucide-react';
 
 interface NavItem {
@@ -80,6 +85,7 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Messagerie', page: 'messages', icon: MessageSquare, emoji: '💬' },
     { label: 'Calendrier', page: 'calendar', icon: CalendarDays, emoji: '📆' },
     { label: 'Profil', page: 'profile', icon: User, emoji: '👤' },
+    { label: 'Aide', page: 'help', icon: Lightbulb, emoji: '💡' },
   ],
   TEACHER: [
     { label: 'Tableau de bord', page: 'teacher-dashboard', icon: LayoutDashboard, emoji: '📊' },
@@ -92,6 +98,7 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Messagerie', page: 'messages', icon: MessageSquare, emoji: '💬' },
     { label: 'Calendrier', page: 'calendar', icon: CalendarDays, emoji: '📆' },
     { label: 'Profil', page: 'profile', icon: User, emoji: '👤' },
+    { label: 'Aide', page: 'help', icon: Lightbulb, emoji: '💡' },
   ],
   STUDENT: [
     { label: 'Tableau de bord', page: 'student-dashboard', icon: LayoutDashboard, emoji: '📊' },
@@ -105,6 +112,7 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Messagerie', page: 'messages', icon: MessageSquare, emoji: '💬' },
     { label: 'Calendrier', page: 'calendar', icon: CalendarDays, emoji: '📆' },
     { label: 'Profil', page: 'profile', icon: User, emoji: '👤' },
+    { label: 'Aide', page: 'help', icon: Lightbulb, emoji: '💡' },
   ],
   PARENT: [
     { label: 'Tableau de bord', page: 'parent-dashboard', icon: LayoutDashboard, emoji: '📊' },
@@ -113,6 +121,7 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Notifications', page: 'parent-notifications', icon: Bell, emoji: '🔔' },
     { label: 'Messagerie', page: 'messages', icon: MessageSquare, emoji: '💬' },
     { label: 'Profil', page: 'profile', icon: User, emoji: '👤' },
+    { label: 'Aide', page: 'help', icon: Lightbulb, emoji: '💡' },
   ],
 };
 
@@ -162,6 +171,7 @@ const pageTitles: Record<PageView, string> = {
   'profile': 'Profil',
   'messages': 'Messagerie',
   'calendar': 'Calendrier',
+  'help': 'Centre d\'aide',
 };
 
 interface AppLayoutProps {
@@ -333,7 +343,34 @@ function SidebarContent({
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const { user, currentPage, setCurrentPage, sidebarOpen, setSidebarOpen, setUser } = useAppStore();
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setMounted(true), 0);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Fetch unread message count
+  useEffect(() => {
+    if (!user) return;
+    const fetchUnread = async () => {
+      try {
+        const res = await fetch(`/api/messages/unread-count?userId=${user.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          setUnreadMessages(data.unreadMessages || 0);
+        }
+      } catch {
+        // silently ignore
+      }
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 15000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   if (!user) return null;
 
@@ -434,6 +471,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 {pageTitles[currentPage] || 'Tableau de bord'}
                 <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full" />
               </h2>
+              <kbd className="hidden md:inline-flex items-center gap-1 px-2 py-1 text-[10px] font-mono text-muted-foreground bg-muted rounded-md border border-border">
+                Ctrl K
+              </kbd>
             </div>
           </div>
 
@@ -451,11 +491,54 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   }}
                 >
                   <Bell className="w-4 h-4" />
-                  {/* Pulsing notification dot */}
-                  <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 animate-pulse-ring text-red-500" />
+                  {/* Unread message badge */}
+                  {unreadMessages > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white px-1 animate-scale-in">
+                      {unreadMessages > 99 ? '99+' : unreadMessages}
+                    </span>
+                  )}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Notifications</TooltipContent>
+            </Tooltip>
+
+            {/* Messages shortcut with unread badge */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="relative hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition-all duration-200 active:scale-[0.97]"
+                  onClick={() => handleNavigate('messages')}
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  {unreadMessages > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white px-1 animate-scale-in">
+                      {unreadMessages > 99 ? '99+' : unreadMessages}
+                    </span>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Messagerie{unreadMessages > 0 ? ` (${unreadMessages})` : ''}</TooltipContent>
+            </Tooltip>
+
+            {/* Dark mode toggle */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                {mounted ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 dark:hover:text-yellow-400 transition-all duration-200 active:scale-[0.97]"
+                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                  >
+                    {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                  </Button>
+                ) : (
+                  <div className="w-8 h-8" />
+                )}
+              </TooltipTrigger>
+              <TooltipContent>{theme === 'dark' ? 'Mode clair' : 'Mode sombre'}</TooltipContent>
             </Tooltip>
 
             {/* User dropdown menu */}
@@ -524,6 +607,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </div>
         </footer>
       </div>
+
+      {/* Command Palette */}
+      <CommandPalette />
 
       {/* Logout confirmation dialog */}
       <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
