@@ -50,6 +50,10 @@ import {
   Users,
   GraduationCap,
   UserCheck,
+  Shield,
+  UserCog,
+  UsersRound,
+  UserPlus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -74,10 +78,24 @@ const roleLabels: Record<string, string> = {
 };
 
 const roleColors: Record<string, string> = {
-  ADMIN: 'bg-red-100 text-red-700',
-  TEACHER: 'bg-green-100 text-green-700',
-  STUDENT: 'bg-blue-100 text-blue-700',
-  PARENT: 'bg-purple-100 text-purple-700',
+  ADMIN: 'bg-blue-100 text-blue-700 border-blue-200',
+  TEACHER: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  STUDENT: 'bg-purple-100 text-purple-700 border-purple-200',
+  PARENT: 'bg-orange-100 text-orange-700 border-orange-200',
+};
+
+const roleAvatarColors: Record<string, string> = {
+  ADMIN: 'bg-blue-500',
+  TEACHER: 'bg-emerald-500',
+  STUDENT: 'bg-purple-500',
+  PARENT: 'bg-orange-500',
+};
+
+const roleIcons: Record<string, typeof Users> = {
+  ADMIN: Shield,
+  TEACHER: GraduationCap,
+  STUDENT: UserCheck,
+  PARENT: UsersRound,
 };
 
 export default function AdminUsers() {
@@ -251,41 +269,57 @@ export default function AdminUsers() {
     u.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  const getCountByRole = (role: string) => {
+    if (role === 'ALL') return users.length;
+    return users.filter(u => u.role === role).length;
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestion des utilisateurs</h1>
-          <p className="text-muted-foreground">Gérez les élèves, professeurs et parents</p>
+    <div className="space-y-6 animate-fade-in">
+      {/* Page Header */}
+      <div className="mb-6 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Gestion des utilisateurs</h1>
+            <p className="text-sm text-muted-foreground mt-1">Gérez les élèves, professeurs et parents</p>
+          </div>
+          <Button onClick={openCreateDialog} className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-lg shadow-blue-500/20">
+            <UserPlus className="h-4 w-4 mr-2" />
+            Ajouter
+          </Button>
         </div>
-        <Button onClick={openCreateDialog} className="bg-blue-600 hover:bg-blue-700">
-          <Plus className="h-4 w-4 mr-2" />
-          Ajouter
-        </Button>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="ALL">
-            <Users className="h-4 w-4 mr-1" />
+          <TabsTrigger value="ALL" className="gap-1.5">
+            <Users className="h-4 w-4" />
             Tous
+            <Badge variant="secondary" className="ml-1 text-xs bg-blue-100 text-blue-700 h-5 min-w-[20px] px-1.5">{getCountByRole('ALL')}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="STUDENT">
-            <UserCheck className="h-4 w-4 mr-1" />
+          <TabsTrigger value="STUDENT" className="gap-1.5">
+            <UserCheck className="h-4 w-4" />
             Élèves
+            <Badge variant="secondary" className="ml-1 text-xs bg-purple-100 text-purple-700 h-5 min-w-[20px] px-1.5">{getCountByRole('STUDENT')}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="TEACHER">
-            <GraduationCap className="h-4 w-4 mr-1" />
+          <TabsTrigger value="TEACHER" className="gap-1.5">
+            <GraduationCap className="h-4 w-4" />
             Professeurs
+            <Badge variant="secondary" className="ml-1 text-xs bg-emerald-100 text-emerald-700 h-5 min-w-[20px] px-1.5">{getCountByRole('TEACHER')}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="PARENT">
-            <Users className="h-4 w-4 mr-1" />
+          <TabsTrigger value="PARENT" className="gap-1.5">
+            <UsersRound className="h-4 w-4" />
             Parents
+            <Badge variant="secondary" className="ml-1 text-xs bg-orange-100 text-orange-700 h-5 min-w-[20px] px-1.5">{getCountByRole('PARENT')}</Badge>
           </TabsTrigger>
         </TabsList>
       </Tabs>
 
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader className="pb-3">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
@@ -294,7 +328,7 @@ export default function AdminUsers() {
                 placeholder="Rechercher un utilisateur..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-10 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
               />
             </div>
           </div>
@@ -307,29 +341,43 @@ export default function AdminUsers() {
               ))}
             </div>
           ) : filteredUsers.length === 0 ? (
-            <div className="text-center py-8">
-              <Users className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-              <p className="text-muted-foreground">Aucun utilisateur trouvé</p>
+            <div className="text-center py-16">
+              <div className="mx-auto w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                <Users className="h-10 w-10 text-muted-foreground/60" />
+              </div>
+              <h3 className="text-lg font-semibold mb-1">Aucun utilisateur trouvé</h3>
+              <p className="text-muted-foreground mb-4">Essayez de modifier votre recherche ou ajoutez un nouvel utilisateur</p>
+              <Button onClick={openCreateDialog} variant="outline" className="hover:scale-[1.02] active:scale-[0.98] transition-all">
+                <UserPlus className="h-4 w-4 mr-2" />
+                Ajouter un utilisateur
+              </Button>
             </div>
           ) : (
             <ScrollArea className="max-h-[500px]">
-              <Table>
+              <Table className="text-sm">
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Nom</TableHead>
+                  <TableRow className="bg-muted/30 hover:bg-muted/30">
+                    <TableHead>Utilisateur</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Rôle</TableHead>
                     <TableHead>Classe</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
+                <TableBody className="[&>tr:nth-child(even)]:bg-muted/30">
                   {filteredUsers.map((u) => (
-                    <TableRow key={u.id}>
-                      <TableCell className="font-medium">{u.fullName}</TableCell>
+                    <TableRow key={u.id} className="hover:bg-blue-50/50 dark:hover:bg-blue-950/20 transition-colors">
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className={`w-9 h-9 rounded-full ${roleAvatarColors[u.role] || 'bg-gray-500'} flex items-center justify-center text-white text-xs font-bold shadow-sm`}>
+                            {getInitials(u.fullName)}
+                          </div>
+                          <span className="font-medium">{u.fullName}</span>
+                        </div>
+                      </TableCell>
                       <TableCell className="text-muted-foreground">{u.email || '—'}</TableCell>
                       <TableCell>
-                        <Badge className={roleColors[u.role] || ''} variant="secondary">
+                        <Badge variant="outline" className={roleColors[u.role] || ''}>
                           {roleLabels[u.role] || u.role}
                         </Badge>
                       </TableCell>
@@ -339,10 +387,11 @@ export default function AdminUsers() {
                           : '—'}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-end gap-1">
                           <Button
                             variant="ghost"
                             size="icon"
+                            className="h-8 w-8 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                             onClick={() => openEditDialog(u)}
                           >
                             <Pencil className="h-4 w-4" />
@@ -350,12 +399,13 @@ export default function AdminUsers() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            className="h-8 w-8 hover:bg-red-50 hover:text-red-600 transition-colors"
                             onClick={() => {
                               setDeletingUser(u);
                               setDeleteDialogOpen(true);
                             }}
                           >
-                            <Trash2 className="h-4 w-4 text-red-500" />
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>
@@ -371,8 +421,10 @@ export default function AdminUsers() {
       {/* Create / Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>
+          <div className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-t-lg -mx-6 -mt-6 mb-0" />
+          <DialogHeader className="pt-2">
+            <DialogTitle className="flex items-center gap-2">
+              {editingUser ? <UserCog className="h-5 w-5 text-blue-600" /> : <UserPlus className="h-5 w-5 text-blue-600" />}
               {editingUser ? 'Modifier l\'utilisateur' : 'Ajouter un utilisateur'}
             </DialogTitle>
           </DialogHeader>
@@ -384,6 +436,7 @@ export default function AdminUsers() {
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
                 placeholder="Ex: Jean Dupont"
+                className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
               />
             </div>
             <div className="space-y-2">
@@ -394,6 +447,7 @@ export default function AdminUsers() {
                 value={formEmail}
                 onChange={(e) => setFormEmail(e.target.value)}
                 placeholder="jean@exemple.com"
+                className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
               />
             </div>
             <div className="space-y-2">
@@ -406,12 +460,13 @@ export default function AdminUsers() {
                 value={formPassword}
                 onChange={(e) => setFormPassword(e.target.value)}
                 placeholder="••••••••"
+                className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="form-role">Rôle *</Label>
               <Select value={formRole} onValueChange={setFormRole}>
-                <SelectTrigger id="form-role">
+                <SelectTrigger id="form-role" className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -426,7 +481,7 @@ export default function AdminUsers() {
                 <div className="space-y-2">
                   <Label htmlFor="form-class">Classe *</Label>
                   <Select value={formClassId} onValueChange={setFormClassId}>
-                    <SelectTrigger id="form-class">
+                    <SelectTrigger id="form-class" className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
                       <SelectValue placeholder="Sélectionner une classe" />
                     </SelectTrigger>
                     <SelectContent>
@@ -441,7 +496,7 @@ export default function AdminUsers() {
                 <div className="space-y-2">
                   <Label htmlFor="form-parent">Parent (optionnel)</Label>
                   <Select value={formParentId} onValueChange={setFormParentId}>
-                    <SelectTrigger id="form-parent">
+                    <SelectTrigger id="form-parent" className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
                       <SelectValue placeholder="Sélectionner un parent" />
                     </SelectTrigger>
                     <SelectContent>
@@ -457,13 +512,13 @@ export default function AdminUsers() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
+            <Button variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }} className="hover:scale-[1.02] active:scale-[0.98] transition-all">
               Annuler
             </Button>
             <Button
               onClick={handleSubmit}
               disabled={submitting}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:scale-[1.02] active:scale-[0.98] transition-transform"
             >
               {submitting ? 'Enregistrement...' : editingUser ? 'Modifier' : 'Créer'}
             </Button>
@@ -474,15 +529,19 @@ export default function AdminUsers() {
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+          <div className="bg-gradient-to-r from-red-500 to-rose-500 h-2 rounded-t-lg -mx-6 -mt-6 mb-0" />
+          <AlertDialogHeader className="pt-2">
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-red-500" />
+              Confirmer la suppression
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Êtes-vous sûr de vouloir supprimer {deletingUser?.fullName} ? Cette action est irréversible.
+              Êtes-vous sûr de vouloir supprimer <span className="font-semibold">{deletingUser?.fullName}</span> ? Cette action est irréversible.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+            <AlertDialogCancel className="hover:scale-[1.02] active:scale-[0.98] transition-all">Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 hover:scale-[1.02] active:scale-[0.98] transition-all">
               Supprimer
             </AlertDialogAction>
           </AlertDialogFooter>

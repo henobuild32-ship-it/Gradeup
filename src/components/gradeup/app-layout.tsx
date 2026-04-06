@@ -148,12 +148,13 @@ function SidebarContent({
 
   if (collapsed) {
     return (
-      <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground">
+      <div className="flex flex-col h-full bg-gradient-to-b from-sidebar via-sidebar to-sidebar/95 text-sidebar-foreground shadow-lg shadow-black/10">
         {/* Brand */}
-        <div className="flex items-center justify-center h-16 px-2">
-          <div className="w-9 h-9 rounded-lg bg-sidebar-primary flex items-center justify-center">
+        <div className="flex flex-col items-center justify-center h-16 px-2 gap-1.5">
+          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-sidebar-primary to-blue-400 flex items-center justify-center shadow-md shadow-blue-500/20">
             <GraduationCap className="w-5 h-5 text-sidebar-primary-foreground" />
           </div>
+          <div className="gradient-accent-line w-7" />
         </div>
 
         <Separator className="bg-sidebar-border" />
@@ -169,10 +170,10 @@ function SidebarContent({
                     <button
                       onClick={() => onNavigate(item.page)}
                       className={`
-                        flex items-center justify-center w-9 h-9 rounded-lg transition-colors
+                        flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200
                         ${isActive
-                          ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                          : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                          ? 'bg-gradient-to-br from-sidebar-primary/20 to-sidebar-primary/10 text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-primary/30'
+                          : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground hover:scale-105'
                         }
                       `}
                     >
@@ -196,7 +197,7 @@ function SidebarContent({
             <TooltipTrigger asChild>
               <button
                 onClick={onLogout}
-                className="flex items-center justify-center w-9 h-9 rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-destructive transition-colors"
+                className="flex items-center justify-center w-9 h-9 rounded-lg text-sidebar-foreground/70 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200 hover:scale-105"
               >
                 <LogOut className="w-4 h-4" />
               </button>
@@ -209,18 +210,21 @@ function SidebarContent({
   }
 
   return (
-    <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground">
+    <div className="flex flex-col h-full bg-gradient-to-b from-sidebar via-sidebar to-sidebar/95 text-sidebar-foreground shadow-lg shadow-black/10">
       {/* Brand */}
-      <div className="flex items-center gap-3 h-16 px-4 shrink-0">
-        <div className="w-9 h-9 rounded-lg bg-sidebar-primary flex items-center justify-center shrink-0">
-          <GraduationCap className="w-5 h-5 text-sidebar-primary-foreground" />
+      <div className="flex flex-col items-start gap-1.5 h-16 px-4 shrink-0 justify-center">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-sidebar-primary to-blue-400 flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20">
+            <GraduationCap className="w-5 h-5 text-sidebar-primary-foreground" />
+          </div>
+          <div className="flex flex-col min-w-0">
+            <span className="text-base font-bold tracking-tight text-sidebar-foreground">GradeUp</span>
+            <span className="text-[10px] text-sidebar-foreground/50 truncate">
+              {user.role === 'ADMIN' ? 'Administration' : roleLabels[user.role]}
+            </span>
+          </div>
         </div>
-        <div className="flex flex-col min-w-0">
-          <span className="text-base font-bold tracking-tight text-sidebar-foreground">GradeUp</span>
-          <span className="text-[10px] text-sidebar-foreground/50 truncate">
-            {user.role === 'ADMIN' ? 'Administration' : roleLabels[user.role]}
-          </span>
-        </div>
+        <div className="gradient-accent-line w-full" />
       </div>
 
       <Separator className="bg-sidebar-border" />
@@ -235,9 +239,9 @@ function SidebarContent({
                 key={item.page}
                 onClick={() => onNavigate(item.page)}
                 className={`
-                  flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
+                  flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200
                   ${isActive
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm'
+                    ? 'bg-gradient-to-r from-sidebar-primary/20 to-sidebar-primary/10 text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-primary/20'
                     : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
                   }
                 `}
@@ -254,8 +258,8 @@ function SidebarContent({
 
       {/* User info */}
       <div className="p-3 shrink-0">
-        <div className="flex items-center gap-3 p-2 rounded-lg bg-sidebar-accent/30">
-          <Avatar className="h-8 w-8 shrink-0">
+        <div className="flex items-center gap-3 p-2 rounded-lg bg-sidebar-accent/30 transition-all duration-200 hover:bg-sidebar-accent/40">
+          <Avatar className="h-8 w-8 shrink-0 ring-2 ring-sidebar-primary/30">
             {user.photoUrl && <AvatarImage src={user.photoUrl} alt={user.fullName} />}
             <AvatarFallback className="text-xs bg-sidebar-primary text-sidebar-primary-foreground">
               {initials}
@@ -269,7 +273,7 @@ function SidebarContent({
         <Button
           variant="ghost"
           size="sm"
-          className="w-full mt-2 text-sidebar-foreground/70 hover:text-destructive hover:bg-sidebar-accent/50 justify-start gap-2"
+          className="w-full mt-2 text-sidebar-foreground/70 hover:text-red-400 hover:bg-red-500/10 justify-start gap-2 transition-all duration-200"
           onClick={onLogout}
         >
           <LogOut className="w-4 h-4" />
@@ -332,14 +336,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Top Header */}
-        <header className="h-14 border-b bg-card shrink-0 flex items-center justify-between px-4 lg:px-6">
+        {/* Top Header with backdrop blur */}
+        <header className="h-14 border-b bg-card/80 backdrop-blur-xl shrink-0 flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30">
           <div className="flex items-center gap-3">
             {/* Mobile hamburger */}
             <Button
               variant="ghost"
               size="icon"
-              className="lg:hidden"
+              className="lg:hidden hover:bg-blue-50 hover:text-blue-600 transition-colors"
               onClick={() => setSidebarOpen(true)}
             >
               <Menu className="w-5 h-5" />
@@ -351,10 +355,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="hidden lg:flex"
+                  className="hidden lg:flex hover:bg-blue-50 hover:text-blue-600 transition-colors"
                   onClick={() => setSidebarOpen(!sidebarOpen)}
                 >
-                  <ChevronLeft className={`w-4 h-4 transition-transform ${!sidebarOpen ? 'rotate-180' : ''}`} />
+                  <ChevronLeft className={`w-4 h-4 transition-transform duration-300 ${!sidebarOpen ? 'rotate-180' : ''}`} />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="right">
@@ -374,7 +378,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="relative"
+                  className="relative hover:bg-blue-50 hover:text-blue-600 transition-colors"
                   onClick={() => {
                     const notifPage = `${user.role.toLowerCase()}-notifications` as PageView;
                     setCurrentPage(notifPage);
@@ -387,7 +391,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             </Tooltip>
 
             {/* User avatar */}
-            <Avatar className="h-8 w-8">
+            <Avatar className="h-8 w-8 ring-2 ring-blue-100 transition-all duration-200 hover:ring-blue-300">
               {user.photoUrl && <AvatarImage src={user.photoUrl} alt={user.fullName} />}
               <AvatarFallback className="text-xs bg-primary text-primary-foreground">
                 {user.fullName
@@ -401,18 +405,22 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </div>
         </header>
 
-        {/* Content */}
+        {/* Content with fade-in animation */}
         <main className="flex-1 overflow-y-auto">
-          <div className="p-4 lg:p-6">
+          <div className="p-4 lg:p-6 animate-fade-in" key={currentPage}>
             {children}
           </div>
         </main>
 
-        {/* Footer */}
-        <footer className="border-t py-3 px-4 lg:px-6 shrink-0">
-          <p className="text-xs text-muted-foreground text-center">
-            © GradeUp – Créé par Axions Labs
-          </p>
+        {/* Footer with gradient divider */}
+        <footer className="shrink-0 relative">
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-300 to-transparent" />
+          <div className="py-3 px-4 lg:px-6">
+            <p className="text-xs text-muted-foreground text-center">
+              © GradeUp – Créé par{' '}
+              <span className="font-medium text-blue-600">Axions Labs</span>
+            </p>
+          </div>
         </footer>
       </div>
     </div>

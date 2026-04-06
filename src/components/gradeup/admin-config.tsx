@@ -86,10 +86,11 @@ export default function AdminConfig() {
   const currentCurrency = currencies.find((c) => c.value === selectedCurrency);
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Configuration</h1>
-        <p className="text-muted-foreground">Paramètres globaux de votre école</p>
+    <div className="space-y-6 max-w-2xl animate-fade-in">
+      {/* Page Header */}
+      <div className="mb-6 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 p-6">
+        <h1 className="text-2xl font-bold">Configuration</h1>
+        <p className="text-sm text-muted-foreground mt-1">Paramètres globaux de votre école</p>
       </div>
 
       {loading ? (
@@ -100,7 +101,7 @@ export default function AdminConfig() {
       ) : (
         <>
           {/* School Info */}
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <School className="h-5 w-5 text-blue-600" />
@@ -109,25 +110,31 @@ export default function AdminConfig() {
               <CardDescription>Informations enregistrées lors de l&apos;inscription</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                <School className="h-5 w-5 text-muted-foreground" />
+              <div className="flex items-center gap-3 p-3.5 rounded-lg bg-blue-50/50 border border-blue-100/50">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100">
+                  <School className="h-5 w-5 text-blue-600" />
+                </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Nom de l&apos;école</p>
-                  <p className="font-medium">{config?.name || user?.school?.name || '—'}</p>
+                  <p className="font-semibold">{config?.name || user?.school?.name || '—'}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                <Mail className="h-5 w-5 text-muted-foreground" />
+              <div className="flex items-center gap-3 p-3.5 rounded-lg bg-blue-50/50 border border-blue-100/50">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100">
+                  <Mail className="h-5 w-5 text-blue-600" />
+                </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Email de l&apos;école</p>
-                  <p className="font-medium">{config?.email || user?.school?.email || '—'}</p>
+                  <p className="font-semibold">{config?.email || user?.school?.email || '—'}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                <Settings className="h-5 w-5 text-muted-foreground" />
+              <div className="flex items-center gap-3 p-3.5 rounded-lg bg-blue-50/50 border border-blue-100/50">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100">
+                  <Settings className="h-5 w-5 text-blue-600" />
+                </div>
                 <div>
                   <p className="text-xs text-muted-foreground">École créée le</p>
-                  <p className="font-medium">
+                  <p className="font-semibold">
                     {config?.createdAt
                       ? new Date(config.createdAt).toLocaleDateString('fr-FR', {
                           year: 'numeric',
@@ -142,7 +149,7 @@ export default function AdminConfig() {
           </Card>
 
           {/* Currency Configuration */}
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Globe className="h-5 w-5 text-blue-600" />
@@ -162,9 +169,9 @@ export default function AdminConfig() {
                   <Label
                     key={currency.value}
                     htmlFor={`currency-${currency.value}`}
-                    className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                    className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all hover:shadow-sm ${
                       selectedCurrency === currency.value
-                        ? 'border-blue-500 bg-blue-50'
+                        ? 'border-blue-500 bg-blue-50 shadow-blue-500/10 shadow-sm'
                         : 'border-muted hover:border-muted-foreground/30'
                     }`}
                   >
@@ -178,7 +185,7 @@ export default function AdminConfig() {
                         Symbole : {currency.symbol}
                       </p>
                     </div>
-                    <span className="text-2xl font-bold text-muted-foreground/50">
+                    <span className="text-2xl font-bold text-muted-foreground/40">
                       {currency.symbol}
                     </span>
                   </Label>
@@ -187,7 +194,7 @@ export default function AdminConfig() {
 
               <Separator />
 
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-50 border border-blue-100">
+              <div className="flex items-center gap-2 p-3.5 rounded-lg bg-blue-50 border border-blue-100">
                 <Info className="h-4 w-4 text-blue-600 shrink-0" />
                 <p className="text-sm text-blue-700">
                   Cette devise sera appliquée à toute la plateforme et affectera l&apos;affichage
@@ -198,7 +205,7 @@ export default function AdminConfig() {
               <Button
                 onClick={handleSave}
                 disabled={saving || selectedCurrency === config?.currency}
-                className="w-full bg-blue-600 hover:bg-blue-700"
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-blue-500/20"
               >
                 {saving ? (
                   <>

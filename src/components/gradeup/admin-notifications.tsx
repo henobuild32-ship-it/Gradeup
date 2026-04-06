@@ -32,6 +32,9 @@ import {
   UserCheck,
   Globe,
   MessageSquare,
+  BellRing,
+  CheckCheck,
+  Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -69,9 +72,17 @@ const targetIcons: Record<string, typeof Users> = {
 const targetColors: Record<string, string> = {
   ALL: 'bg-gray-100 text-gray-700 border-gray-200',
   STUDENT: 'bg-blue-100 text-blue-700 border-blue-200',
-  TEACHER: 'bg-green-100 text-green-700 border-green-200',
+  TEACHER: 'bg-emerald-100 text-emerald-700 border-emerald-200',
   PARENT: 'bg-purple-100 text-purple-700 border-purple-200',
   CLASS: 'bg-amber-100 text-amber-700 border-amber-200',
+};
+
+const targetBgColors: Record<string, string> = {
+  ALL: 'bg-gray-100 text-gray-600',
+  STUDENT: 'bg-blue-100 text-blue-600',
+  TEACHER: 'bg-emerald-100 text-emerald-600',
+  PARENT: 'bg-purple-100 text-purple-600',
+  CLASS: 'bg-amber-100 text-amber-600',
 };
 
 export default function AdminNotifications() {
@@ -82,7 +93,6 @@ export default function AdminNotifications() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Form state
   const [formTarget, setFormTarget] = useState('ALL');
   const [formClassId, setFormClassId] = useState('');
   const [formMessage, setFormMessage] = useState('');
@@ -158,23 +168,60 @@ export default function AdminNotifications() {
     }
   };
 
+  const formatRelativeTime = (dateStr: string) => {
+    const now = new Date();
+    const date = new Date(dateStr);
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    if (diffMins < 1) return "À l'instant";
+    if (diffMins < 60) return `Il y a ${diffMins} min`;
+    if (diffHours < 24) return `Il y a ${diffHours}h`;
+    if (diffDays < 7) return `Il y a ${diffDays}j`;
+    return new Date(dateStr).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  const handleMarkAllAsRead = async () => {
+    const unread = notifications.filter((n) => !n.read);
+    if (unread.length === 0) return;
+    try {
+      await Promise.all(unread.map((n) => fetch(`/api/notifications/${n.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ read: true }) })));
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      toast.success('Toutes les notifications ont été marquées comme lues');
+    } catch {
+      toast.error('Erreur lors du marquage');
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
-          <p className="text-muted-foreground">Envoyez et gérez les notifications de l&apos;école</p>
+    <div className="space-y-6 animate-fade-in">
+      {/* Page Header */}
+      <div className="mb-6 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Notifications</h1>
+            <p className="text-sm text-muted-foreground mt-1">Envoyez et gérez les notifications de l&apos;école</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {notifications.some((n) => !n.read) && (
+              <Button variant="outline" size="sm" onClick={handleMarkAllAsRead} className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:scale-[1.02] active:scale-[0.98] transition-transform gap-1.5">
+                <CheckCheck className="h-4 w-4" />Tout marquer comme lu
+              </Button>
+            )}
+            <Button onClick={() => { resetForm(); setDialogOpen(true); }} className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-lg shadow-blue-500/20">
+              <BellRing className="h-4 w-4 mr-2" />
+              Envoyer une notification
+            </Button>
+          </div>
         </div>
-        <Button onClick={() => { resetForm(); setDialogOpen(true); }} className="bg-blue-600 hover:bg-blue-700">
-          <Plus className="h-4 w-4 mr-2" />
-          Envoyer une notification
-        </Button>
       </div>
 
       {/* Send Notification Dialog */}
       <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader>
+          <div className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-t-lg -mx-6 -mt-6 mb-0" />
+          <DialogHeader className="pt-2">
             <DialogTitle className="flex items-center gap-2">
               <Send className="h-5 w-5 text-blue-600" />
               Envoyer une notification
@@ -184,7 +231,7 @@ export default function AdminNotifications() {
             <div className="space-y-2">
               <Label htmlFor="notif-target">Destinataire</Label>
               <Select value={formTarget} onValueChange={(v) => { setFormTarget(v); setFormClassId(''); }}>
-                <SelectTrigger id="notif-target">
+                <SelectTrigger id="notif-target" className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -201,7 +248,7 @@ export default function AdminNotifications() {
               <div className="space-y-2">
                 <Label htmlFor="notif-class">Classe</Label>
                 <Select value={formClassId} onValueChange={setFormClassId}>
-                  <SelectTrigger id="notif-class">
+                  <SelectTrigger id="notif-class" className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
                     <SelectValue placeholder="Sélectionner une classe" />
                   </SelectTrigger>
                   <SelectContent>
@@ -223,7 +270,7 @@ export default function AdminNotifications() {
                 onChange={(e) => setFormMessage(e.target.value)}
                 placeholder="Entrez votre message ici..."
                 rows={4}
-                className="resize-none"
+                className="resize-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
               />
               <p className="text-xs text-muted-foreground">
                 Ce message sera envoyé à {targetLabels[formTarget]?.toLowerCase() || 'tous'}.
@@ -231,13 +278,13 @@ export default function AdminNotifications() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
+            <Button variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }} className="hover:scale-[1.02] active:scale-[0.98] transition-all">
               Annuler
             </Button>
             <Button
               onClick={handleSubmit}
               disabled={submitting || !formMessage.trim()}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-[1.02] active:scale-[0.98] transition-all"
             >
               {submitting ? (
                 'Envoi en cours...'
@@ -253,7 +300,7 @@ export default function AdminNotifications() {
       </Dialog>
 
       {/* Notifications List */}
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <Bell className="h-5 w-5 text-blue-600" />
@@ -273,13 +320,15 @@ export default function AdminNotifications() {
               ))}
             </div>
           ) : notifications.length === 0 ? (
-            <div className="text-center py-12">
-              <MessageSquare className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+            <div className="text-center py-16">
+              <div className="mx-auto w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                <MessageSquare className="h-10 w-10 text-muted-foreground/50" />
+              </div>
               <h3 className="text-lg font-semibold mb-1">Aucune notification</h3>
               <p className="text-muted-foreground mb-4">
                 Envoyez votre première notification à la communauté scolaire
               </p>
-              <Button onClick={() => { resetForm(); setDialogOpen(true); }} variant="outline">
+              <Button onClick={() => { resetForm(); setDialogOpen(true); }} variant="outline" className="hover:scale-[1.02] active:scale-[0.98] transition-all">
                 <Plus className="h-4 w-4 mr-2" />
                 Envoyer une notification
               </Button>
@@ -292,11 +341,11 @@ export default function AdminNotifications() {
                   return (
                     <div
                       key={n.id}
-                      className="p-4 rounded-lg border hover:bg-muted/50 transition-colors"
+                      className="p-4 rounded-lg border hover:bg-muted/30 hover:shadow-sm transition-all"
                     >
                       <div className="flex items-start gap-3">
-                        <div className={`p-2 rounded-lg shrink-0 ${targetColors[n.targetRole]?.split(' ')[0] || 'bg-gray-100'}`}>
-                          <TargetIcon className={`h-4 w-4 ${targetColors[n.targetRole]?.split(' ')[1] || 'text-gray-600'}`} />
+                        <div className={`p-2.5 rounded-lg shrink-0 ${targetBgColors[n.targetRole] || 'bg-gray-100 text-gray-600'}`}>
+                          <TargetIcon className="h-4 w-4" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -313,17 +362,10 @@ export default function AdminNotifications() {
                             )}
                           </div>
                           <p className="text-sm whitespace-pre-wrap mb-2">{n.message}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {n.createdAt
-                              ? new Date(n.createdAt).toLocaleDateString('fr-FR', {
-                                  day: 'numeric',
-                                  month: 'long',
-                                  year: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })
-                              : ''}
-                          </p>
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {formatRelativeTime(n.createdAt)}
+                            </p>
                         </div>
                       </div>
                     </div>

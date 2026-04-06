@@ -7,28 +7,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  TrendingUp,
-  BookOpen,
-  Award,
-  BarChart3,
+  TrendingUp, BookOpen, Award, BarChart3,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -41,32 +28,15 @@ export default function ParentGrades() {
   const [loading, setLoading] = useState(true);
   const schoolId = user?.schoolId || '';
 
-  useEffect(() => {
-    fetchChildren();
-  }, [user]);
-
-  useEffect(() => {
-    if (selectedChildId && schoolId) {
-      fetchGrades();
-    }
-  }, [selectedChildId, trimester, schoolId]);
+  useEffect(() => { fetchChildren(); }, [user]);
+  useEffect(() => { if (selectedChildId && schoolId) { fetchGrades(); } }, [selectedChildId, trimester, schoolId]);
 
   const fetchChildren = async () => {
     if (!user?.id || !schoolId) return;
     try {
       const res = await fetch(`/api/users?schoolId=${schoolId}&role=STUDENT&parentId=${user.id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setChildren(data);
-        if (data.length > 0 && !selectedChildId) {
-          setSelectedChildId(data[0].id);
-        }
-      }
-    } catch {
-      toast.error('Erreur lors du chargement des enfants');
-    } finally {
-      setLoading(false);
-    }
+      if (res.ok) { const data = await res.json(); setChildren(data); if (data.length > 0 && !selectedChildId) { setSelectedChildId(data[0].id); } }
+    } catch { toast.error('Erreur lors du chargement des enfants'); } finally { setLoading(false); }
   };
 
   const fetchGrades = async () => {
@@ -74,19 +44,12 @@ export default function ParentGrades() {
     setLoading(true);
     try {
       const res = await fetch(`/api/grades?schoolId=${schoolId}&studentId=${selectedChildId}&trimester=${trimester}`);
-      if (res.ok) {
-        setGrades(await res.json());
-      }
-    } catch {
-      toast.error('Erreur lors du chargement des notes');
-    } finally {
-      setLoading(false);
-    }
+      if (res.ok) { setGrades(await res.json()); }
+    } catch { toast.error('Erreur lors du chargement des notes'); } finally { setLoading(false); }
   };
 
   const selectedChild = children.find(c => c.id === selectedChildId);
 
-  // Group grades by course
   const gradesByCourse = grades.reduce<Record<string, GradeInfo[]>>((acc, grade) => {
     const key = grade.courseId;
     if (!acc[key]) acc[key] = [];
@@ -94,14 +57,12 @@ export default function ParentGrades() {
     return acc;
   }, {});
 
-  // Calculate average per course
   const courseAverages = Object.entries(gradesByCourse).map(([courseId, courseGrades]) => {
     const avg = courseGrades.reduce((sum, g) => sum + (g.maxScore > 0 ? (g.score / g.maxScore) * 20 : 0), 0) / courseGrades.length;
     const courseName = courseGrades[0]?.course?.name || 'Cours inconnu';
     return { courseId, courseName, average: avg, grades: courseGrades };
   }).sort((a, b) => b.average - a.average);
 
-  // Overall average
   const overallAverage = grades.length > 0
     ? grades.reduce((sum, g) => sum + (g.maxScore > 0 ? (g.score / g.maxScore) * 20 : 0), 0) / grades.length
     : 0;
@@ -111,6 +72,13 @@ export default function ParentGrades() {
     if (pct >= 80) return 'text-emerald-600';
     if (pct >= 60) return 'text-amber-600';
     return 'text-red-600';
+  };
+
+  const getGradeBg = (score: number, max: number) => {
+    const normalized = max > 0 ? (score / max) * 20 : 0;
+    if (normalized >= 10) return 'bg-emerald-50 text-emerald-700';
+    if (normalized >= 7) return 'bg-amber-50 text-amber-700';
+    return 'bg-red-50 text-red-700';
   };
 
   const getProgressColor = (avg: number) => {
@@ -128,20 +96,16 @@ export default function ParentGrades() {
     return { label: 'Insuffisant', className: 'bg-red-100 text-red-700 border-red-200' };
   };
 
-  const trimesterLabels: Record<string, string> = {
-    '1': '1er Trimestre',
-    '2': '2ème Trimestre',
-    '3': '3ème Trimestre',
-  };
+  const trimesterLabels: Record<string, string> = { '1': '1er Trimestre', '2': '2ème Trimestre', '3': '3ème Trimestre' };
 
   if (!user) return null;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Notes</h1>
-        <p className="text-muted-foreground">Suivi des notes de vos enfants</p>
+    <div className="space-y-6 animate-fade-in">
+      {/* Page Header */}
+      <div className="mb-6 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 p-6">
+        <h1 className="text-2xl font-bold">Notes</h1>
+        <p className="text-sm text-muted-foreground mt-1">Suivi des notes de vos enfants</p>
       </div>
 
       {/* Controls */}
@@ -150,25 +114,15 @@ export default function ParentGrades() {
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground whitespace-nowrap">Enfant :</span>
             <Select value={selectedChildId} onValueChange={setSelectedChildId}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Sélectionner un enfant" />
-              </SelectTrigger>
-              <SelectContent>
-                {children.map(child => (
-                  <SelectItem key={child.id} value={child.id}>
-                    {child.fullName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
+              <SelectTrigger className="w-[200px] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"><SelectValue placeholder="Sélectionner un enfant" /></SelectTrigger>
+              <SelectContent>{children.map(child => <SelectItem key={child.id} value={child.id}>{child.fullName}</SelectItem>)}</SelectContent>
             </Select>
           </div>
         )}
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground whitespace-nowrap">Trimestre :</span>
           <Select value={trimester} onValueChange={setTrimester}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue />
-            </SelectTrigger>
+            <SelectTrigger className="w-[180px] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="1">1er Trimestre</SelectItem>
               <SelectItem value="2">2ème Trimestre</SelectItem>
@@ -179,46 +133,31 @@ export default function ParentGrades() {
       </div>
 
       {loading ? (
-        <div className="space-y-6">
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-64 w-full" />
-        </div>
+        <div className="space-y-6"><Skeleton className="h-32 w-full" /><Skeleton className="h-64 w-full" /></div>
       ) : grades.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12 gap-4">
-            <BarChart3 className="size-12 text-muted-foreground/40" />
-            <p className="text-muted-foreground text-center">Aucune note disponible pour ce trimestre</p>
-          </CardContent>
-        </Card>
+        <div className="text-center py-20">
+          <div className="mx-auto w-24 h-24 rounded-full bg-muted/50 flex items-center justify-center mb-4"><BarChart3 className="h-12 w-12 text-muted-foreground/50" /></div>
+          <p className="text-muted-foreground text-center">Aucune note disponible pour ce trimestre</p>
+        </div>
       ) : (
         <>
           {/* Overall Average */}
-          <Card className="border-blue-100 bg-gradient-to-r from-blue-50/50 to-white dark:from-blue-950/20 dark:to-background">
+          <Card className="border-blue-100 bg-gradient-to-r from-blue-50/50 to-white shadow-sm">
             <CardContent className="pt-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                    <TrendingUp className="size-4 text-blue-600" />
-                    Moyenne générale — {trimesterLabels[trimester]} — {selectedChild?.fullName}
+                    <TrendingUp className="size-4 text-blue-600" />Moyenne générale — {trimesterLabels[trimester]} — {selectedChild?.fullName}
                   </div>
                   <div className="flex items-baseline gap-3">
                     <span className="text-4xl font-bold">{overallAverage.toFixed(2)}</span>
                     <span className="text-muted-foreground text-lg">/20</span>
-                    {(() => {
-                      const badge = getAverageBadge(overallAverage);
-                      return <Badge variant="outline" className={badge.className}>{badge.label}</Badge>;
-                    })()}
+                    {(() => { const badge = getAverageBadge(overallAverage); return <Badge variant="outline" className={badge.className}>{badge.label}</Badge>; })()}
                   </div>
                 </div>
                 <div className="flex gap-4 text-sm text-muted-foreground">
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-foreground">{grades.length}</p>
-                    <p>Évaluations</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-foreground">{courseAverages.length}</p>
-                    <p>Matières</p>
-                  </div>
+                  <div className="text-center"><p className="text-2xl font-bold text-foreground">{grades.length}</p><p>Évaluations</p></div>
+                  <div className="text-center"><p className="text-2xl font-bold text-foreground">{courseAverages.length}</p><p>Matières</p></div>
                 </div>
               </div>
             </CardContent>
@@ -227,24 +166,14 @@ export default function ParentGrades() {
           {/* View Toggle */}
           <Tabs defaultValue="overview">
             <TabsList>
-              <TabsTrigger value="overview" className="gap-1.5">
-                <BarChart3 className="size-4" />
-                Vue d&apos;ensemble
-              </TabsTrigger>
-              <TabsTrigger value="details" className="gap-1.5">
-                <BookOpen className="size-4" />
-                Détails
-              </TabsTrigger>
+              <TabsTrigger value="overview" className="gap-1.5"><BarChart3 className="size-4" />Vue d&apos;ensemble</TabsTrigger>
+              <TabsTrigger value="details" className="gap-1.5"><BookOpen className="size-4" />Détails</TabsTrigger>
             </TabsList>
 
-            {/* Overview - Progress bars per subject */}
             <TabsContent value="overview">
-              <Card>
+              <Card className="shadow-sm">
                 <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Award className="size-5 text-blue-600" />
-                    Moyennes par matière
-                  </CardTitle>
+                  <CardTitle className="text-lg flex items-center gap-2"><Award className="size-5 text-blue-600" />Moyennes par matière</CardTitle>
                   <CardDescription>Performance par cours pour le {trimesterLabels[trimester].toLowerCase()}</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -260,19 +189,12 @@ export default function ParentGrades() {
                                 <span className="text-xs text-muted-foreground">({courseGrades.length} éval.)</span>
                               </div>
                               <div className="flex items-center gap-2 shrink-0">
-                                <span className={`text-sm font-bold ${average >= 10 ? 'text-emerald-600' : 'text-red-600'}`}>
-                                  {average.toFixed(1)}/20
-                                </span>
-                                <Badge variant="outline" className={`text-[10px] ${badge.className}`}>
-                                  {badge.label}
-                                </Badge>
+                                <span className={`text-sm font-bold ${average >= 10 ? 'text-emerald-600' : 'text-red-600'}`}>{average.toFixed(1)}/20</span>
+                                <Badge variant="outline" className={`text-[10px] ${badge.className}`}>{badge.label}</Badge>
                               </div>
                             </div>
                             <div className={`h-2.5 w-full rounded-full overflow-hidden bg-primary/10 ${getProgressColor(average)}`}>
-                              <div
-                                className="h-full rounded-full transition-all duration-500"
-                                style={{ width: `${Math.min(average * 5, 100)}%` }}
-                              />
+                              <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(average * 5, 100)}%` }} />
                             </div>
                           </div>
                         );
@@ -283,53 +205,43 @@ export default function ParentGrades() {
               </Card>
             </TabsContent>
 
-            {/* Details - Full table */}
             <TabsContent value="details">
-              <Card>
+              <Card className="shadow-sm">
                 <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <BookOpen className="size-5 text-blue-600" />
-                    Détail des évaluations
-                  </CardTitle>
+                  <CardTitle className="text-lg flex items-center gap-2"><BookOpen className="size-5 text-blue-600" />Détail des évaluations</CardTitle>
                   <CardDescription>Toutes les notes du {trimesterLabels[trimester].toLowerCase()}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="max-h-[500px]">
                     <Table>
                       <TableHeader>
-                        <TableRow>
-                          <TableHead>Cours</TableHead>
-                          <TableHead className="text-center">Note</TableHead>
-                          <TableHead className="text-center">Note max</TableHead>
-                          <TableHead className="text-center">Moyenne (/20)</TableHead>
-                          <TableHead className="hidden sm:table-cell">Commentaire</TableHead>
-                          <TableHead className="hidden md:table-cell">Date</TableHead>
-                        </TableRow>
+                        <TableRow className="bg-muted/30 hover:bg-muted/30"><TableHead>Cours</TableHead><TableHead className="text-center">Note</TableHead><TableHead className="text-center">Note max</TableHead><TableHead className="text-center">Moyenne (/20)</TableHead><TableHead className="hidden sm:table-cell">Commentaire</TableHead><TableHead className="hidden md:table-cell">Date</TableHead></TableRow>
                       </TableHeader>
                       <TableBody>
                         {[...grades].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map(grade => {
                           const normalizedScore = grade.maxScore > 0 ? (grade.score / grade.maxScore) * 20 : 0;
                           return (
-                            <TableRow key={grade.id}>
+                            <TableRow key={grade.id} className="even:bg-muted/20 hover:bg-blue-50/50 transition-colors">
                               <TableCell className="font-medium">{grade.course?.name || 'Cours'}</TableCell>
-                              <TableCell className={`text-center font-semibold ${getGradeColor(grade.score, grade.maxScore)}`}>
-                                {grade.score}
-                              </TableCell>
+                              <TableCell className={`text-center font-semibold ${getGradeColor(grade.score, grade.maxScore)}`}>{grade.score}</TableCell>
                               <TableCell className="text-center text-muted-foreground">{grade.maxScore}</TableCell>
                               <TableCell className="text-center">
-                                <span className={`font-semibold ${normalizedScore >= 10 ? 'text-emerald-600' : 'text-red-600'}`}>
-                                  {normalizedScore.toFixed(1)}
-                                </span>
+                                <span className={`inline-flex items-center justify-center rounded-lg px-2 py-0.5 text-sm font-bold shadow-sm ${getGradeBg(grade.score, grade.maxScore)}`}>{normalizedScore.toFixed(1)}</span>
                               </TableCell>
-                              <TableCell className="hidden sm:table-cell text-muted-foreground max-w-[200px] truncate">
-                                {grade.comment || '—'}
-                              </TableCell>
-                              <TableCell className="hidden md:table-cell text-muted-foreground text-xs">
-                                {new Date(grade.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
-                              </TableCell>
+                              <TableCell className="hidden sm:table-cell text-muted-foreground max-w-[200px] truncate">{grade.comment || '—'}</TableCell>
+                              <TableCell className="hidden md:table-cell text-muted-foreground text-xs">{new Date(grade.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</TableCell>
                             </TableRow>
                           );
                         })}
+                        {/* Average Row */}
+                        <TableRow className="bg-gradient-to-r from-blue-50 to-indigo-50 font-bold">
+                          <TableCell className="text-blue-700">Moyenne</TableCell>
+                          <TableCell colSpan={2}></TableCell>
+                          <TableCell className="text-center">
+                            <Badge className="bg-blue-100 text-blue-700 border-blue-200">{overallAverage.toFixed(2)}/20</Badge>
+                          </TableCell>
+                          <TableCell colSpan={2}></TableCell>
+                        </TableRow>
                       </TableBody>
                     </Table>
                   </ScrollArea>

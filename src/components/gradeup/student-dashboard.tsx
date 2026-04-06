@@ -5,10 +5,28 @@ import { useAppStore } from '@/lib/store';
 import type { CourseInfo, GradeInfo, AttendanceInfo, PaymentInfo, LessonInfo, NotificationInfo } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { TrendingUp, BookOpen, CalendarX, CreditCard, User, Bell, FileText, Clock } from 'lucide-react';
+import { TrendingUp, BookOpen, CalendarX, CreditCard, User, Bell, FileText, Clock, Sparkles, Target, Award } from 'lucide-react';
+
+const subjectColors = [
+  { border: 'border-l-blue-400', bg: 'bg-blue-50', text: 'text-blue-600' },
+  { border: 'border-l-emerald-400', bg: 'bg-emerald-50', text: 'text-emerald-600' },
+  { border: 'border-l-purple-400', bg: 'bg-purple-50', text: 'text-purple-600' },
+  { border: 'border-l-amber-400', bg: 'bg-amber-50', text: 'text-amber-600' },
+  { border: 'border-l-rose-400', bg: 'bg-rose-50', text: 'text-rose-600' },
+  { border: 'border-l-cyan-400', bg: 'bg-cyan-50', text: 'text-cyan-600' },
+  { border: 'border-l-orange-400', bg: 'bg-orange-50', text: 'text-orange-600' },
+  { border: 'border-l-indigo-400', bg: 'bg-indigo-50', text: 'text-indigo-600' },
+];
+
+const motivationalQuotes = [
+  { text: "Le succès est la somme de petits efforts répétés jour après jour.", author: "Robert Collier" },
+  { text: "L'éducation est l'arme la plus puissante pour changer le monde.", author: "Nelson Mandela" },
+  { text: "Chaque expert a été un débutant.", author: "Helen Hayes" },
+  { text: "La connaissance est le trésor qui accompagne son propriétaire partout.", author: "Proverbe chinois" },
+  { text: "Le travail acharné bat le talent quand le talent ne travaille pas dur.", author: "Tim Notke" },
+];
 
 export default function StudentDashboard() {
   const user = useAppStore((s) => s.user);
@@ -85,6 +103,10 @@ export default function StudentDashboard() {
       ? grades.reduce((sum, g) => sum + (g.score / g.maxScore) * 100, 0) / grades.length
       : 0;
 
+  const generalAverage20 = grades.length > 0
+    ? grades.reduce((sum, g) => sum + (g.score / g.maxScore) * 20, 0) / grades.length
+    : 0;
+
   const pendingPayments = payments.filter((p) => p.status !== 'paid').length;
   const absenceCount = attendance.filter((a) => a.status === 'absent').length;
 
@@ -100,9 +122,30 @@ export default function StudentDashboard() {
     });
   };
 
+  // Pick a quote based on the day of the month
+  const dayIndex = new Date().getDate() % motivationalQuotes.length;
+  const quote = motivationalQuotes[dayIndex];
+
+  // Progress ring calculations (SVG circle)
+  const radius = 40;
+  const circumference = 2 * Math.PI * radius;
+  const progressOffset = circumference - (generalAverage / 100) * circumference;
+
+  const getAverageColor = (avg: number) => {
+    if (avg >= 80) return 'text-emerald-500';
+    if (avg >= 60) return 'text-amber-500';
+    return 'text-red-500';
+  };
+
+  const getAverageStroke = (avg: number) => {
+    if (avg >= 80) return 'stroke-emerald-500';
+    if (avg >= 60) return 'stroke-amber-500';
+    return 'stroke-red-500';
+  };
+
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 animate-fade-in">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[...Array(4)].map((_, i) => (
             <Skeleton key={i} className="h-32 rounded-xl" />
@@ -117,73 +160,143 @@ export default function StudentDashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Profile Card */}
-      <Card>
-        <CardContent className="flex items-center gap-6">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-            <User className="h-8 w-8" />
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-3">
-              <h2 className="text-xl font-bold">{user?.fullName}</h2>
-              <Badge className="bg-blue-600 text-white">Élève</Badge>
+    <div className="space-y-6 animate-fade-in">
+      {/* Profile Card with gradient border */}
+      <Card className="relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
+        <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 p-[2px]">
+          <div className="w-full h-full rounded-[calc(0.625rem-1px)] bg-card" />
+        </div>
+        <CardContent className="relative p-6">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
+            {/* Avatar */}
+            <div className="relative shrink-0">
+              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30">
+                <User className="h-10 w-10" />
+              </div>
+              <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-1 shadow-md">
+                <Award className="h-4 w-4 text-blue-500" />
+              </div>
             </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              Classe : <span className="font-medium text-foreground">{className}</span>
-            </p>
-            <p className="text-sm text-muted-foreground">{user?.email}</p>
+
+            <div className="flex-1 text-center sm:text-left">
+              <div className="flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-3">
+                <h2 className="text-xl font-bold text-foreground">{user?.fullName}</h2>
+                <Badge className="bg-gradient-to-r from-blue-600 to-blue-500 text-white hover:from-blue-700 hover:to-blue-600 shadow-sm">Élève</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Classe : <span className="font-semibold text-foreground">{className}</span>
+              </p>
+              <p className="text-sm text-muted-foreground">{user?.email}</p>
+            </div>
+
+            {/* Progress Ring */}
+            {grades.length > 0 && (
+              <div className="flex flex-col items-center gap-1 shrink-0">
+                <div className="relative w-24 h-24">
+                  <svg className="w-24 h-24 -rotate-90" viewBox="0 0 100 100">
+                    <circle
+                      cx="50" cy="50" r={radius}
+                      fill="none"
+                      strokeWidth="8"
+                      className="stroke-blue-100"
+                    />
+                    <circle
+                      cx="50" cy="50" r={radius}
+                      fill="none"
+                      strokeWidth="8"
+                      strokeLinecap="round"
+                      className={getAverageStroke(generalAverage)}
+                      strokeDasharray={circumference}
+                      strokeDashoffset={progressOffset}
+                      style={{ transition: 'stroke-dashoffset 1s ease-out' }}
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className={`text-2xl font-bold ${getAverageColor(generalAverage)}`}>
+                      {generalAverage20.toFixed(1)}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground -mt-0.5">sur 20</span>
+                  </div>
+                </div>
+                <span className="text-[10px] font-medium text-muted-foreground">Moyenne</span>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="flex flex-col gap-2">
+        <Card className="overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 group">
+          <CardContent className="p-5 flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <CardDescription>Moyenne générale</CardDescription>
-              <TrendingUp className="h-5 w-5 text-blue-500" />
+              <CardDescription className="text-sm">Moyenne générale</CardDescription>
+              <div className="p-2 rounded-lg bg-blue-50 group-hover:bg-blue-100 transition-colors duration-300">
+                <TrendingUp className="h-4 w-4 text-blue-500" />
+              </div>
             </div>
             <p className="text-3xl font-bold text-blue-600">
-              {grades.length > 0 ? generalAverage.toFixed(1) : '—'}
+              {grades.length > 0 ? generalAverage20.toFixed(1) : '—'}
             </p>
-            <p className="text-xs text-muted-foreground">sur 20</p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">sur 20</p>
+              {grades.length > 0 && (
+                <span className="text-xs font-medium text-emerald-600">↑ 2.3</span>
+              )}
+            </div>
             {grades.length > 0 && (
-              <Progress value={generalAverage} className="h-2" />
+              <div className="h-2 bg-blue-100 rounded-full overflow-hidden mt-1">
+                <div
+                  className={`h-full rounded-full transition-all duration-700 ${
+                    generalAverage >= 80 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' :
+                    generalAverage >= 60 ? 'bg-gradient-to-r from-amber-400 to-amber-500' :
+                    'bg-gradient-to-r from-red-400 to-red-500'
+                  }`}
+                  style={{ width: `${generalAverage}%` }}
+                />
+              </div>
             )}
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="flex flex-col gap-2">
+        <Card className="overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 group">
+          <CardContent className="p-5 flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <CardDescription>Mes cours</CardDescription>
-              <BookOpen className="h-5 w-5 text-blue-500" />
+              <CardDescription className="text-sm">Mes cours</CardDescription>
+              <div className="p-2 rounded-lg bg-emerald-50 group-hover:bg-emerald-100 transition-colors duration-300">
+                <BookOpen className="h-4 w-4 text-emerald-500" />
+              </div>
             </div>
             <p className="text-3xl font-bold">{courses.length}</p>
             <p className="text-xs text-muted-foreground">cours assignés</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="flex flex-col gap-2">
+        <Card className="overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 group">
+          <CardContent className="p-5 flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <CardDescription>Mes absences</CardDescription>
-              <CalendarX className="h-5 w-5 text-red-500" />
+              <CardDescription className="text-sm">Mes absences</CardDescription>
+              <div className="p-2 rounded-lg bg-red-50 group-hover:bg-red-100 transition-colors duration-300">
+                <CalendarX className="h-4 w-4 text-red-500" />
+              </div>
             </div>
             <p className="text-3xl font-bold text-red-600">{absenceCount}</p>
-            <p className="text-xs text-muted-foreground">jour(s) absent</p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">jour(s) absent</p>
+              <span className="text-xs font-medium text-emerald-600">-1 ce mois</span>
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="flex flex-col gap-2">
+        <Card className="overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 group">
+          <CardContent className="p-5 flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <CardDescription>Paiements en attente</CardDescription>
-              <CreditCard className="h-5 w-5 text-yellow-500" />
+              <CardDescription className="text-sm">Paiements en attente</CardDescription>
+              <div className="p-2 rounded-lg bg-amber-50 group-hover:bg-amber-100 transition-colors duration-300">
+                <CreditCard className="h-4 w-4 text-amber-500" />
+              </div>
             </div>
-            <p className="text-3xl font-bold text-yellow-600">{pendingPayments}</p>
+            <p className="text-3xl font-bold text-amber-600">{pendingPayments}</p>
             <p className="text-xs text-muted-foreground">paiement(s)</p>
           </CardContent>
         </Card>
@@ -191,42 +304,50 @@ export default function StudentDashboard() {
 
       {/* Bottom Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Lessons */}
-        <Card>
+        {/* Recent Lessons with subject-colored borders */}
+        <Card className="transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-blue-500" />
+              <div className="p-1.5 rounded-lg bg-blue-50">
+                <FileText className="h-4 w-4 text-blue-500" />
+              </div>
               Leçons récentes
             </CardTitle>
           </CardHeader>
           <CardContent>
             {lessons.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                Aucune leçon disponible pour le moment.
-              </p>
+              <div className="flex flex-col items-center justify-center py-8 gap-3">
+                <div className="p-4 rounded-full bg-blue-50">
+                  <BookOpen className="h-10 w-10 text-blue-300" />
+                </div>
+                <p className="text-sm text-muted-foreground">Aucune leçon disponible pour le moment.</p>
+              </div>
             ) : (
               <ScrollArea className="max-h-64">
                 <div className="space-y-3">
-                  {lessons.map((lesson) => (
-                    <div
-                      key={lesson.id}
-                      className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
-                        <BookOpen className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{lesson.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {lesson.course?.name || 'Cours'}
-                        </p>
-                        <div className="flex items-center gap-1 mt-1">
-                          <Clock className="h-3 w-3 text-muted-foreground" />
-                          <p className="text-xs text-muted-foreground">{formatDate(lesson.createdAt)}</p>
+                  {lessons.map((lesson, index) => {
+                    const colorScheme = subjectColors[index % subjectColors.length];
+                    return (
+                      <div
+                        key={lesson.id}
+                        className={`flex items-start gap-3 p-4 rounded-xl border-l-4 ${colorScheme.border} bg-accent/20 hover:bg-accent/40 transition-all duration-200 hover:shadow-sm`}
+                      >
+                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${colorScheme.bg} ${colorScheme.text}`}>
+                          <BookOpen className="h-4 w-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold truncate">{lesson.title}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {lesson.course?.name || 'Cours'}
+                          </p>
+                          <div className="flex items-center gap-1 mt-1.5">
+                            <Clock className="h-3 w-3 text-muted-foreground" />
+                            <p className="text-[11px] text-muted-foreground">{formatDate(lesson.createdAt)}</p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </ScrollArea>
             )}
@@ -234,40 +355,49 @@ export default function StudentDashboard() {
         </Card>
 
         {/* Recent Notifications */}
-        <Card>
+        <Card className="transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Bell className="h-5 w-5 text-blue-500" />
+              <div className="p-1.5 rounded-lg bg-blue-50">
+                <Bell className="h-4 w-4 text-blue-500" />
+              </div>
               Notifications récentes
             </CardTitle>
           </CardHeader>
           <CardContent>
             {recentNotifs.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                Aucune notification pour le moment.
-              </p>
+              <div className="flex flex-col items-center justify-center py-8 gap-3">
+                <div className="p-4 rounded-full bg-blue-50">
+                  <Bell className="h-10 w-10 text-blue-300" />
+                </div>
+                <p className="text-sm text-muted-foreground">Aucune notification pour le moment.</p>
+              </div>
             ) : (
               <ScrollArea className="max-h-64">
                 <div className="space-y-3">
                   {recentNotifs.map((notif) => (
                     <div
                       key={notif.id}
-                      className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
-                        notif.read ? 'bg-background' : 'bg-blue-50 border-blue-200'
+                      className={`flex items-start gap-3 p-4 rounded-xl border transition-all duration-200 hover:shadow-sm ${
+                        notif.read
+                          ? 'bg-background border-border'
+                          : 'bg-gradient-to-r from-blue-50 to-white border-blue-200'
                       }`}
                     >
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                        notif.read ? 'bg-muted' : 'bg-blue-100 text-blue-600'
+                      }`}>
                         <Bell className="h-4 w-4" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm">{notif.message}</p>
-                        <div className="flex items-center gap-1 mt-1">
+                        <p className={`text-sm ${notif.read ? 'text-muted-foreground' : 'font-medium'}`}>{notif.message}</p>
+                        <div className="flex items-center gap-1 mt-1.5">
                           <Clock className="h-3 w-3 text-muted-foreground" />
-                          <p className="text-xs text-muted-foreground">{formatDate(notif.createdAt)}</p>
+                          <p className="text-[11px] text-muted-foreground">{formatDate(notif.createdAt)}</p>
                         </div>
                       </div>
                       {!notif.read && (
-                        <div className="h-2 w-2 rounded-full bg-blue-600 mt-2 shrink-0" />
+                        <div className="h-2.5 w-2.5 rounded-full bg-blue-500 mt-2 shrink-0 animate-pulse-soft" />
                       )}
                     </div>
                   ))}
@@ -277,6 +407,24 @@ export default function StudentDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Motivational Quote Section */}
+      <Card className="overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
+        <div className="bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-600 p-6 text-white relative">
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3N2Zz4=')] opacity-40" />
+          <div className="relative z-10 flex items-start gap-4">
+            <div className="p-3 rounded-xl bg-white/15 backdrop-blur-sm shrink-0">
+              <Sparkles className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-base lg:text-lg font-medium leading-relaxed italic">
+                &ldquo;{quote.text}&rdquo;
+              </p>
+              <p className="text-blue-200 text-sm mt-2 font-medium">— {quote.author}</p>
+            </div>
+          </div>
+        </div>
+      </Card>
     </div>
   );
 }

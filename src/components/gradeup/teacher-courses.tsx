@@ -79,66 +79,64 @@ export default function TeacherCourses() {
   if (!user) return null;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Mes Cours</h1>
-        <p className="text-muted-foreground mt-1">
-          Gérez et consultez vos cours assignés
-        </p>
+    <div className="space-y-6 animate-fade-in">
+      {/* Page Header */}
+      <div className="mb-6 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 p-6">
+        <h1 className="text-2xl font-bold">Mes Cours</h1>
+        <p className="text-sm text-muted-foreground mt-1">Gérez et consultez vos cours assignés</p>
       </div>
 
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(3)].map((_, i) => (
-            <Skeleton key={i} className="h-48 rounded-xl" />
+            <Skeleton key={i} className="h-52 rounded-xl" />
           ))}
         </div>
       ) : courses.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <BookOpen className="h-12 w-12 text-muted-foreground/40 mb-3" />
-            <p className="text-muted-foreground">Aucun cours assigné</p>
-          </CardContent>
-        </Card>
+        <div className="text-center py-20">
+          <div className="mx-auto w-24 h-24 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+            <BookOpen className="h-12 w-12 text-muted-foreground/50" />
+          </div>
+          <h3 className="text-xl font-semibold mb-2">Aucun cours assigné</h3>
+          <p className="text-muted-foreground">Veuillez contacter l&apos;administrateur pour l&apos;attribution de cours</p>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {courses.map((course) => (
             <Card
               key={course.id}
-              className="hover:shadow-md transition-shadow border-l-4 border-l-blue-500"
+              className="hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 cursor-pointer border-l-4 border-l-blue-500 hover:border-l-blue-600"
             >
               <CardHeader>
                 <div className="flex items-start justify-between">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-100 to-blue-200 text-blue-600 shadow-sm">
                     <BookOpen className="h-5 w-5" />
                   </div>
-                  <Badge variant="secondary">{course.class?.name}</Badge>
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">{course.class?.name}</Badge>
                 </div>
-                <CardTitle className="text-lg mt-2">{course.name}</CardTitle>
+                <CardTitle className="text-lg mt-3">{course.name}</CardTitle>
                 {course.description && (
-                  <CardDescription className="line-clamp-2">
-                    {course.description}
-                  </CardDescription>
+                  <CardDescription className="line-clamp-2">{course.description}</CardDescription>
                 )}
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5">
                     <Users className="h-4 w-4" />
                     <span>{course.class?._count?.enrollments || 0} élèves</span>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5">
                     <FileText className="h-4 w-4" />
                     <span>{course._count?.lessons || 0} leçons</span>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5">
                     <BarChart3 className="h-4 w-4" />
                     <span>{course._count?.grades || 0} notes</span>
                   </div>
                 </div>
                 <Button
                   variant="outline"
-                  className="w-full gap-2 border-blue-200 text-blue-700 hover:bg-blue-50"
+                  className="w-full gap-2 border-blue-200 text-blue-700 hover:bg-blue-50 hover:scale-[1.02] active:scale-[0.98] transition-all"
                   onClick={() => openCourseDetail(course)}
                 >
                   <Eye className="h-4 w-4" />
@@ -153,7 +151,8 @@ export default function TeacherCourses() {
       {/* Course Detail Dialog */}
       <Dialog open={!!selectedCourse} onOpenChange={(open) => !open && setSelectedCourse(null)}>
         <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
-          <DialogHeader>
+          <div className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-t-lg -mx-6 -mt-6 mb-0" />
+          <DialogHeader className="pt-2">
             <DialogTitle className="text-xl flex items-center gap-2">
               <BookOpen className="h-5 w-5 text-blue-500" />
               {selectedCourse?.name}
@@ -166,23 +165,23 @@ export default function TeacherCourses() {
           <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
             {/* Stats */}
             <div className="grid grid-cols-3 gap-3">
-              <div className="p-3 rounded-lg bg-blue-50 text-center">
+              <div className="p-3 rounded-lg bg-blue-50 text-center border border-blue-100">
                 <p className="text-2xl font-bold text-blue-600">
                   {selectedCourse?._count?.lessons || 0}
                 </p>
                 <p className="text-xs text-blue-600/80">Leçons</p>
               </div>
-              <div className="p-3 rounded-lg bg-blue-50 text-center">
-                <p className="text-2xl font-bold text-blue-600">
+              <div className="p-3 rounded-lg bg-indigo-50 text-center border border-indigo-100">
+                <p className="text-2xl font-bold text-indigo-600">
                   {selectedCourse?._count?.grades || 0}
                 </p>
-                <p className="text-xs text-blue-600/80">Notes</p>
+                <p className="text-xs text-indigo-600/80">Notes</p>
               </div>
-              <div className="p-3 rounded-lg bg-blue-50 text-center">
-                <p className="text-2xl font-bold text-blue-600">
+              <div className="p-3 rounded-lg bg-emerald-50 text-center border border-emerald-100">
+                <p className="text-2xl font-bold text-emerald-600">
                   {getClassAverage() || '—'}
                 </p>
-                <p className="text-xs text-blue-600/80">Moyenne</p>
+                <p className="text-xs text-emerald-600/80">Moyenne</p>
               </div>
             </div>
 
@@ -205,10 +204,10 @@ export default function TeacherCourses() {
                       return (
                         <div
                           key={student.id}
-                          className="flex items-center justify-between p-2.5 rounded-lg border bg-accent/30"
+                          className="flex items-center justify-between p-2.5 rounded-lg border bg-accent/20 hover:bg-accent/40 transition-colors"
                         >
                           <div className="flex items-center gap-3">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600 text-xs font-bold">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500 text-blue-100 text-xs font-bold shadow-sm">
                               {student.fullName.charAt(0).toUpperCase()}
                             </div>
                             <span className="text-sm font-medium">{student.fullName}</span>
@@ -219,7 +218,9 @@ export default function TeacherCourses() {
                                 variant="secondary"
                                 className={
                                   parseFloat(avg) >= 10
-                                    ? 'bg-green-100 text-green-700'
+                                    ? 'bg-emerald-100 text-emerald-700'
+                                    : parseFloat(avg) >= 7
+                                    ? 'bg-amber-100 text-amber-700'
                                     : 'bg-red-100 text-red-700'
                                 }
                               >

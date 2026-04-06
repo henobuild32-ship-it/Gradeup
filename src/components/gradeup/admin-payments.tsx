@@ -47,6 +47,10 @@ import {
   CheckCircle,
   Clock,
   AlertTriangle,
+  TrendingUp,
+  Wallet,
+  CircleDollarSign,
+  Receipt,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -67,8 +71,8 @@ interface StudentItem {
 }
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof CheckCircle }> = {
-  paid: { label: 'Payé', color: 'bg-green-100 text-green-700 border-green-200', icon: CheckCircle },
-  pending: { label: 'En attente', color: 'bg-yellow-100 text-yellow-700 border-yellow-200', icon: Clock },
+  paid: { label: 'Payé', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: CheckCircle },
+  pending: { label: 'En attente', color: 'bg-amber-100 text-amber-700 border-amber-200', icon: Clock },
   overdue: { label: 'En retard', color: 'bg-red-100 text-red-700 border-red-200', icon: AlertTriangle },
 };
 
@@ -90,7 +94,6 @@ export default function AdminPayments() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Form state
   const [formStudentId, setFormStudentId] = useState('');
   const [formAmount, setFormAmount] = useState('');
   const [formMonth, setFormMonth] = useState('');
@@ -220,51 +223,66 @@ export default function AdminPayments() {
   const totalOverdue = payments
     .filter((p) => p.status === 'overdue')
     .reduce((sum, p) => sum + p.amount, 0);
+  const totalAll = totalPaid + totalPending + totalOverdue;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestion des paiements</h1>
-          <p className="text-muted-foreground">Suivez et gérez les paiements des élèves</p>
+    <div className="space-y-6 animate-fade-in">
+      {/* Page Header */}
+      <div className="mb-6 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Gestion des paiements</h1>
+            <p className="text-sm text-muted-foreground mt-1">Suivez et gérez les paiements des élèves</p>
+          </div>
+          <Button onClick={() => { resetForm(); setDialogOpen(true); }} className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-lg shadow-blue-500/20">
+            <Plus className="h-4 w-4 mr-2" />
+            Nouveau paiement
+          </Button>
         </div>
-        <Button onClick={() => { resetForm(); setDialogOpen(true); }} className="bg-blue-600 hover:bg-blue-700">
-          <Plus className="h-4 w-4 mr-2" />
-          Nouveau paiement
-        </Button>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="border-green-200">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white">
           <CardContent className="p-4 flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-green-50">
-              <CheckCircle className="h-5 w-5 text-green-600" />
+            <div className="p-3 rounded-xl bg-blue-100">
+              <Wallet className="h-5 w-5 text-blue-600" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Payé</p>
-              <p className="text-xl font-bold text-green-600">{totalPaid.toLocaleString()} USD</p>
+              <p className="text-xs text-muted-foreground font-medium">Total</p>
+              <p className="text-xl font-bold text-blue-600">{totalAll.toLocaleString()} USD</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-yellow-200">
+        <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-white">
           <CardContent className="p-4 flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-yellow-50">
-              <Clock className="h-5 w-5 text-yellow-600" />
+            <div className="p-3 rounded-xl bg-emerald-100">
+              <CheckCircle className="h-5 w-5 text-emerald-600" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">En attente</p>
-              <p className="text-xl font-bold text-yellow-600">{totalPending.toLocaleString()} USD</p>
+              <p className="text-xs text-muted-foreground font-medium">Payé</p>
+              <p className="text-xl font-bold text-emerald-600">{totalPaid.toLocaleString()} USD</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-red-200">
+        <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-white">
           <CardContent className="p-4 flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-red-50">
+            <div className="p-3 rounded-xl bg-amber-100">
+              <Clock className="h-5 w-5 text-amber-600" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground font-medium">En attente</p>
+              <p className="text-xl font-bold text-amber-600">{totalPending.toLocaleString()} USD</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-red-200 bg-gradient-to-br from-red-50 to-white">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-red-100">
               <AlertTriangle className="h-5 w-5 text-red-600" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">En retard</p>
+              <p className="text-xs text-muted-foreground font-medium">En retard</p>
               <p className="text-xl font-bold text-red-600">{totalOverdue.toLocaleString()} USD</p>
             </div>
           </CardContent>
@@ -276,13 +294,22 @@ export default function AdminPayments() {
         <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
           <TabsList>
             <TabsTrigger value="ALL">Tous</TabsTrigger>
-            <TabsTrigger value="paid">Payé</TabsTrigger>
-            <TabsTrigger value="pending">En attente</TabsTrigger>
-            <TabsTrigger value="overdue">En retard</TabsTrigger>
+            <TabsTrigger value="paid">
+              <CheckCircle className="h-3.5 w-3.5 mr-1 text-emerald-500" />
+              Payé
+            </TabsTrigger>
+            <TabsTrigger value="pending">
+              <Clock className="h-3.5 w-3.5 mr-1 text-amber-500" />
+              En attente
+            </TabsTrigger>
+            <TabsTrigger value="overdue">
+              <AlertTriangle className="h-3.5 w-3.5 mr-1 text-red-500" />
+              En retard
+            </TabsTrigger>
           </TabsList>
           <div className="flex gap-2">
             <Select value={filterClass} onValueChange={setFilterClass}>
-              <SelectTrigger className="w-[160px]">
+              <SelectTrigger className="w-[160px] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
                 <SelectValue placeholder="Toutes les classes" />
               </SelectTrigger>
               <SelectContent>
@@ -293,7 +320,7 @@ export default function AdminPayments() {
               </SelectContent>
             </Select>
             <Select value={filterMonth} onValueChange={setFilterMonth}>
-              <SelectTrigger className="w-[160px]">
+              <SelectTrigger className="w-[160px] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
                 <SelectValue placeholder="Tous les mois" />
               </SelectTrigger>
               <SelectContent>
@@ -308,7 +335,7 @@ export default function AdminPayments() {
       </Tabs>
 
       {/* Payments Table */}
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader className="pb-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -316,7 +343,7 @@ export default function AdminPayments() {
               placeholder="Rechercher un élève..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
             />
           </div>
         </CardHeader>
@@ -328,15 +355,18 @@ export default function AdminPayments() {
               ))}
             </div>
           ) : filteredPayments.length === 0 ? (
-            <div className="text-center py-8">
-              <CreditCard className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-              <p className="text-muted-foreground">Aucun paiement trouvé</p>
+            <div className="text-center py-16">
+              <div className="mx-auto w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                <CreditCard className="h-10 w-10 text-muted-foreground/60" />
+              </div>
+              <h3 className="text-lg font-semibold mb-1">Aucun paiement trouvé</h3>
+              <p className="text-muted-foreground">Enregistrez le premier paiement pour commencer</p>
             </div>
           ) : (
             <ScrollArea className="max-h-[500px]">
-              <Table>
+              <Table className="text-sm">
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="bg-muted/30 hover:bg-muted/30">
                     <TableHead>Élève</TableHead>
                     <TableHead>Montant</TableHead>
                     <TableHead>Mois</TableHead>
@@ -346,17 +376,17 @@ export default function AdminPayments() {
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
+                <TableBody className="[&>tr:nth-child(even)]:bg-muted/30">
                   {filteredPayments.map((p) => {
                     const status = statusConfig[p.status] || statusConfig.pending;
                     const StatusIcon = status.icon;
                     return (
-                      <TableRow key={p.id}>
+                      <TableRow key={p.id} className="hover:bg-blue-50/50 dark:hover:bg-blue-950/20 transition-colors">
                         <TableCell className="font-medium">
                           {p.student?.fullName || 'Inconnu'}
                         </TableCell>
-                        <TableCell className="font-semibold">
-                          {Number(p.amount).toLocaleString()} USD
+                        <TableCell className="font-bold">
+                          {Number(p.amount).toLocaleString()} <span className="text-muted-foreground font-normal">USD</span>
                         </TableCell>
                         <TableCell>{p.month || '—'}</TableCell>
                         <TableCell>
@@ -365,24 +395,24 @@ export default function AdminPayments() {
                             {status.label}
                           </Badge>
                         </TableCell>
-                        <TableCell className="capitalize">{p.method || '—'}</TableCell>
+                        <TableCell className="capitalize text-muted-foreground">{p.method || '—'}</TableCell>
                         <TableCell className="text-muted-foreground text-sm">
                           {p.createdAt ? new Date(p.createdAt).toLocaleDateString('fr-FR') : '—'}
                         </TableCell>
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-blue-50 transition-colors">
                                 <MoreVertical className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => handleUpdateStatus(p.id, 'paid')}>
-                                <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                                <CheckCircle className="h-4 w-4 mr-2 text-emerald-600" />
                                 Marquer payé
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleUpdateStatus(p.id, 'pending')}>
-                                <Clock className="h-4 w-4 mr-2 text-yellow-600" />
+                                <Clock className="h-4 w-4 mr-2 text-amber-600" />
                                 Marquer en attente
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleUpdateStatus(p.id, 'overdue')}>
@@ -405,14 +435,18 @@ export default function AdminPayments() {
       {/* Create Payment Dialog */}
       <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Nouveau paiement</DialogTitle>
+          <div className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-t-lg -mx-6 -mt-6 mb-0" />
+          <DialogHeader className="pt-2">
+            <DialogTitle className="flex items-center gap-2">
+              <CircleDollarSign className="h-5 w-5 text-blue-600" />
+              Nouveau paiement
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="pay-student">Élève *</Label>
               <Select value={formStudentId} onValueChange={setFormStudentId}>
-                <SelectTrigger id="pay-student">
+                <SelectTrigger id="pay-student" className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
                   <SelectValue placeholder="Sélectionner un élève" />
                 </SelectTrigger>
                 <SelectContent>
@@ -434,12 +468,13 @@ export default function AdminPayments() {
                 value={formAmount}
                 onChange={(e) => setFormAmount(e.target.value)}
                 placeholder="0.00"
+                className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="pay-month">Mois</Label>
               <Select value={formMonth} onValueChange={setFormMonth}>
-                <SelectTrigger id="pay-month">
+                <SelectTrigger id="pay-month" className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
                   <SelectValue placeholder="Sélectionner un mois" />
                 </SelectTrigger>
                 <SelectContent>
@@ -453,7 +488,7 @@ export default function AdminPayments() {
               <div className="space-y-2">
                 <Label htmlFor="pay-status">Statut</Label>
                 <Select value={formStatus} onValueChange={setFormStatus}>
-                  <SelectTrigger id="pay-status">
+                  <SelectTrigger id="pay-status" className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -466,7 +501,7 @@ export default function AdminPayments() {
               <div className="space-y-2">
                 <Label htmlFor="pay-method">Méthode</Label>
                 <Select value={formMethod} onValueChange={setFormMethod}>
-                  <SelectTrigger id="pay-method">
+                  <SelectTrigger id="pay-method" className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -479,13 +514,13 @@ export default function AdminPayments() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
+            <Button variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }} className="hover:scale-[1.02] active:scale-[0.98] transition-all">
               Annuler
             </Button>
             <Button
               onClick={handleSubmit}
               disabled={submitting}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:scale-[1.02] active:scale-[0.98] transition-transform"
             >
               {submitting ? 'Enregistrement...' : 'Enregistrer'}
             </Button>

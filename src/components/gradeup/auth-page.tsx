@@ -25,6 +25,7 @@ import {
   Sparkles,
   Users,
   BookOpen,
+  ArrowLeft,
 } from 'lucide-react';
 
 const roleDashboardMap: Record<UserRole, PageView> = {
@@ -55,6 +56,7 @@ export default function AuthPage() {
   const [regLoading, setRegLoading] = useState(false);
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [showRegConfirmPassword, setShowRegConfirmPassword] = useState(false);
+  const [activeTab, setActiveTab] = useState('login');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -149,17 +151,29 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row">
+    <div className="min-h-screen flex flex-col lg:flex-row relative overflow-hidden">
+      {/* Animated background dots */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-[10%] left-[60%] w-64 h-64 rounded-full bg-blue-100/40 animate-[pulse_4s_ease-in-out_infinite]" />
+        <div className="absolute top-[60%] left-[30%] w-48 h-48 rounded-full bg-indigo-100/40 animate-[pulse_5s_ease-in-out_infinite_1s]" />
+        <div className="absolute top-[80%] left-[70%] w-32 h-32 rounded-full bg-blue-200/30 animate-[pulse_3s_ease-in-out_infinite_0.5s]" />
+        <div className="absolute top-[20%] left-[80%] w-20 h-20 rounded-full bg-indigo-200/30 animate-[pulse_6s_ease-in-out_infinite_2s]" />
+        <div className="absolute top-[40%] left-[10%] w-40 h-40 rounded-full bg-blue-50/50 animate-[pulse_7s_ease-in-out_infinite]" />
+      </div>
+
       {/* Left Branding Panel */}
-      <div className="hidden lg:flex lg:w-1/2 xl:w-[55%] bg-gradient-to-br from-primary via-primary/90 to-primary/80 text-white flex-col justify-between p-8 xl:p-12 relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 xl:w-[55%] bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white flex-col justify-between p-8 xl:p-12 relative overflow-hidden">
+        {/* Animated gradient shift overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-indigo-900/40 via-transparent to-blue-400/20 animate-[pulse_8s_ease-in-out_infinite]" />
+        
         {/* Decorative circles */}
-        <div className="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-white/5" />
-        <div className="absolute -bottom-32 -left-32 w-96 h-96 rounded-full bg-white/5" />
-        <div className="absolute top-1/2 left-1/3 w-48 h-48 rounded-full bg-white/5" />
+        <div className="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-white/5 animate-[spin_30s_linear_infinite]" />
+        <div className="absolute -bottom-32 -left-32 w-96 h-96 rounded-full bg-white/5 animate-[spin_25s_linear_infinite_reverse]" />
+        <div className="absolute top-1/2 left-1/3 w-48 h-48 rounded-full bg-white/5 animate-[spin_20s_linear_infinite]" />
 
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+            <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
               <GraduationCap className="w-8 h-8 text-white" />
             </div>
             <span className="text-2xl font-bold tracking-tight">GradeUp</span>
@@ -178,22 +192,22 @@ export default function AuthPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/10">
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/10 hover:bg-white/15 transition-colors">
               <Shield className="w-6 h-6 mb-2 text-white/90" />
               <p className="text-sm font-medium text-white/90">Sécurisé</p>
               <p className="text-xs text-white/60">Données protégées</p>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/10">
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/10 hover:bg-white/15 transition-colors">
               <Users className="w-6 h-6 mb-2 text-white/90" />
               <p className="text-sm font-medium text-white/90">Multi-rôles</p>
               <p className="text-xs text-white/60">Admin, prof, élève, parent</p>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/10">
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/10 hover:bg-white/15 transition-colors">
               <BookOpen className="w-6 h-6 mb-2 text-white/90" />
               <p className="text-sm font-medium text-white/90">Cours & Notes</p>
               <p className="text-xs text-white/60">Gestion complète</p>
             </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/10">
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/10 hover:bg-white/15 transition-colors">
               <Sparkles className="w-6 h-6 mb-2 text-white/90" />
               <p className="text-sm font-medium text-white/90">IA Gradie</p>
               <p className="text-xs text-white/60">Assistant intelligent</p>
@@ -207,28 +221,34 @@ export default function AuthPage() {
       </div>
 
       {/* Right Form Panel */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-8 lg:p-12 bg-background">
+      <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-8 lg:p-12 bg-background relative z-10">
         {/* Mobile branding */}
         <div className="lg:hidden flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-lg">
             <GraduationCap className="w-6 h-6" />
           </div>
           <span className="text-xl font-bold text-foreground">GradeUp</span>
         </div>
 
         <div className="w-full max-w-md">
-          <Card className="border-0 shadow-lg">
-            <CardHeader className="text-center pb-2">
+          <Card className="border-0 shadow-xl shadow-blue-500/5 relative overflow-hidden animate-fade-in">
+            {/* Gradient border effect */}
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-600" />
+            
+            <CardHeader className="text-center pb-2 pt-8">
+              <div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mb-4 shadow-lg shadow-blue-500/20">
+                <GraduationCap className="w-8 h-8 text-white" />
+              </div>
               <CardTitle className="text-2xl font-bold">Bienvenue</CardTitle>
               <CardDescription>
                 Connectez-vous ou créez votre école
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="login" className="w-full">
+            <CardContent className="pb-8">
+              <Tabs defaultValue="login" value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="w-full grid grid-cols-2 mb-6">
-                  <TabsTrigger value="login">Connexion</TabsTrigger>
-                  <TabsTrigger value="register">Inscription</TabsTrigger>
+                  <TabsTrigger value="login" className="transition-all">Connexion</TabsTrigger>
+                  <TabsTrigger value="register" className="transition-all">Inscription</TabsTrigger>
                 </TabsList>
 
                 {/* Login Tab */}
@@ -241,6 +261,7 @@ export default function AuthPage() {
                         placeholder="Jean Dupont"
                         value={loginFullName}
                         onChange={(e) => setLoginFullName(e.target.value)}
+                        className="h-11 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       />
                     </div>
                     <div className="space-y-2">
@@ -250,6 +271,7 @@ export default function AuthPage() {
                         placeholder="École Excellence"
                         value={loginSchoolName}
                         onChange={(e) => setLoginSchoolName(e.target.value)}
+                        className="h-11 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       />
                     </div>
                     <div className="space-y-2">
@@ -261,6 +283,7 @@ export default function AuthPage() {
                           placeholder="••••••••"
                           value={loginPassword}
                           onChange={(e) => setLoginPassword(e.target.value)}
+                          className="h-11 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
                         <button
                           type="button"
@@ -274,7 +297,7 @@ export default function AuthPage() {
                     <div className="space-y-2">
                       <Label htmlFor="login-role">Type de compte</Label>
                       <Select value={loginRole} onValueChange={(v) => setLoginRole(v as UserRole)}>
-                        <SelectTrigger className="w-full" id="login-role">
+                        <SelectTrigger className="w-full h-11 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" id="login-role">
                           <SelectValue placeholder="Sélectionner..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -285,7 +308,7 @@ export default function AuthPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <Button type="submit" className="w-full" size="lg" disabled={loginLoading}>
+                    <Button type="submit" className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-blue-500/25" size="lg" disabled={loginLoading}>
                       {loginLoading ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -308,6 +331,7 @@ export default function AuthPage() {
                         placeholder="Jean Dupont"
                         value={regFullName}
                         onChange={(e) => setRegFullName(e.target.value)}
+                        className="h-11 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       />
                     </div>
                     <div className="space-y-2">
@@ -317,6 +341,7 @@ export default function AuthPage() {
                         placeholder="École Excellence"
                         value={regSchoolName}
                         onChange={(e) => setRegSchoolName(e.target.value)}
+                        className="h-11 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       />
                     </div>
                     <div className="space-y-2">
@@ -327,6 +352,7 @@ export default function AuthPage() {
                         placeholder="admin@ecole.com"
                         value={regEmail}
                         onChange={(e) => setRegEmail(e.target.value)}
+                        className="h-11 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       />
                     </div>
                     <div className="space-y-2">
@@ -338,6 +364,7 @@ export default function AuthPage() {
                           placeholder="••••••••"
                           value={regPassword}
                           onChange={(e) => setRegPassword(e.target.value)}
+                          className="h-11 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
                         <button
                           type="button"
@@ -357,6 +384,7 @@ export default function AuthPage() {
                           placeholder="••••••••"
                           value={regConfirmPassword}
                           onChange={(e) => setRegConfirmPassword(e.target.value)}
+                          className="h-11 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                         />
                         <button
                           type="button"
@@ -367,7 +395,7 @@ export default function AuthPage() {
                         </button>
                       </div>
                     </div>
-                    <Button type="submit" className="w-full" size="lg" disabled={regLoading}>
+                    <Button type="submit" className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-blue-500/25" size="lg" disabled={regLoading}>
                       {regLoading ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -377,6 +405,14 @@ export default function AuthPage() {
                         'Créer mon école'
                       )}
                     </Button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('login')}
+                      className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1 py-2"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      Retour à la connexion
+                    </button>
                   </form>
                 </TabsContent>
               </Tabs>

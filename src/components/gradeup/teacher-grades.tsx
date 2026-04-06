@@ -15,7 +15,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Edit, Trash2, GraduationCap, Filter } from 'lucide-react';
+import { Plus, Edit, Trash2, GraduationCap, Filter, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 import type { CourseInfo, GradeInfo, UserInfo } from '@/lib/types';
 
@@ -29,11 +29,9 @@ export default function TeacherGrades() {
   const [editingGrade, setEditingGrade] = useState<GradeInfo | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Filters
   const [filterCourseId, setFilterCourseId] = useState<string>('');
   const [filterTrimester, setFilterTrimester] = useState<string>('');
 
-  // Form state
   const [formCourseId, setFormCourseId] = useState('');
   const [formStudentId, setFormStudentId] = useState('');
   const [formScore, setFormScore] = useState('');
@@ -121,7 +119,6 @@ export default function TeacherGrades() {
     setFormMaxScore(String(grade.maxScore));
     setFormTrimester(grade.trimester);
     setFormComment(grade.comment);
-    // Load students for that course
     const course = courses.find((c) => c.id === grade.courseId);
     if (course && user) {
       fetch(`/api/users?schoolId=${user.schoolId}&role=STUDENT&classId=${course.classId}`)
@@ -218,29 +215,30 @@ export default function TeacherGrades() {
   if (!user) return null;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Gestion des Notes</h1>
-          <p className="text-muted-foreground mt-1">
-            Ajoutez, modifiez et consultez les notes de vos élèves
-          </p>
+    <div className="space-y-6 animate-fade-in">
+      {/* Page Header */}
+      <div className="mb-6 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 p-6">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-bold">Gestion des Notes</h1>
+            <p className="text-sm text-muted-foreground mt-1">Ajoutez, modifiez et consultez les notes de vos élèves</p>
+          </div>
+          <Button
+            className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-lg shadow-blue-500/20 gap-2"
+            onClick={openCreateDialog}
+          >
+            <Plus className="h-4 w-4" />
+            Ajouter une note
+          </Button>
         </div>
-        <Button
-          className="bg-blue-600 hover:bg-blue-700 gap-2"
-          onClick={openCreateDialog}
-        >
-          <Plus className="h-4 w-4" />
-          Ajouter une note
-        </Button>
       </div>
 
       {/* Filters */}
-      <Card>
+      <Card className="shadow-sm">
         <CardContent className="flex items-center gap-4 flex-wrap py-4">
           <Filter className="h-4 w-4 text-muted-foreground" />
           <Select value={filterCourseId} onValueChange={(v) => setFilterCourseId(v === '__all__' ? '' : v)}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-48 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
               <SelectValue placeholder="Tous les cours" />
             </SelectTrigger>
             <SelectContent>
@@ -251,7 +249,7 @@ export default function TeacherGrades() {
             </SelectContent>
           </Select>
           <Select value={filterTrimester} onValueChange={(v) => setFilterTrimester(v === '__all__' ? '' : v)}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-40 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
               <SelectValue placeholder="Trimestre" />
             </SelectTrigger>
             <SelectContent>
@@ -262,8 +260,11 @@ export default function TeacherGrades() {
             </SelectContent>
           </Select>
           <div className="ml-auto flex items-center gap-4 text-sm text-muted-foreground">
-            <span>Moyenne: <strong className="text-foreground">{getClassAverage()}</strong>/20</span>
-            <span>Au-dessus de 10: <strong className="text-green-600">{getPassCount()}</strong>/{grades.length}</span>
+            <span className="flex items-center gap-1.5">
+              <Calculator className="h-4 w-4 text-blue-500" />
+              Moyenne: <strong className="text-foreground">{getClassAverage()}</strong>/20
+            </span>
+            <span>Au-dessus de 10: <strong className="text-emerald-600">{getPassCount()}</strong>/{grades.length}</span>
           </div>
         </CardContent>
       </Card>
@@ -276,22 +277,27 @@ export default function TeacherGrades() {
           ))}
         </div>
       ) : grades.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <GraduationCap className="h-12 w-12 text-muted-foreground/40 mb-3" />
-            <p className="text-muted-foreground">Aucune note enregistrée</p>
-          </CardContent>
-        </Card>
+        <div className="text-center py-20">
+          <div className="mx-auto w-24 h-24 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+            <GraduationCap className="h-12 w-12 text-muted-foreground/50" />
+          </div>
+          <h3 className="text-xl font-semibold mb-2">Aucune note enregistrée</h3>
+          <p className="text-muted-foreground mb-4">Ajoutez des notes pour vos élèves</p>
+          <Button onClick={openCreateDialog} variant="outline" className="hover:scale-[1.02] active:scale-[0.98] transition-all gap-2">
+            <Plus className="h-4 w-4" />
+            Ajouter une note
+          </Button>
+        </div>
       ) : (
-        <Card>
+        <Card className="shadow-sm">
           <ScrollArea className="max-h-[500px]">
             <Table>
               <TableHeader>
-                <TableRow>
+                <TableRow className="bg-muted/30 hover:bg-muted/30">
                   <TableHead>Élève</TableHead>
                   <TableHead>Cours</TableHead>
-                  <TableHead>Note</TableHead>
-                  <TableHead>Note max</TableHead>
+                  <TableHead className="text-center">Note</TableHead>
+                  <TableHead className="text-center">Note max</TableHead>
                   <TableHead>Trimestre</TableHead>
                   <TableHead className="hidden sm:table-cell">Commentaire</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -300,9 +306,8 @@ export default function TeacherGrades() {
               <TableBody>
                 {grades.map((grade) => {
                   const normalizedScore = (grade.score / grade.maxScore) * 20;
-                  const isPassing = normalizedScore >= 10;
                   return (
-                    <TableRow key={grade.id}>
+                    <TableRow key={grade.id} className="even:bg-muted/20 hover:bg-blue-50/50 transition-colors">
                       <TableCell className="font-medium">
                         {grade.student?.fullName || getStudentName(grade.studentId)}
                       </TableCell>
@@ -311,40 +316,32 @@ export default function TeacherGrades() {
                           {grade.course?.name || getCourseName(grade.courseId)}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-center">
                         <span
-                          className={`inline-flex items-center justify-center rounded-md px-2 py-0.5 text-sm font-bold ${
-                            isPassing
-                              ? 'bg-green-100 text-green-700'
+                          className={`inline-flex items-center justify-center rounded-lg px-3 py-1 text-sm font-bold shadow-sm ${
+                            normalizedScore >= 10
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : normalizedScore >= 7
+                              ? 'bg-amber-100 text-amber-700'
                               : 'bg-red-100 text-red-700'
                           }`}
                         >
                           {grade.score}
                         </span>
                       </TableCell>
-                      <TableCell>{grade.maxScore}</TableCell>
+                      <TableCell className="text-center text-muted-foreground">{grade.maxScore}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">T{grade.trimester}</Badge>
+                        <Badge variant="outline" className="text-xs border-blue-200 text-blue-600 bg-blue-50">T{grade.trimester}</Badge>
                       </TableCell>
                       <TableCell className="hidden sm:table-cell max-w-[200px] truncate text-muted-foreground text-xs">
                         {grade.comment || '—'}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
-                            onClick={() => openEditDialog(grade)}
-                          >
+                          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-blue-50 hover:text-blue-600 transition-colors" onClick={() => openEditDialog(grade)}>
                             <Edit className="h-3.5 w-3.5" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
-                            onClick={() => handleDelete(grade.id)}
-                          >
+                          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-red-50 hover:text-red-600 transition-colors" onClick={() => handleDelete(grade.id)}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
@@ -352,6 +349,16 @@ export default function TeacherGrades() {
                     </TableRow>
                   );
                 })}
+                {/* Average Row */}
+                <TableRow className="bg-gradient-to-r from-blue-50 to-indigo-50 font-bold">
+                  <TableCell colSpan={2} className="text-blue-700">Moyenne</TableCell>
+                  <TableCell className="text-center">
+                    <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-sm">
+                      {getClassAverage()}/20
+                    </Badge>
+                  </TableCell>
+                  <TableCell colSpan={4}></TableCell>
+                </TableRow>
               </TableBody>
             </Table>
           </ScrollArea>
@@ -361,7 +368,8 @@ export default function TeacherGrades() {
       {/* Create/Edit Grade Dialog */}
       <Dialog open={dialogOpen} onOpenChange={(open) => !open && resetForm()}>
         <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
+          <div className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-t-lg -mx-6 -mt-6 mb-0" />
+          <DialogHeader className="pt-2">
             <DialogTitle className="flex items-center gap-2">
               <GraduationCap className="h-5 w-5 text-blue-500" />
               {editingGrade ? 'Modifier la note' : 'Ajouter une note'}
@@ -374,30 +382,21 @@ export default function TeacherGrades() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Cours *</Label>
-              <Select
-                value={formCourseId}
-                onValueChange={(v) => {
-                  setFormCourseId(v);
-                  setFormStudentId('');
-                }}
-              >
-                <SelectTrigger className="w-full">
+              <Select value={formCourseId} onValueChange={(v) => { setFormCourseId(v); setFormStudentId(''); }}>
+                <SelectTrigger className="w-full focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
                   <SelectValue placeholder="Sélectionner un cours" />
                 </SelectTrigger>
                 <SelectContent>
                   {courses.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name} — {c.class?.name}
-                    </SelectItem>
+                    <SelectItem key={c.id} value={c.id}>{c.name} — {c.class?.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
               <Label>Élève *</Label>
               <Select value={formStudentId} onValueChange={setFormStudentId} disabled={!formCourseId}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
                   <SelectValue placeholder={formCourseId ? 'Sélectionner un élève' : 'Sélectionnez d\'abord un cours'} />
                 </SelectTrigger>
                 <SelectContent>
@@ -407,36 +406,20 @@ export default function TeacherGrades() {
                 </SelectContent>
               </Select>
             </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Note *</Label>
-                <Input
-                  type="number"
-                  placeholder="0"
-                  min="0"
-                  max={formMaxScore}
-                  step="0.25"
-                  value={formScore}
-                  onChange={(e) => setFormScore(e.target.value)}
-                />
+                <Input type="number" placeholder="0" min="0" max={formMaxScore} step="0.25" value={formScore} onChange={(e) => setFormScore(e.target.value)} className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" />
               </div>
               <div className="space-y-2">
                 <Label>Note max</Label>
-                <Input
-                  type="number"
-                  placeholder="20"
-                  min="1"
-                  value={formMaxScore}
-                  onChange={(e) => setFormMaxScore(e.target.value)}
-                />
+                <Input type="number" placeholder="20" min="1" value={formMaxScore} onChange={(e) => setFormMaxScore(e.target.value)} className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" />
               </div>
             </div>
-
             <div className="space-y-2">
               <Label>Trimestre *</Label>
               <Select value={formTrimester} onValueChange={setFormTrimester}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
                   <SelectValue placeholder="Sélectionner le trimestre" />
                 </SelectTrigger>
                 <SelectContent>
@@ -446,27 +429,15 @@ export default function TeacherGrades() {
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
               <Label>Commentaire</Label>
-              <Textarea
-                placeholder="Commentaire sur la performance..."
-                value={formComment}
-                onChange={(e) => setFormComment(e.target.value)}
-                rows={3}
-              />
+              <Textarea placeholder="Commentaire sur la performance..." value={formComment} onChange={(e) => setFormComment(e.target.value)} rows={3} className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" />
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
-              Annuler
-            </Button>
-            <Button
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={handleSubmit}
-              disabled={submitting || !formCourseId || !formStudentId || !formScore || !formTrimester}
-            >
+            <Button variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }} className="hover:scale-[1.02] active:scale-[0.98] transition-all">Annuler</Button>
+            <Button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:scale-[1.02] active:scale-[0.98] transition-transform" onClick={handleSubmit} disabled={submitting || !formCourseId || !formStudentId || !formScore || !formTrimester}>
               {submitting ? 'Enregistrement...' : editingGrade ? 'Modifier' : 'Ajouter'}
             </Button>
           </DialogFooter>

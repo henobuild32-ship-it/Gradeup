@@ -136,22 +136,25 @@ export default function TeacherLessons() {
   if (!user) return null;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Mes Leçons</h1>
-          <p className="text-muted-foreground mt-1">
-            Publiez et gérez vos leçons quotidiennes
-          </p>
+    <div className="space-y-6 animate-fade-in">
+      {/* Page Header */}
+      <div className="mb-6 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Mes Leçons</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Publiez et gérez vos leçons quotidiennes
+            </p>
+          </div>
+          <Button
+            className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:scale-[1.02] active:scale-[0.98] transition-transform gap-2"
+            onClick={() => setDialogOpen(true)}
+            disabled={isAtLimit}
+          >
+            <Plus className="h-4 w-4" />
+            Publier une leçon
+          </Button>
         </div>
-        <Button
-          className="bg-blue-600 hover:bg-blue-700 gap-2"
-          onClick={() => setDialogOpen(true)}
-          disabled={isAtLimit}
-        >
-          <Plus className="h-4 w-4" />
-          Publier une leçon
-        </Button>
       </div>
 
       {/* Limit Warning */}
@@ -177,20 +180,21 @@ export default function TeacherLessons() {
           ))}
         </div>
       ) : sortedLessons.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <FileText className="h-12 w-12 text-muted-foreground/40 mb-3" />
-            <p className="text-muted-foreground">Aucune leçon publiée</p>
-            <Button
-              variant="outline"
-              className="mt-4 gap-2 border-blue-200 text-blue-700 hover:bg-blue-50"
-              onClick={() => setDialogOpen(true)}
-            >
-              <Plus className="h-4 w-4" />
-              Publier votre première leçon
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+            <FileText className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <h3 className="font-medium">Aucune leçon publiée</h3>
+          <p className="text-sm text-muted-foreground mt-1">Commencez par publier votre première leçon</p>
+          <Button
+            variant="outline"
+            className="mt-4 gap-2 border-blue-200 text-blue-700 hover:bg-blue-50 hover:scale-[1.02] active:scale-[0.98] transition-transform"
+            onClick={() => setDialogOpen(true)}
+          >
+            <Plus className="h-4 w-4" />
+            Publier votre première leçon
+          </Button>
+        </div>
       ) : (
         <div className="relative">
           <div className="absolute left-[18px] top-0 bottom-0 w-0.5 bg-blue-100" />
@@ -254,10 +258,11 @@ export default function TeacherLessons() {
 
       {/* Create Lesson Dialog */}
       <Dialog open={dialogOpen} onOpenChange={(open) => !open && resetForm()}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[500px]">
+          <div className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-t-lg -mx-6 -mt-6 mb-0" />
+          <DialogHeader className="pt-2">
             <DialogTitle className="flex items-center gap-2">
-              <Plus className="h-5 w-5 text-blue-500" />
+              <Plus className="h-5 w-5 text-blue-600" />
               Publier une leçon
             </DialogTitle>
             <DialogDescription>
@@ -274,7 +279,7 @@ export default function TeacherLessons() {
             <div className="space-y-2">
               <Label>Cours *</Label>
               <Select value={formCourseId} onValueChange={setFormCourseId}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="w-full focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:border-blue-500 transition-all">
                   <SelectValue placeholder="Sélectionner un cours" />
                 </SelectTrigger>
                 <SelectContent>
@@ -293,6 +298,7 @@ export default function TeacherLessons() {
                 placeholder="Titre de la leçon"
                 value={formTitle}
                 onChange={(e) => setFormTitle(e.target.value)}
+                className="focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:border-blue-500 transition-all"
               />
             </div>
 
@@ -303,6 +309,7 @@ export default function TeacherLessons() {
                 value={formContent}
                 onChange={(e) => setFormContent(e.target.value)}
                 rows={5}
+                className="focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:border-blue-500 transition-all"
               />
             </div>
 
@@ -313,6 +320,7 @@ export default function TeacherLessons() {
                   placeholder="Nom du fichier (ex: cours_chap3.pdf)"
                   value={formFileName}
                   onChange={(e) => setFormFileName(e.target.value)}
+                  className="focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:border-blue-500 transition-all"
                 />
                 <Button type="button" variant="outline" size="icon" className="shrink-0">
                   <Upload className="h-4 w-4" />
@@ -325,11 +333,11 @@ export default function TeacherLessons() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
+            <Button variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }} className="hover:scale-[1.02] active:scale-[0.98] transition-transform">
               Annuler
             </Button>
             <Button
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:scale-[1.02] active:scale-[0.98] transition-transform"
               onClick={handleCreate}
               disabled={submitting || !formCourseId || !formTitle.trim()}
             >
