@@ -1,0 +1,344 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useAppStore } from '@/lib/store';
+import type { UserInfo, GradeInfo } from '@/lib/types';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Progress } from '@/components/ui/progress';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  TrendingUp,
+  BookOpen,
+  Award,
+  BarChart3,
+} from 'lucide-react';
+import { toast } from 'sonner';
+
+export default function ParentGrades() {
+  const { user } = useAppStore();
+  const [children, setChildren] = useState<UserInfo[]>([]);
+  const [selectedChildId, setSelectedChildId] = useState('');
+  const [trimester, setTrimester] = useState('1');
+  const [grades, setGrades] = useState<GradeInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const schoolId = user?.schoolId || '';
+
+  useEffect(() => {
+    fetchChildren();
+  }, [user]);
+
+  useEffect(() => {
+    if (selectedChildId && schoolId) {
+      fetchGrades();
+    }
+  }, [selectedChildId, trimester, schoolId]);
+
+  const fetchChildren = async () => {
+    if (!user?.id || !schoolId) return;
+    try {
+      const res = await fetch(`/api/users?schoolId=${schoolId}&role=STUDENT&parentId=${user.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setChildren(data);
+        if (data.length > 0 && !selectedChildId) {
+          setSelectedChildId(data[0].id);
+        }
+      }
+    } catch {
+      toast.error('Erreur lors du chargement des enfants');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchGrades = async () => {
+    if (!selectedChildId) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/grades?schoolId=${schoolId}&studentId=${selectedChildId}&trimester=${trimester}`);
+      if (res.ok) {
+        setGrades(await res.json());
+      }
+    } catch {
+      toast.error('Erreur lors du chargement des notes');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const selectedChild = children.find(c => c.id === selectedChildId);
+
+  // Group grades by course
+  const gradesByCourse = grades.reduce<Record<string, GradeInfo[]>>((acc, grade) => {
+    const key = grade.courseId;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(grade);
+    return acc;
+  }, {});
+
+  // Calculate average per course
+  const courseAverages = Object.entries(gradesByCourse).map(([courseId, courseGrades]) => {
+    const avg = courseGrades.reduce((sum, g) => sum + (g.maxScore > 0 ? (g.score / g.maxScore) * 20 : 0), 0) / courseGrades.length;
+    const courseName = courseGrades[0]?.course?.name || 'Cours inconnu';
+    return { courseId, courseName, average: avg, grades: courseGrades };
+  }).sort((a, b) => b.average - a.average);
+
+  // Overall average
+  const overallAverage = grades.length > 0
+    ? grades.reduce((sum, g) => sum + (g.maxScore > 0 ? (g.score / g.maxScore) * 20 : 0), 0) / grades.length
+    : 0;
+
+  const getGradeColor = (score: number, max: number) => {
+    const pct = (score / max) * 100;
+    if (pct >= 80) return 'text-emerald-600';
+    if (pct >= 60) return 'text-amber-600';
+    return 'text-red-600';
+  };
+
+  const getProgressColor = (avg: number) => {
+    if (avg >= 16) return '[&>div]:bg-emerald-500';
+    if (avg >= 12) return '[&>div]:bg-blue-500';
+    if (avg >= 10) return '[&>div]:bg-amber-500';
+    return '[&>div]:bg-red-500';
+  };
+
+  const getAverageBadge = (avg: number) => {
+    if (avg >= 16) return { label: 'Excellent', className: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+    if (avg >= 14) return { label: 'Très bien', className: 'bg-blue-100 text-blue-700 border-blue-200' };
+    if (avg >= 12) return { label: 'Bien', className: 'bg-sky-100 text-sky-700 border-sky-200' };
+    if (avg >= 10) return { label: 'Assez bien', className: 'bg-amber-100 text-amber-700 border-amber-200' };
+    return { label: 'Insuffisant', className: 'bg-red-100 text-red-700 border-red-200' };
+  };
+
+  const trimesterLabels: Record<string, string> = {
+    '1': '1er Trimestre',
+    '2': '2ème Trimestre',
+    '3': '3ème Trimestre',
+  };
+
+  if (!user) return null;
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Notes</h1>
+        <p className="text-muted-foreground">Suivi des notes de vos enfants</p>
+      </div>
+
+      {/* Controls */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        {children.length > 1 && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground whitespace-nowrap">Enfant :</span>
+            <Select value={selectedChildId} onValueChange={setSelectedChildId}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Sélectionner un enfant" />
+              </SelectTrigger>
+              <SelectContent>
+                {children.map(child => (
+                  <SelectItem key={child.id} value={child.id}>
+                    {child.fullName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground whitespace-nowrap">Trimestre :</span>
+          <Select value={trimester} onValueChange={setTrimester}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">1er Trimestre</SelectItem>
+              <SelectItem value="2">2ème Trimestre</SelectItem>
+              <SelectItem value="3">3ème Trimestre</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="space-y-6">
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      ) : grades.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12 gap-4">
+            <BarChart3 className="size-12 text-muted-foreground/40" />
+            <p className="text-muted-foreground text-center">Aucune note disponible pour ce trimestre</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Overall Average */}
+          <Card className="border-blue-100 bg-gradient-to-r from-blue-50/50 to-white dark:from-blue-950/20 dark:to-background">
+            <CardContent className="pt-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                    <TrendingUp className="size-4 text-blue-600" />
+                    Moyenne générale — {trimesterLabels[trimester]} — {selectedChild?.fullName}
+                  </div>
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-4xl font-bold">{overallAverage.toFixed(2)}</span>
+                    <span className="text-muted-foreground text-lg">/20</span>
+                    {(() => {
+                      const badge = getAverageBadge(overallAverage);
+                      return <Badge variant="outline" className={badge.className}>{badge.label}</Badge>;
+                    })()}
+                  </div>
+                </div>
+                <div className="flex gap-4 text-sm text-muted-foreground">
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-foreground">{grades.length}</p>
+                    <p>Évaluations</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-foreground">{courseAverages.length}</p>
+                    <p>Matières</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* View Toggle */}
+          <Tabs defaultValue="overview">
+            <TabsList>
+              <TabsTrigger value="overview" className="gap-1.5">
+                <BarChart3 className="size-4" />
+                Vue d&apos;ensemble
+              </TabsTrigger>
+              <TabsTrigger value="details" className="gap-1.5">
+                <BookOpen className="size-4" />
+                Détails
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Overview - Progress bars per subject */}
+            <TabsContent value="overview">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Award className="size-5 text-blue-600" />
+                    Moyennes par matière
+                  </CardTitle>
+                  <CardDescription>Performance par cours pour le {trimesterLabels[trimester].toLowerCase()}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="max-h-[500px]">
+                    <div className="space-y-5">
+                      {courseAverages.map(({ courseId, courseName, average, grades: courseGrades }) => {
+                        const badge = getAverageBadge(average);
+                        return (
+                          <div key={courseId} className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-sm font-medium truncate">{courseName}</span>
+                                <span className="text-xs text-muted-foreground">({courseGrades.length} éval.)</span>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className={`text-sm font-bold ${average >= 10 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                  {average.toFixed(1)}/20
+                                </span>
+                                <Badge variant="outline" className={`text-[10px] ${badge.className}`}>
+                                  {badge.label}
+                                </Badge>
+                              </div>
+                            </div>
+                            <div className={`h-2.5 w-full rounded-full overflow-hidden bg-primary/10 ${getProgressColor(average)}`}>
+                              <div
+                                className="h-full rounded-full transition-all duration-500"
+                                style={{ width: `${Math.min(average * 5, 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Details - Full table */}
+            <TabsContent value="details">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <BookOpen className="size-5 text-blue-600" />
+                    Détail des évaluations
+                  </CardTitle>
+                  <CardDescription>Toutes les notes du {trimesterLabels[trimester].toLowerCase()}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="max-h-[500px]">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Cours</TableHead>
+                          <TableHead className="text-center">Note</TableHead>
+                          <TableHead className="text-center">Note max</TableHead>
+                          <TableHead className="text-center">Moyenne (/20)</TableHead>
+                          <TableHead className="hidden sm:table-cell">Commentaire</TableHead>
+                          <TableHead className="hidden md:table-cell">Date</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {[...grades].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map(grade => {
+                          const normalizedScore = grade.maxScore > 0 ? (grade.score / grade.maxScore) * 20 : 0;
+                          return (
+                            <TableRow key={grade.id}>
+                              <TableCell className="font-medium">{grade.course?.name || 'Cours'}</TableCell>
+                              <TableCell className={`text-center font-semibold ${getGradeColor(grade.score, grade.maxScore)}`}>
+                                {grade.score}
+                              </TableCell>
+                              <TableCell className="text-center text-muted-foreground">{grade.maxScore}</TableCell>
+                              <TableCell className="text-center">
+                                <span className={`font-semibold ${normalizedScore >= 10 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                  {normalizedScore.toFixed(1)}
+                                </span>
+                              </TableCell>
+                              <TableCell className="hidden sm:table-cell text-muted-foreground max-w-[200px] truncate">
+                                {grade.comment || '—'}
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell text-muted-foreground text-xs">
+                                {new Date(grade.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </>
+      )}
+    </div>
+  );
+}

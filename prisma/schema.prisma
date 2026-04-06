@@ -1,0 +1,196 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model School {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  password      String
+  currency      String   @default("USD")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  users         User[]
+  classes       SchoolClass[]
+  payments      Payment[]
+  notifications Notification[]
+  courses       Course[]
+  lessons       Lesson[]
+  grades        Grade[]
+  homework      Homework[]
+  attendance    Attendance[]
+}
+
+model User {
+  id            String   @id @default(cuid())
+  schoolId      String
+  fullName      String
+  email         String   @default("")
+  password      String
+  role          String   @default("STUDENT")
+  photoUrl      String   @default("")
+  parentId      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  school        School   @relation(fields: [schoolId], references: [id])
+  classEnrollments EnrolledClass[]
+  courses       Course[]
+  gradesStudent  Grade[]  @relation("GradeStudent")
+  gradesTeacher  Grade[]  @relation("GradeTeacher")
+  attendanceStudent Attendance[] @relation("AttendanceStudent")
+  attendanceTeacher Attendance[] @relation("AttendanceTeacher")
+  homework      Homework[]
+  lessons       Lesson[]
+  children      User[]   @relation("ParentChild")
+  parent        User?    @relation("ParentChild", fields: [parentId], references: [id])
+  payments      Payment[]
+  
+  @@unique([schoolId, fullName, role])
+}
+
+model SchoolClass {
+  id            String   @id @default(cuid())
+  schoolId      String
+  name          String
+  level         String   @default("Primaire")
+  fees          Float    @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  school        School   @relation(fields: [schoolId], references: [id])
+  enrollments   EnrolledClass[]
+  courses       Course[]
+}
+
+model EnrolledClass {
+  id            String   @id @default(cuid())
+  userId        String
+  classId       String
+  createdAt     DateTime @default(now())
+
+  user          User     @relation(fields: [userId], references: [id])
+  class         SchoolClass @relation(fields: [classId], references: [id])
+
+  @@unique([userId, classId])
+}
+
+model Course {
+  id            String   @id @default(cuid())
+  schoolId      String
+  classId       String
+  teacherId     String
+  name          String
+  description   String   @default("")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  school        School       @relation(fields: [schoolId], references: [id])
+  class         SchoolClass  @relation(fields: [classId], references: [id])
+  teacher       User         @relation(fields: [teacherId], references: [id])
+  lessons       Lesson[]
+  grades        Grade[]
+  homework      Homework[]
+}
+
+model Lesson {
+  id            String   @id @default(cuid())
+  schoolId      String
+  courseId      String
+  teacherId     String
+  title         String
+  content       String   @default("")
+  fileUrl       String   @default("")
+  fileName      String   @default("")
+  createdAt     DateTime @default(now())
+
+  school        School   @relation(fields: [schoolId], references: [id])
+  course        Course   @relation(fields: [courseId], references: [id])
+  teacher       User     @relation(fields: [teacherId], references: [id])
+}
+
+model Grade {
+  id            String   @id @default(cuid())
+  schoolId      String
+  courseId      String
+  studentId     String
+  teacherId     String
+  score         Float
+  maxScore      Float    @default(20)
+  trimester     String   @default("1")
+  comment       String   @default("")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  school        School   @relation(fields: [schoolId], references: [id])
+  course        Course   @relation(fields: [courseId], references: [id])
+  student       User     @relation("GradeStudent", fields: [studentId], references: [id])
+  teacher       User     @relation("GradeTeacher", fields: [teacherId], references: [id])
+}
+
+model Homework {
+  id            String   @id @default(cuid())
+  schoolId      String
+  courseId      String
+  teacherId     String
+  title         String
+  description   String   @default("")
+  dueDate       String   @default("")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  school        School   @relation(fields: [schoolId], references: [id])
+  course        Course   @relation(fields: [courseId], references: [id])
+  teacher       User     @relation(fields: [teacherId], references: [id])
+}
+
+model Attendance {
+  id            String   @id @default(cuid())
+  schoolId      String
+  studentId     String
+  teacherId     String
+  date          String
+  status        String   @default("absent")
+  reason        String   @default("")
+  createdAt     DateTime @default(now())
+
+  school        School   @relation(fields: [schoolId], references: [id])
+  student       User     @relation("AttendanceStudent", fields: [studentId], references: [id])
+  teacher       User     @relation("AttendanceTeacher", fields: [teacherId], references: [id])
+
+  @@unique([studentId, date])
+}
+
+model Payment {
+  id            String   @id @default(cuid())
+  schoolId      String
+  studentId     String
+  amount        Float
+  status        String   @default("pending")
+  month         String   @default("")
+  method        String   @default("cash")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  school        School   @relation(fields: [schoolId], references: [id])
+  student       User     @relation(fields: [studentId], references: [id])
+}
+
+model Notification {
+  id            String   @id @default(cuid())
+  schoolId      String
+  senderId      String   @default("")
+  targetRole    String   @default("ALL")
+  targetClassId String   @default("")
+  message       String
+  read          Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  school        School   @relation(fields: [schoolId], references: [id])
+}
