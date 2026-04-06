@@ -22,6 +22,20 @@ function randomBetween(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+function generateInviteCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = 'ECOLE-';
+  for (let i = 0; i < 6; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+  return code;
+}
+
+function generateParentCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = 'P-';
+  for (let i = 0; i < 6; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+  return code;
+}
+
 async function main() {
   console.log('🌱 Seeding demo data...');
 
@@ -42,11 +56,13 @@ async function main() {
 
   // ─── 2. Create School ───
   console.log('🏫 Creating school...');
+  const inviteCode = generateInviteCode();
   const school = await db.school.create({
     data: {
       name: 'Institut Sainte-Marie',
       email: 'contact@stmarie.cd',
       password: 'admin123',
+      inviteCode,
       currency: 'USD',
     },
   });
@@ -61,6 +77,8 @@ async function main() {
       email: 'admin@stmarie.cd',
       password: 'admin123',
       role: 'ADMIN',
+      parentCode: generateParentCode(),
+      active: true,
     },
   });
   console.log(`   Created: ${admin.fullName}`);
@@ -111,6 +129,8 @@ async function main() {
         email: `${t.name.split(' ')[1]?.toLowerCase() || t.name.toLowerCase()}@stmarie.cd`,
         password: 'teacher123',
         role: 'TEACHER',
+        parentCode: generateParentCode(),
+        active: true,
       },
     });
     teachers.push({ id: teacher.id, name: t.name, subject: t.subject });
@@ -133,6 +153,8 @@ async function main() {
         email: p.email,
         password: 'parent123',
         role: 'PARENT',
+        parentCode: generateParentCode(),
+        active: true,
       },
     });
     parents.push({ id: parent.id, name: p.name });
@@ -167,6 +189,8 @@ async function main() {
         email: `${s.name.split(' ')[1].toLowerCase()}@stmarie.cd`,
         password: 'student123',
         role: 'STUDENT',
+        parentCode: generateParentCode(),
+        active: true,
         parentId: s.parentIndex !== null ? parents[s.parentIndex].id : null,
       },
     });
@@ -582,7 +606,8 @@ async function main() {
   console.log('  ✅ Demo data seeded successfully!');
   console.log('═══════════════════════════════════════════════');
   console.log('');
-  console.log('  School: Institut Sainte-Marie (contact@stmarie.cd)');
+  console.log(`  School: Institut Sainte-Marie (contact@stmarie.cd)`);
+  console.log(`  Invite Code: ${inviteCode}`);
   console.log('  ─────────────────────────────────────────────');
   console.log('  Admin:   Directeur Mbeki / admin123');
   console.log('  Teachers: (5 accounts, password: teacher123)');

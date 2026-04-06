@@ -23,6 +23,10 @@ import {
   CheckCircle2,
   Inbox,
   Search,
+  Key,
+  Copy,
+  Check,
+  RefreshCw,
 } from 'lucide-react';
 import WelcomeBanner from './welcome-banner';
 import ActivityFeed from './activity-feed';
@@ -67,6 +71,11 @@ export default function AdminDashboard() {
   const [selectedStudent, setSelectedStudent] = useState<StudentResult | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Invite code
+  const [inviteCode, setInviteCode] = useState(user?.school?.inviteCode || '');
+  const [regeneratingCode, setRegeneratingCode] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   // Close search dropdown on outside click
   useEffect(() => {
@@ -207,6 +216,68 @@ export default function AdminDashboard() {
       {!loading && (
         <WelcomeBanner totalStudents={stats?.totalStudents ?? 0} />
       )}
+
+      {/* School Invite Code Card */}
+      <Card className="relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 rounded-2xl">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+        <CardContent className="p-5">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30">
+                <Key className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold">Code école</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Partagez ce code pour inscrire les membres</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg px-4 py-2.5">
+                <Key className="w-4 h-4 text-blue-600" />
+                <span className="text-lg font-bold font-mono tracking-wider text-blue-700">{inviteCode || '—'}</span>
+                <button
+                  onClick={() => {
+                    if (inviteCode) {
+                      navigator.clipboard.writeText(inviteCode);
+                      setCodeCopied(true);
+                      setTimeout(() => setCodeCopied(false), 2000);
+                    }
+                  }}
+                  className="text-blue-600 hover:text-blue-800 transition-colors"
+                  disabled={!inviteCode}
+                >
+                  {codeCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-blue-300 text-blue-700 hover:bg-blue-50 hover:text-blue-800 transition-all duration-200"
+                onClick={async () => {
+                  if (!user?.schoolId) return;
+                  setRegeneratingCode(true);
+                  try {
+                    const res = await fetch('/api/invite-code', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ schoolId: user.schoolId }),
+                    });
+                    const data = await res.json();
+                    if (data.inviteCode) {
+                      setInviteCode(data.inviteCode);
+                    }
+                  } catch { /* skip */ }
+                  setRegeneratingCode(false);
+                }}
+                disabled={regeneratingCode}
+              >
+                <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${regeneratingCode ? 'animate-spin' : ''}`} />
+                Régénérer
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Quick Student Search */}
       <div ref={searchRef} className="relative">

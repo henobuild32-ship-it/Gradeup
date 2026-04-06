@@ -54,6 +54,8 @@ import {
   UserCog,
   UsersRound,
   UserPlus,
+  Power,
+  PowerOff,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -62,6 +64,7 @@ interface UserItem {
   fullName: string;
   email: string;
   role: string;
+  active?: boolean;
   classEnrollments?: Array<{ class: { id: string; name: string } }>;
 }
 
@@ -264,6 +267,22 @@ export default function AdminUsers() {
     }
   };
 
+  const toggleActive = async (u: UserItem) => {
+    try {
+      const res = await fetch('/api/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: u.id, active: !u.active }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erreur');
+      toast.success(u.active ? 'Compte désactivé' : 'Compte activé');
+      fetchUsers();
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Erreur lors de l\'opération');
+    }
+  };
+
   const filteredUsers = users.filter((u) =>
     u.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     u.email.toLowerCase().includes(searchQuery.toLowerCase())
@@ -361,6 +380,7 @@ export default function AdminUsers() {
                     <TableHead>Email</TableHead>
                     <TableHead>Rôle</TableHead>
                     <TableHead>Classe</TableHead>
+                    <TableHead>Statut</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -385,6 +405,22 @@ export default function AdminUsers() {
                         {u.classEnrollments && u.classEnrollments.length > 0
                           ? u.classEnrollments.map((e) => e.class.name).join(', ')
                           : '—'}
+                      </TableCell>
+                      <TableCell>
+                        <button
+                          onClick={() => toggleActive(u)}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-200 ${
+                            u.active !== false
+                              ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                              : 'bg-red-100 text-red-700 hover:bg-red-200'
+                          }`}
+                        >
+                          {u.active !== false ? (
+                            <><Power className="w-3 h-3" /> Actif</>
+                          ) : (
+                            <><PowerOff className="w-3 h-3" /> Inactif</>
+                          )}
+                        </button>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">

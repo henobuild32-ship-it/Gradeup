@@ -4,10 +4,11 @@ import { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import type { CourseInfo, GradeInfo, AttendanceInfo, PaymentInfo, LessonInfo, NotificationInfo } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { TrendingUp, BookOpen, CalendarX, CreditCard, User, Bell, FileText, Clock, Sparkles, Target, Award } from 'lucide-react';
+import { TrendingUp, BookOpen, CalendarX, CreditCard, User, Bell, FileText, Clock, Sparkles, Target, Award, Key, Copy, Check, RefreshCw, Users } from 'lucide-react';
 import { AttendanceTrendChart } from './charts-widget';
 
 const subjectColors = [
@@ -38,6 +39,9 @@ export default function StudentDashboard() {
   const [lessons, setLessons] = useState<LessonInfo[]>([]);
   const [notifications, setNotifications] = useState<NotificationInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [parentCode, setParentCode] = useState(user?.parentCode || '');
+  const [generatingCode, setGeneratingCode] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   const classId = user?.classEnrollments?.[0]?.classId;
   const className = user?.classEnrollments?.[0]?.class?.name || '—';
@@ -222,6 +226,68 @@ export default function StudentDashboard() {
                 <span className="text-[10px] font-medium text-muted-foreground">Moyenne</span>
               </div>
             )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Parent Code Card */}
+      <Card className="relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500" />
+        <CardContent className="p-6">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg shadow-amber-500/30">
+                <Users className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold">Code Parent</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Partagez ce code avec vos parents</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-2.5">
+                <Key className="w-4 h-4 text-amber-600" />
+                <span className="text-lg font-bold font-mono tracking-wider text-amber-700">{parentCode || '—'}</span>
+                <button
+                  onClick={() => {
+                    if (parentCode) {
+                      navigator.clipboard.writeText(parentCode);
+                      setCodeCopied(true);
+                      setTimeout(() => setCodeCopied(false), 2000);
+                    }
+                  }}
+                  className="text-amber-600 hover:text-amber-800 transition-colors"
+                  disabled={!parentCode}
+                >
+                  {codeCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-amber-300 text-amber-700 hover:bg-amber-50 hover:text-amber-800 transition-all duration-200"
+                onClick={async () => {
+                  if (!user?.id) return;
+                  setGeneratingCode(true);
+                  try {
+                    const res = await fetch('/api/parent-code', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ userId: user.id }),
+                    });
+                    const data = await res.json();
+                    if (data.parentCode) {
+                      setParentCode(data.parentCode);
+                    }
+                  } catch { /* skip */ }
+                  setGeneratingCode(false);
+                }}
+                disabled={generatingCode}
+              >
+                <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${generatingCode ? 'animate-spin' : ''}`} />
+                Régénérer
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

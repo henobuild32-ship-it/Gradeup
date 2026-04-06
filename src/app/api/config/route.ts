@@ -5,6 +5,26 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const schoolId = searchParams.get('schoolId');
+    const inviteCode = searchParams.get('inviteCode');
+
+    // Lookup by invite code
+    if (inviteCode) {
+      const school = await db.school.findUnique({
+        where: { inviteCode },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          currency: true,
+          inviteCode: true,
+          createdAt: true,
+        },
+      });
+      if (!school) {
+        return NextResponse.json({ school: null });
+      }
+      return NextResponse.json({ school });
+    }
 
     if (!schoolId) {
       return NextResponse.json({ error: 'schoolId is required' }, { status: 400 });
@@ -17,6 +37,7 @@ export async function GET(request: NextRequest) {
         name: true,
         email: true,
         currency: true,
+        inviteCode: true,
         createdAt: true,
       },
     });

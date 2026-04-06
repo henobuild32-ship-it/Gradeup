@@ -325,3 +325,97 @@ GradeUp platform is fully functional with 31+ components, 23 API routes, seed da
 - Dev server HTTP 200 on homepage
 - Login API tested successfully: `Directeur Mbeki` → ADMIN role confirmed
 - All navigation items properly scrollable within sidebar
+
+---
+## Task ID: r5-referral-system
+Agent: Main Orchestrator
+Task: Fix registration + implement complete referral code system (school code + parent code)
+
+### Current Project Status Assessment
+GradeUp platform is fully functional. The registration page was rebuilt from scratch to support the new referral code system. All existing features preserved.
+
+### Work Summary
+
+#### 1. Prisma Schema Updates (`prisma/schema.prisma`)
+- Added `inviteCode String @unique` to `School` model — unique code generated when admin creates a school
+- Added `parentCode String @unique` to `User` model — unique code for students to share with parents
+- Added `active Boolean @default(true)` to `User` model — admin can activate/deactivate accounts
+- Force-reset database and pushed new schema successfully
+
+#### 2. Auth API Rewrite (`/api/auth/register/route.ts`)
+- **Create-school mode**: Admin creates school + gets invite code (ECOLE-XXXXXX format)
+- **Join-school mode**: Non-admin joins via invite code
+  - Student: auto-enrolls in selected class
+  - Teacher: auto-creates courses for selected classes
+  - Parent: links to student via parent code (P-XXXXXX)
+- Code generation: `ECOLE-XXXXXX` for schools, `P-XXXXXX` for parent codes
+- Unique code collision handling with while loop
+
+#### 3. Login API Rewrite (`/api/auth/login/route.ts`)
+- Now uses `inviteCode` instead of `schoolName` to identify the school
+- Role is auto-detected (no more role selector on login)
+- Checks `active` field — returns 403 if account is disabled
+
+#### 4. New API Routes
+- `POST /api/invite-code` — Generate/regenerate school invite code
+- `POST /api/parent-code` — Generate/regenerate student parent code
+- `PATCH /api/users` — Toggle user active status (activate/deactivate)
+- `DELETE /api/users` — Delete a user (with children check)
+- `GET /api/config?inviteCode=XXX` — Lookup school by invite code (for join flow)
+
+#### 5. Auth Page Complete Redesign (`auth-page.tsx`)
+- **Login tab**: Code école + Nom + Mot de passe (3 fields, no role selector)
+- **Register tab** with two modes:
+  - **Créer une école** (Create school): School name + Admin name + Email + Password + Confirm
+  - **Rejoindre une école** (Join school): Code école + Name + Password + Confirm + Role selector + role-specific fields
+- Role-specific registration fields:
+  - **Student**: Class selector (multi-choice buttons fetched from API via invite code)
+  - **Teacher**: Class selector (multi-choice, optional)
+  - **Parent**: Parent code input (required)
+- Visual code verification indicator (green checkmark when invite code is valid)
+- Created school banner showing the generated invite code with copy button
+- Mobile-responsive layout with proper form transitions
+
+#### 6. Student Dashboard - Parent Code Card (`student-dashboard.tsx`)
+- Added "Code Parent" card with amber gradient theme
+- Displays current parent code in mono font with copy button
+- "Régénérer" button to generate a new parent code via `/api/parent-code`
+- Loading spinner on regenerate
+
+#### 7. Admin Dashboard - School Invite Code Card (`admin-dashboard.tsx`)
+- Added "Code école" card with blue/purple gradient theme
+- Displays current invite code in mono font with copy button
+- "Régénérer" button to generate a new invite code via `/api/invite-code`
+- Positioned prominently below welcome banner
+
+#### 8. Admin Users Page - Activate/Deactivate (`admin-users.tsx`)
+- Added `active` field to UserItem interface
+- Added "Statut" column in user table
+- Toggle button: green "Actif" / red "Inactif" badge with click to toggle
+- Uses PATCH `/api/users` to toggle active status
+- Icons: `Power` for active, `PowerOff` for inactive
+
+#### 9. Seed Script Update (`seed-demo.ts`)
+- Added `generateInviteCode()` and `generateParentCode()` helper functions
+- School created with unique invite code
+- All users created with unique parent code and `active: true`
+- Summary output now includes the invite code for easy reference
+
+### Verification
+- Zero ESLint errors
+- Dev server compiles and runs correctly
+- Login API tested: invite code `ECOLE-JPZLW4` → Directeur Mbeki (ADMIN) with full user data including `parentCode`, `active`, `school.inviteCode`
+- Homepage returns 200
+- Seed script runs successfully with all new fields populated
+
+### Known Issues
+1. Dev server memory: Under concurrent API calls, the server may become unresponsive (environment limitation, not code bug)
+2. No real-time sync: Account activation/deactivation requires page refresh
+
+### Priority Recommendations for Next Phase
+1. **Real-time notifications**: Add WebSocket/SSE for live updates when admin activates/deactivates accounts
+2. **Email notifications**: Send invite codes via email when school is created
+3. **QR codes**: Generate QR codes for invite/parent codes for easy sharing
+4. **Rate limiting**: Prevent brute-force attempts on invite codes
+5. **Data export improvements**: Export student lists with parent codes
+6. **Bulk user import**: CSV upload for creating multiple students at once

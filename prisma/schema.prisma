@@ -12,6 +12,7 @@ model School {
   name          String
   email         String   @unique
   password      String
+  inviteCode    String   @unique
   currency      String   @default("USD")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -35,6 +36,8 @@ model User {
   password      String
   role          String   @default("STUDENT")
   photoUrl      String   @default("")
+  parentCode    String   @unique
+  active        Boolean  @default(true)
   parentId      String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

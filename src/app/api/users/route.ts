@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
+function generateParentCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = 'P-';
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -66,6 +75,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    let parentCodeVal = await generateParentCode();
+    while (await db.user.findUnique({ where: { parentCode: parentCodeVal } })) {
+      parentCodeVal = generateParentCode();
+    }
+
     const user = await db.user.create({
       data: {
         schoolId,
@@ -75,6 +89,7 @@ export async function POST(request: NextRequest) {
         role,
         photoUrl: photoUrl || '',
         parentId: parentId || null,
+        parentCode: parentCodeVal,
       },
       include: {
         school: true,
@@ -106,6 +121,66 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ user: userWithEnrollments }, { status: 201 });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+// PATCH: Toggle user active status or update user info
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { userId, active, fullName, email } = body;
+
+    if (!userId) {
+      return NextResponse.json({ error: 'userId requis.' }, { status: 400 });
+    }
+
+    const updateData: Record<string, unknown> = {};
+    if (active !== undefined) updateData.active = active;
+    if (fullName) updateData.fullName = fullName;
+    if (email !== undefined) updateData.email = email;
+
+    const user = await db.user.update({
+      where: { id: userId },
+      data: updateData,
+      include: {
+        school: true,
+        classEnrollments: { include: { class: true } },
+        children: true,
+      },
+    });
+
+    return NextResponse.json({ user });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Erreur interne.';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+// DELETE: Remove a user
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
+
+    if (!userId) {
+      return NextResponse.json({ error: 'userId requis.' }, { status: 400 });
+    }
+
+    // Check if user has children (parent)
+    const children = await db.user.findMany({ where: { parentId: userId } });
+    if (children.length > 0) {
+      return NextResponse.json(
+        { error: 'Impossible de supprimer un utilisateur lié à d\'autres comptes.' },
+        { status: 400 }
+      );
+    }
+
+    await db.user.delete({ where: { id: userId } });
+
+    return NextResponse.json({ success: true });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Erreur interne.';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
