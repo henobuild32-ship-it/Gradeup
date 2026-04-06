@@ -290,3 +290,38 @@ A comprehensive 500+ line TypeScript seed script using `PrismaClient` directly (
 - `npm run lint`: Zero ESLint errors
 - Direct database query verification: all counts match expectations
 - Dev server unavailable at time of verification (login curl test deferred)
+
+---
+## Task ID: r4-logo-sidebar
+Agent: Main Orchestrator
+Task: Add custom GradeUp logo and ensure scrollable sidebar navigation
+
+### Current Project Status Assessment
+GradeUp platform is fully functional with 31+ components, 23 API routes, seed data, charts, calendar, messages, profile pages. All working correctly.
+
+### Work Summary
+
+#### 1. Custom Logo Integration
+- Copied user-uploaded GradeUp logo (`logo-gradeup.png`) to `/public/logo-gradeup.png`
+- Logo features graduation cap, "GRADE UP" text, "ELEVATE YOUR FUTURE" tagline
+- Replaced all GraduationCap icon usages with the actual logo image
+
+#### 2. Auth Page (`auth-page.tsx`)
+- Replaced branding panel icon with `<img>` logo (w-14 h-14) + "ELEVATE YOUR FUTURE" tagline
+- Replaced mobile header icon with logo image (w-10 h-10)
+- Replaced card header GraduationCap icon with larger logo (w-20 h-20)
+- Removed unused `GraduationCap` import from lucide-react
+
+#### 3. App Layout (`app-layout.tsx`)
+- Replaced sidebar brand icons (collapsed + expanded) with logo `<img>` tags
+- Added logo in mobile header (visible on `lg:hidden`)
+- Added `ChevronDown` collapse button in expanded sidebar header
+- Replaced `GraduationCap` nav icon with `School` icon from lucide-react
+- Ensured `ScrollArea` properly wraps all navigation items (flex-1 with shrink-0 on brand + user sections)
+- Sidebar structure: Brand (shrink-0) → Separator → Scrollable Nav (flex-1) → Separator → User Info (shrink-0)
+
+### Verification
+- Zero ESLint errors
+- Dev server HTTP 200 on homepage
+- Login API tested successfully: `Directeur Mbeki` → ADMIN role confirmed
+- All navigation items properly scrollable within sidebar

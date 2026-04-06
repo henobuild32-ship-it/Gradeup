@@ -17,7 +17,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  GraduationCap,
   Loader2,
   Eye,
   EyeOff,
@@ -178,10 +177,11 @@ export default function AuthPage() {
 
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
-              <GraduationCap className="w-8 h-8 text-white" />
+            <img src="/logo-gradeup.png" alt="GradeUp" className="w-14 h-14 rounded-xl object-contain drop-shadow-lg" />
+            <div className="flex flex-col">
+              <span className="text-2xl font-bold tracking-tight">GradeUp</span>
+              <span className="text-xs text-white/50 font-medium tracking-wide">ELEVATE YOUR FUTURE</span>
             </div>
-            <span className="text-2xl font-bold tracking-tight">GradeUp</span>
           </div>
         </div>
 
@@ -229,9 +229,7 @@ export default function AuthPage() {
       <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-8 lg:p-12 bg-background relative z-10">
         {/* Mobile branding */}
         <div className="lg:hidden flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-lg">
-            <GraduationCap className="w-6 h-6" />
-          </div>
+          <img src="/logo-gradeup.png" alt="GradeUp" className="w-10 h-10 rounded-lg object-contain drop-shadow-lg" />
           <span className="text-xl font-bold text-foreground">GradeUp</span>
         </div>
 
@@ -241,9 +239,7 @@ export default function AuthPage() {
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-600" />
             
             <CardHeader className="text-center pb-2 pt-8">
-              <div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mb-4 shadow-lg shadow-blue-500/20">
-                <GraduationCap className="w-8 h-8 text-white" />
-              </div>
+              <img src="/logo-gradeup.png" alt="GradeUp" className="mx-auto w-20 h-20 object-contain mb-4 drop-shadow-lg" />
               <CardTitle className="text-2xl font-bold">Bienvenue</CardTitle>
               <CardDescription>
                 Connectez-vous ou créez votre école
