@@ -31,6 +31,9 @@ import ParentDashboard from '@/components/gradeup/parent-dashboard';
 import ParentGrades from '@/components/gradeup/parent-grades';
 import ParentPayments from '@/components/gradeup/parent-payments';
 import ParentNotifications from '@/components/gradeup/parent-notifications';
+import ProfilePage from '@/components/gradeup/profile-page';
+import MessageCenter from '@/components/gradeup/message-center';
+import SchoolCalendar from '@/components/gradeup/school-calendar';
 
 function PageRouter({ page }: { page: PageView }) {
   if (page === 'auth' || page === 'register') return <AuthPage />;
@@ -60,6 +63,9 @@ function PageRouter({ page }: { page: PageView }) {
   if (page === 'parent-grades') return <ParentGrades />;
   if (page === 'parent-payments') return <ParentPayments />;
   if (page === 'parent-notifications') return <ParentNotifications />;
+  if (page === 'profile') return <ProfilePage />;
+  if (page === 'messages') return <MessageCenter />;
+  if (page === 'calendar') return <SchoolCalendar />;
   return <AuthPage />;
 }
 

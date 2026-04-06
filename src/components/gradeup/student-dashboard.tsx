@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { TrendingUp, BookOpen, CalendarX, CreditCard, User, Bell, FileText, Clock, Sparkles, Target, Award } from 'lucide-react';
+import { AttendanceTrendChart } from './charts-widget';
 
 const subjectColors = [
   { border: 'border-l-blue-400', bg: 'bg-blue-50', text: 'text-blue-600' },
@@ -407,6 +408,9 @@ export default function StudentDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Attendance Trend Chart */}
+      {user?.schoolId && <AttendanceTrendChart schoolId={user.schoolId} />}
 
       {/* Motivational Quote Section */}
       <Card className="overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">

@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import WelcomeBanner from './welcome-banner';
 import ActivityFeed from './activity-feed';
+import { MonthlyRevenueChart, GradeDistributionChart } from './charts-widget';
 
 interface Stats {
   totalStudents: number;
@@ -184,7 +185,7 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Welcome Banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-blue-500 to-blue-700 p-6 lg:p-8 text-white shadow-xl shadow-blue-500/20">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-blue-500 to-blue-700 p-6 lg:p-8 text-white shadow-xl shadow-[0_0_40px_-10px_rgba(59,130,246,0.15)]">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wOCkiLz48L3N2Zz4=')] opacity-50" />
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-2">
@@ -298,7 +299,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="stagger-children grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {loading
           ? Array.from({ length: 4 }).map((_, i) => (
               <Skeleton key={i} className="h-36 rounded-xl" />
@@ -306,7 +307,7 @@ export default function AdminDashboard() {
           : statCards.map((card, index) => (
               <Card
                 key={card.title}
-                className={`group border ${card.border} overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 hover:border-opacity-60`}
+                className={`group border ${card.border} overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 hover:border-opacity-60 hover:brightness-110 animate-scale-in rounded-2xl`}
                 style={{ animationDelay: `${index * 80}ms` }}
               >
                 <div className={`absolute inset-0 bg-gradient-to-br ${card.bg} opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
@@ -325,7 +326,7 @@ export default function AdminDashboard() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">{card.title}</p>
-                    <p className="text-2xl font-bold text-foreground">{card.value}</p>
+                    <p className="text-2xl font-bold text-foreground transition-all duration-700">{card.value}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -387,7 +388,9 @@ export default function AdminDashboard() {
       )}
 
       {/* Quick Actions */}
-      <Card className="overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
+      <Card className="overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 hover:brightness-110 rounded-2xl relative">
+        {/* Decorative dots pattern */}
+        <div className="absolute top-0 right-0 w-32 h-32 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjEiIGZpbGw9InJnYmEoNTksMTMwLDI0NiwwLjA4KSIvPjwvc3ZnPg==')] bg-repeat opacity-50 pointer-events-none" />
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <div className="p-1.5 rounded-lg bg-blue-50">
@@ -396,10 +399,10 @@ export default function AdminDashboard() {
             Actions rapides
           </CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-3">
+        <CardContent className="flex flex-wrap gap-3 relative">
           <Button
             onClick={() => setCurrentPage('admin-users')}
-            className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 hover:scale-[1.02] transition-all duration-300"
+            className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 hover:scale-[1.02] hover:brightness-110 active:scale-[0.97] transition-all duration-200"
           >
             <Plus className="h-4 w-4 mr-2" />
             Ajouter un élève
@@ -407,7 +410,7 @@ export default function AdminDashboard() {
           <Button
             variant="outline"
             onClick={() => setCurrentPage('admin-classes')}
-            className="border-blue-200 text-blue-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:border-blue-300 hover:scale-[1.02] transition-all duration-300"
+            className="border-blue-200 text-blue-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:border-blue-300 hover:scale-[1.02] hover:brightness-110 active:scale-[0.97] transition-all duration-200 rounded-xl"
           >
             <BookOpen className="h-4 w-4 mr-2" />
             Créer une classe
@@ -415,7 +418,7 @@ export default function AdminDashboard() {
           <Button
             variant="outline"
             onClick={() => setCurrentPage('admin-notifications')}
-            className="border-blue-200 text-blue-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:border-blue-300 hover:scale-[1.02] transition-all duration-300"
+            className="border-blue-200 text-blue-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:border-blue-300 hover:scale-[1.02] hover:brightness-110 active:scale-[0.97] transition-all duration-200 rounded-xl"
           >
             <Bell className="h-4 w-4 mr-2" />
             Envoyer notification
@@ -423,13 +426,21 @@ export default function AdminDashboard() {
         </CardContent>
       </Card>
 
+      {/* Charts Section */}
+      {user?.schoolId && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <MonthlyRevenueChart schoolId={user.schoolId} />
+          <GradeDistributionChart schoolId={user.schoolId} />
+        </div>
+      )}
+
       {/* Activity Feed */}
       {user?.schoolId && <ActivityFeed schoolId={user.schoolId} />}
 
       {/* Alerts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Pending Payments */}
-        <Card className="transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
+        <Card className="transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 hover:brightness-110 rounded-2xl">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
               <div className="p-1.5 rounded-lg bg-yellow-50">
@@ -477,7 +488,7 @@ export default function AdminDashboard() {
         </Card>
 
         {/* Overdue Payments */}
-        <Card className="transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
+        <Card className="transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 hover:brightness-110 rounded-2xl">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
               <div className="p-1.5 rounded-lg bg-red-50">

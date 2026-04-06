@@ -92,7 +92,12 @@ export default function AiChat({ schoolId, userId, role }: AiChatProps) {
   const handleClear = () => { clearChatMessages(chatKey); };
 
   return (
-    <Card className="flex flex-col h-[600px] shadow-lg border-blue-100">
+    <Card className="flex flex-col h-[600px] shadow-lg border-blue-100 transition-all duration-300 hover:shadow-xl hover:border-blue-200 rounded-2xl relative overflow-hidden">
+      {/* Gradient thinking indicator at top when AI is loading */}
+      {loading && (
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-500 animate-gradient-bg z-20" />
+      )}
+
       {/* Gradient Header */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 flex items-center gap-3 rounded-t-lg">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
@@ -100,7 +105,13 @@ export default function AiChat({ schoolId, userId, role }: AiChatProps) {
         </div>
         <div>
           <p className="text-sm font-semibold text-white">IA Gradie</p>
-          <p className="text-xs text-blue-200">En ligne — prêt à vous aider</p>
+          <p className="text-xs text-blue-200 flex items-center gap-1.5">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+            </span>
+            En ligne — prêt à vous aider
+          </p>
         </div>
       </div>
 
@@ -136,7 +147,7 @@ export default function AiChat({ schoolId, userId, role }: AiChatProps) {
             )}
 
             {messages.map((msg) => (
-              <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-scale-in`}>
                 {msg.role === 'assistant' && (
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white mt-1 shadow-sm">
                     <Bot className="h-4 w-4" />
@@ -202,7 +213,7 @@ export default function AiChat({ schoolId, userId, role }: AiChatProps) {
             />
           </div>
           <Button
-            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shrink-0 hover:scale-[1.05] active:scale-[0.95] transition-all shadow-lg shadow-blue-500/20"
+            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shrink-0 hover:scale-[1.05] hover:brightness-110 active:scale-[0.97] transition-all duration-200 shadow-lg shadow-blue-500/20"
             onClick={() => handleSend()}
             disabled={!input.trim() || loading}
             size="icon"

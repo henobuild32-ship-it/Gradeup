@@ -37,6 +37,9 @@ import {
   LogOut,
   Menu,
   ChevronLeft,
+  User,
+  MessageSquare,
+  CalendarDays,
 } from 'lucide-react';
 
 interface NavItem {
@@ -55,6 +58,9 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Configuration', page: 'admin-config', icon: Settings, emoji: '⚙️' },
     { label: 'Rapports', page: 'admin-reports', icon: BarChart3, emoji: '📈' },
     { label: 'Notifications', page: 'admin-notifications', icon: Bell, emoji: '🔔' },
+    { label: 'Messages', page: 'messages', icon: MessageSquare, emoji: '💬' },
+    { label: 'Calendrier', page: 'calendar', icon: CalendarDays, emoji: '📆' },
+    { label: 'Profil', page: 'profile', icon: User, emoji: '👤' },
   ],
   TEACHER: [
     { label: 'Tableau de bord', page: 'teacher-dashboard', icon: LayoutDashboard, emoji: '📊' },
@@ -64,6 +70,8 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Devoirs', page: 'teacher-homework', icon: ClipboardCheck, emoji: '📋' },
     { label: 'Absences', page: 'teacher-attendance', icon: Calendar, emoji: '📅' },
     { label: 'IA Gradie', page: 'teacher-ai', icon: Bot, emoji: '🤖' },
+    { label: 'Calendrier', page: 'calendar', icon: CalendarDays, emoji: '📆' },
+    { label: 'Profil', page: 'profile', icon: User, emoji: '👤' },
   ],
   STUDENT: [
     { label: 'Tableau de bord', page: 'student-dashboard', icon: LayoutDashboard, emoji: '📊' },
@@ -74,12 +82,15 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Paiements', page: 'student-payments', icon: CreditCard, emoji: '💳' },
     { label: 'IA Gradie', page: 'student-ai', icon: Bot, emoji: '🤖' },
     { label: 'Notifications', page: 'student-notifications', icon: Bell, emoji: '🔔' },
+    { label: 'Calendrier', page: 'calendar', icon: CalendarDays, emoji: '📆' },
+    { label: 'Profil', page: 'profile', icon: User, emoji: '👤' },
   ],
   PARENT: [
     { label: 'Tableau de bord', page: 'parent-dashboard', icon: LayoutDashboard, emoji: '📊' },
     { label: 'Suivi scolaire', page: 'parent-grades', icon: BarChart3, emoji: '📊' },
     { label: 'Paiements', page: 'parent-payments', icon: CreditCard, emoji: '💳' },
     { label: 'Notifications', page: 'parent-notifications', icon: Bell, emoji: '🔔' },
+    { label: 'Profil', page: 'profile', icon: User, emoji: '👤' },
   ],
 };
 
@@ -119,6 +130,9 @@ const pageTitles: Record<PageView, string> = {
   'parent-grades': 'Suivi scolaire',
   'parent-payments': 'Paiements',
   'parent-notifications': 'Notifications',
+  'profile': 'Profil',
+  'messages': 'Messages',
+  'calendar': 'Calendrier',
 };
 
 interface AppLayoutProps {
@@ -161,7 +175,7 @@ function SidebarContent({
 
         {/* Nav items - icons only */}
         <ScrollArea className="flex-1 py-2">
-          <nav className="flex flex-col items-center gap-1 px-2">
+          <nav className="stagger-children flex flex-col items-center gap-1 px-2">
             {navItems.map((item) => {
               const isActive = currentPage === item.page;
               return (
@@ -170,10 +184,10 @@ function SidebarContent({
                     <button
                       onClick={() => onNavigate(item.page)}
                       className={`
-                        flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200
+                        flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-200 focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:ring-offset-2
                         ${isActive
                           ? 'bg-gradient-to-br from-sidebar-primary/20 to-sidebar-primary/10 text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-primary/30'
-                          : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground hover:scale-105'
+                          : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground hover:scale-105 hover:brightness-110'
                         }
                       `}
                     >
@@ -231,7 +245,7 @@ function SidebarContent({
 
       {/* Navigation */}
       <ScrollArea className="flex-1 py-3">
-        <nav className="flex flex-col gap-1 px-3">
+        <nav className="stagger-children flex flex-col gap-1 px-3">
           {navItems.map((item) => {
             const isActive = currentPage === item.page;
             return (
@@ -239,10 +253,10 @@ function SidebarContent({
                 key={item.page}
                 onClick={() => onNavigate(item.page)}
                 className={`
-                  flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200
+                  flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:ring-offset-2
                   ${isActive
                     ? 'bg-gradient-to-r from-sidebar-primary/20 to-sidebar-primary/10 text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-primary/20'
-                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground hover:brightness-110'
                   }
                 `}
               >
@@ -310,6 +324,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
           sidebarOpen ? 'w-60' : 'w-[60px]'
         }`}
       >
+        {/* Animated gradient border on left edge of sidebar */}
+        <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-blue-500 via-indigo-500 to-purple-500 opacity-60 z-10" />
         <SidebarContent
           collapsed={!sidebarOpen}
           user={user}
@@ -366,8 +382,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
               </TooltipContent>
             </Tooltip>
 
-            <h2 className="text-base font-semibold text-foreground">
+            <h2 className="text-base font-semibold text-foreground relative">
               {pageTitles[currentPage] || 'Tableau de bord'}
+              <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full" />
             </h2>
           </div>
 
@@ -378,13 +395,15 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="relative hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                  className="relative hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 hover:brightness-110 active:scale-[0.97]"
                   onClick={() => {
                     const notifPage = `${user.role.toLowerCase()}-notifications` as PageView;
                     setCurrentPage(notifPage);
                   }}
                 >
                   <Bell className="w-4 h-4" />
+                  {/* Pulsing notification dot */}
+                  <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 animate-pulse-ring text-red-500" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Notifications</TooltipContent>
@@ -415,7 +434,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         {/* Footer with gradient divider */}
         <footer className="shrink-0 relative">
           <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-300 to-transparent" />
-          <div className="py-3 px-4 lg:px-6">
+          <div className="py-3 px-4 lg:px-6 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjAuNSIgZmlsbD0icmdiYSgwLDAsMCwwLjAzKSIvPjwvc3ZnPg==')] bg-repeat">
             <p className="text-xs text-muted-foreground text-center">
               © GradeUp – Créé par{' '}
               <span className="font-medium text-blue-600">Axions Labs</span>

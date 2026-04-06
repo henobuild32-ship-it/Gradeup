@@ -164,12 +164,17 @@ export default function AuthPage() {
       {/* Left Branding Panel */}
       <div className="hidden lg:flex lg:w-1/2 xl:w-[55%] bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white flex-col justify-between p-8 xl:p-12 relative overflow-hidden">
         {/* Animated gradient shift overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-indigo-900/40 via-transparent to-blue-400/20 animate-[pulse_8s_ease-in-out_infinite]" />
+        <div className="absolute inset-0 bg-gradient-to-tl from-indigo-900/40 via-transparent to-blue-400/20 animate-gradient-bg" />
         
         {/* Decorative circles */}
         <div className="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-white/5 animate-[spin_30s_linear_infinite]" />
         <div className="absolute -bottom-32 -left-32 w-96 h-96 rounded-full bg-white/5 animate-[spin_25s_linear_infinite_reverse]" />
         <div className="absolute top-1/2 left-1/3 w-48 h-48 rounded-full bg-white/5 animate-[spin_20s_linear_infinite]" />
+
+        {/* Floating decorative shapes */}
+        <div className="absolute top-16 right-24 w-16 h-16 rounded-full bg-white/10 animate-float" />
+        <div className="absolute bottom-32 right-16 w-10 h-10 rounded-full bg-white/8 animate-float-delayed" />
+        <div className="absolute top-1/2 right-48 w-6 h-6 rounded-full bg-white/12 animate-float" />
 
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-2">
@@ -231,7 +236,7 @@ export default function AuthPage() {
         </div>
 
         <div className="w-full max-w-md">
-          <Card className="border-0 shadow-xl shadow-blue-500/5 relative overflow-hidden animate-fade-in">
+          <Card className="border-0 shadow-2xl shadow-blue-500/10 relative overflow-hidden animate-fade-in rounded-2xl">
             {/* Gradient border effect */}
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-600" />
             
@@ -247,8 +252,8 @@ export default function AuthPage() {
             <CardContent className="pb-8">
               <Tabs defaultValue="login" value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="w-full grid grid-cols-2 mb-6">
-                  <TabsTrigger value="login" className="transition-all">Connexion</TabsTrigger>
-                  <TabsTrigger value="register" className="transition-all">Inscription</TabsTrigger>
+                  <TabsTrigger value="login" className="transition-all duration-500">Connexion</TabsTrigger>
+                  <TabsTrigger value="register" className="transition-all duration-500">Inscription</TabsTrigger>
                 </TabsList>
 
                 {/* Login Tab */}
@@ -261,7 +266,7 @@ export default function AuthPage() {
                         placeholder="Jean Dupont"
                         value={loginFullName}
                         onChange={(e) => setLoginFullName(e.target.value)}
-                        className="h-11 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                        className="h-11 focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:ring-offset-2 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 rounded-xl"
                       />
                     </div>
                     <div className="space-y-2">
@@ -271,7 +276,7 @@ export default function AuthPage() {
                         placeholder="École Excellence"
                         value={loginSchoolName}
                         onChange={(e) => setLoginSchoolName(e.target.value)}
-                        className="h-11 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                        className="h-11 focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:ring-offset-2 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 rounded-xl"
                       />
                     </div>
                     <div className="space-y-2">
@@ -283,7 +288,7 @@ export default function AuthPage() {
                           placeholder="••••••••"
                           value={loginPassword}
                           onChange={(e) => setLoginPassword(e.target.value)}
-                          className="h-11 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                          className="h-11 focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:ring-offset-2 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 rounded-xl"
                         />
                         <button
                           type="button"
@@ -297,7 +302,7 @@ export default function AuthPage() {
                     <div className="space-y-2">
                       <Label htmlFor="login-role">Type de compte</Label>
                       <Select value={loginRole} onValueChange={(v) => setLoginRole(v as UserRole)}>
-                        <SelectTrigger className="w-full h-11 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" id="login-role">
+                        <SelectTrigger className="w-full h-11 focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:ring-offset-2 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 rounded-xl" id="login-role">
                           <SelectValue placeholder="Sélectionner..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -308,7 +313,7 @@ export default function AuthPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <Button type="submit" className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-blue-500/25" size="lg" disabled={loginLoading}>
+                    <Button type="submit" className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-[1.02] hover:brightness-110 active:scale-[0.97] transition-all duration-200 shadow-lg shadow-blue-500/25" size="lg" disabled={loginLoading}>
                       {loginLoading ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -331,7 +336,7 @@ export default function AuthPage() {
                         placeholder="Jean Dupont"
                         value={regFullName}
                         onChange={(e) => setRegFullName(e.target.value)}
-                        className="h-11 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                        className="h-11 focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:ring-offset-2 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 rounded-xl"
                       />
                     </div>
                     <div className="space-y-2">
@@ -341,7 +346,7 @@ export default function AuthPage() {
                         placeholder="École Excellence"
                         value={regSchoolName}
                         onChange={(e) => setRegSchoolName(e.target.value)}
-                        className="h-11 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                        className="h-11 focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:ring-offset-2 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 rounded-xl"
                       />
                     </div>
                     <div className="space-y-2">
@@ -352,7 +357,7 @@ export default function AuthPage() {
                         placeholder="admin@ecole.com"
                         value={regEmail}
                         onChange={(e) => setRegEmail(e.target.value)}
-                        className="h-11 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                        className="h-11 focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:ring-offset-2 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 rounded-xl"
                       />
                     </div>
                     <div className="space-y-2">
@@ -364,7 +369,7 @@ export default function AuthPage() {
                           placeholder="••••••••"
                           value={regPassword}
                           onChange={(e) => setRegPassword(e.target.value)}
-                          className="h-11 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                          className="h-11 focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:ring-offset-2 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 rounded-xl"
                         />
                         <button
                           type="button"
@@ -384,7 +389,7 @@ export default function AuthPage() {
                           placeholder="••••••••"
                           value={regConfirmPassword}
                           onChange={(e) => setRegConfirmPassword(e.target.value)}
-                          className="h-11 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                          className="h-11 focus-visible:ring-2 focus-visible:ring-blue-500/30 focus-visible:ring-offset-2 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 rounded-xl"
                         />
                         <button
                           type="button"
@@ -395,7 +400,7 @@ export default function AuthPage() {
                         </button>
                       </div>
                     </div>
-                    <Button type="submit" className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-blue-500/25" size="lg" disabled={regLoading}>
+                    <Button type="submit" className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-[1.02] hover:brightness-110 active:scale-[0.97] transition-all duration-200 shadow-lg shadow-blue-500/25" size="lg" disabled={regLoading}>
                       {regLoading ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin" />

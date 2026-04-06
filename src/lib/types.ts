@@ -163,7 +163,10 @@ export type PageView =
   | 'parent-dashboard'
   | 'parent-grades'
   | 'parent-payments'
-  | 'parent-notifications';
+  | 'parent-notifications'
+  | 'profile'
+  | 'messages'
+  | 'calendar';
 
 export interface ChatMessage {
   id: string;
