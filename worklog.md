@@ -507,3 +507,67 @@ GradeUp platform had a critical bug where registration and login were broken due
 4. **Email integration**: Send invite codes via email
 5. **Bulk user import**: CSV upload for creating multiple students
 6. **Data export improvements**: Export with parent codes, filtered by role
+
+---
+## Task ID: r7-messaging
+Agent: Main Orchestrator
+Task: Add complete real-time internal messaging system with chat interface
+
+### Work Task
+Implement a full messaging system with Prisma model, API routes, and a rich chat UI component integrated into all 4 roles' navigation.
+
+### Work Summary
+
+#### 1. Prisma Schema (`prisma/schema.prisma`)
+- Added `Message` model with fields: id, schoolId, senderId, recipientId, content, read, createdAt
+- Relations: Message → School, sender (User "SentMessages"), recipient (User "ReceivedMessages")
+- Added `sentMessages` and `receivedMessages` relations to User model
+- Added `messages` relation to School model
+- Pushed schema to SQLite successfully
+
+#### 2. API Routes
+- **`GET /api/messages`** — Lists conversations for a user (query: userId, schoolId). Returns unique conversation partners with lastMessage, lastMessageAt, and unreadCount. Sorted by most recent.
+- **`POST /api/messages`** — Sends a new message (body: senderId, recipientId, content, schoolId). Validates all fields, content length max 5000 chars.
+- **`GET /api/messages/conversation`** — Gets messages between two users (query: userId1, userId2, schoolId). Automatically marks received messages as read. Returns messages in ascending chronological order.
+
+#### 3. Chat UI Component (`src/components/gradeup/chat-page.tsx`)
+- **Left panel**: Contact list with search/filter, role-based visibility (ADMIN=all, TEACHER=all, STUDENT=teachers+own parents+admin, PARENT=teachers+admin), avatar with initials, role badge, last message preview, unread count badge, active conversation highlighting with blue border
+- **Right panel**: Chat messages with sent (right/blue gradient) and received (left/gray) alignment, HH:mm French locale timestamps, date separators, read receipts (✓/✓✓), unread message blue highlight, auto-scroll to bottom
+- **Responsive**: Mobile shows either contact list or chat with back button toggle
+- **Polling**: 3-second interval to check for new messages and conversation updates
+- **Empty states**: Decorative icons with French text when no contacts or no conversation selected
+- **Input**: Text input + gradient send button, Enter key to send, loading spinner during send
+- All text in French, uses shadcn/ui components, lucide-react icons
+
+#### 4. Types (`src/lib/types.ts`)
+- Added `MessageInfo` interface with sender/recipient optional relations
+- Added `ConversationInfo` interface with partnerId, partnerName, partnerRole, lastMessage, lastMessageAt, unreadCount
+
+#### 5. Navigation Integration (`src/components/gradeup/app-layout.tsx`)
+- Changed 'messages' nav label to "Messagerie" for all roles
+- Added 'messages' nav item to TEACHER, STUDENT, and PARENT roles
+- Updated pageTitles mapping: 'messages' → 'Messagerie'
+
+#### 6. Routing (`src/app/page.tsx`)
+- Added ChatPage import
+- Replaced MessageCenter routing for 'messages' with ChatPage
+
+### Files Created
+| File | Description |
+|------|-------------|
+| `src/app/api/messages/route.ts` | GET conversations + POST send message |
+| `src/app/api/messages/conversation/route.ts` | GET conversation messages + mark as read |
+| `src/components/gradeup/chat-page.tsx` | Full chat UI component |
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `prisma/schema.prisma` | Added Message model, relations to User and School |
+| `src/lib/types.ts` | Added MessageInfo, ConversationInfo interfaces |
+| `src/components/gradeup/app-layout.tsx` | Added Messagerie to all roles, updated labels |
+| `src/app/page.tsx` | Added ChatPage import and routing |
+
+### Verification
+- Zero ESLint errors
+- Dev server compiles and runs correctly (homepage returns 200)
+- All Prisma relations validated and pushed to SQLite

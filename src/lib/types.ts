@@ -177,3 +177,24 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
 }
+
+export interface MessageInfo {
+  id: string;
+  schoolId: string;
+  senderId: string;
+  recipientId: string;
+  content: string;
+  read: boolean;
+  createdAt: string;
+  sender?: { id: string; fullName: string; role: string };
+  recipient?: { id: string; fullName: string; role: string };
+}
+
+export interface ConversationInfo {
+  partnerId: string;
+  partnerName: string;
+  partnerRole: string;
+  lastMessage: string;
+  lastMessageAt: string;
+  unreadCount: number;
+}

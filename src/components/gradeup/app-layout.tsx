@@ -77,7 +77,7 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Configuration', page: 'admin-config', icon: Settings, emoji: '⚙️' },
     { label: 'Rapports', page: 'admin-reports', icon: BarChart3, emoji: '📈' },
     { label: 'Notifications', page: 'admin-notifications', icon: Bell, emoji: '🔔' },
-    { label: 'Messages', page: 'messages', icon: MessageSquare, emoji: '💬' },
+    { label: 'Messagerie', page: 'messages', icon: MessageSquare, emoji: '💬' },
     { label: 'Calendrier', page: 'calendar', icon: CalendarDays, emoji: '📆' },
     { label: 'Profil', page: 'profile', icon: User, emoji: '👤' },
   ],
@@ -89,6 +89,7 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Devoirs', page: 'teacher-homework', icon: ClipboardCheck, emoji: '📋' },
     { label: 'Absences', page: 'teacher-attendance', icon: Calendar, emoji: '📅' },
     { label: 'IA Gradie', page: 'teacher-ai', icon: Bot, emoji: '🤖' },
+    { label: 'Messagerie', page: 'messages', icon: MessageSquare, emoji: '💬' },
     { label: 'Calendrier', page: 'calendar', icon: CalendarDays, emoji: '📆' },
     { label: 'Profil', page: 'profile', icon: User, emoji: '👤' },
   ],
@@ -101,6 +102,7 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Paiements', page: 'student-payments', icon: CreditCard, emoji: '💳' },
     { label: 'IA Gradie', page: 'student-ai', icon: Bot, emoji: '🤖' },
     { label: 'Notifications', page: 'student-notifications', icon: Bell, emoji: '🔔' },
+    { label: 'Messagerie', page: 'messages', icon: MessageSquare, emoji: '💬' },
     { label: 'Calendrier', page: 'calendar', icon: CalendarDays, emoji: '📆' },
     { label: 'Profil', page: 'profile', icon: User, emoji: '👤' },
   ],
@@ -109,6 +111,7 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Suivi scolaire', page: 'parent-grades', icon: BarChart3, emoji: '📊' },
     { label: 'Paiements', page: 'parent-payments', icon: CreditCard, emoji: '💳' },
     { label: 'Notifications', page: 'parent-notifications', icon: Bell, emoji: '🔔' },
+    { label: 'Messagerie', page: 'messages', icon: MessageSquare, emoji: '💬' },
     { label: 'Profil', page: 'profile', icon: User, emoji: '👤' },
   ],
 };
@@ -157,7 +160,7 @@ const pageTitles: Record<PageView, string> = {
   'parent-payments': 'Paiements',
   'parent-notifications': 'Notifications',
   'profile': 'Profil',
-  'messages': 'Messages',
+  'messages': 'Messagerie',
   'calendar': 'Calendrier',
 };
 

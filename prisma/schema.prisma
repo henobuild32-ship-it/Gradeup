@@ -26,6 +26,7 @@ model School {
   grades        Grade[]
   homework      Homework[]
   attendance    Attendance[]
+  messages      Message[]
 }
 
 model User {
@@ -54,6 +55,8 @@ model User {
   children      User[]   @relation("ParentChild")
   parent        User?    @relation("ParentChild", fields: [parentId], references: [id])
   payments      Payment[]
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
   
   @@unique([schoolId, fullName, role])
 }
@@ -183,6 +186,20 @@ model Payment {
 
   school        School   @relation(fields: [schoolId], references: [id])
   student       User     @relation(fields: [studentId], references: [id])
+}
+
+model Message {
+  id            String   @id @default(cuid())
+  schoolId      String
+  senderId      String
+  recipientId   String
+  content       String
+  read          Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  school        School   @relation(fields: [schoolId], references: [id])
+  sender        User     @relation("SentMessages", fields: [senderId], references: [id])
+  recipient     User     @relation("ReceivedMessages", fields: [recipientId], references: [id])
 }
 
 model Notification {
