@@ -36,7 +36,9 @@ export default function ParentDashboard() {
   const [notifications, setNotifications] = useState<NotificationInfo[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const selectedChild = children[selectedChildIndex] || null;
+  // ✅ Correction : Sécurisation de children avant d'accéder à l'index
+  const safeChildren = Array.isArray(children) ? children : [];
+  const selectedChild = safeChildren[selectedChildIndex] || null;
   const schoolId = user?.schoolId || '';
 
   useEffect(() => {
@@ -61,7 +63,9 @@ export default function ParentDashboard() {
       const res = await fetch(`/api/users?schoolId=${schoolId}&role=STUDENT&parentId=${user.id}`);
       if (res.ok) {
         const data = await res.json();
-        setChildren(data);
+        // API peut retourner { users: [...] } ou directement un tableau
+        const list = Array.isArray(data) ? data : (Array.isArray(data?.users) ? data.users : []);
+        setChildren(list);
       }
     } catch {
       toast.error('Erreur lors du chargement des enfants');
@@ -77,9 +81,18 @@ export default function ParentDashboard() {
         fetch(`/api/payments?schoolId=${schoolId}&studentId=${childId}`),
       ]);
 
-      if (gradesRes.ok) setGrades(await gradesRes.json());
-      if (attendanceRes.ok) setAttendance(await attendanceRes.json());
-      if (paymentsRes.ok) setPayments(await paymentsRes.json());
+      if (gradesRes.ok) {
+        const d = await gradesRes.json();
+        setGrades(Array.isArray(d) ? d : (Array.isArray(d?.grades) ? d.grades : []));
+      }
+      if (attendanceRes.ok) {
+        const d = await attendanceRes.json();
+        setAttendance(Array.isArray(d) ? d : (Array.isArray(d?.attendance) ? d.attendance : []));
+      }
+      if (paymentsRes.ok) {
+        const d = await paymentsRes.json();
+        setPayments(Array.isArray(d) ? d : (Array.isArray(d?.payments) ? d.payments : []));
+      }
     } catch {
       toast.error('Erreur lors du chargement des données');
     } finally {
@@ -91,24 +104,30 @@ export default function ParentDashboard() {
     try {
       const res = await fetch(`/api/notifications?schoolId=${schoolId}&targetRole=PARENT`);
       if (res.ok) {
-        setNotifications(await res.json());
+        const d = await res.json();
+        setNotifications(Array.isArray(d) ? d : (Array.isArray(d?.notifications) ? d.notifications : []));
       }
     } catch {
       // Silently fail for notifications
     }
   };
 
-  const average = grades.length > 0
-    ? grades.reduce((acc, g) => acc + (g.maxScore > 0 ? (g.score / g.maxScore) * 20 : 0), 0) / grades.length
+  const safeGrades = Array.isArray(grades) ? grades : [];
+  const safeAttendance = Array.isArray(attendance) ? attendance : [];
+  const safePayments = Array.isArray(payments) ? payments : [];
+  const safeNotifications = Array.isArray(notifications) ? notifications : [];
+
+  const average = safeGrades.length > 0
+    ? safeGrades.reduce((acc, g) => acc + (g.maxScore > 0 ? (g.score / g.maxScore) * 20 : 0), 0) / safeGrades.length
     : 0;
 
-  const absences = attendance.filter(a => a.status === 'absent').length;
-  const pendingPayments = payments.filter(p => p.status === 'pending' || p.status === 'overdue').length;
+  const absences = safeAttendance.filter(a => a.status === 'absent').length;
+  const pendingPayments = safePayments.filter(p => p.status === 'pending' || p.status === 'overdue').length;
 
   const childClass = selectedChild?.classEnrollments?.[0]?.class?.name || 'Non assigné';
-  const courseCount = [...new Set(grades.map(g => g.courseId))].length;
-  const recentGrades = [...grades].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5);
-  const recentNotifications = [...notifications].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5);
+  const courseCount = [...new Set(safeGrades.map(g => g.courseId))].length;
+  const recentGrades = [...safeGrades].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5);
+  const recentNotifications = [...safeNotifications].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5);
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -160,7 +179,7 @@ export default function ParentDashboard() {
         </div>
       </div>
 
-      {children.length === 0 ? (
+      {safeChildren.length === 0 ? (
         <Card className="transition-all duration-300 hover:shadow-lg">
           <CardContent className="flex flex-col items-center justify-center py-16 gap-4">
             <div className="p-4 rounded-full bg-blue-50">
@@ -174,7 +193,7 @@ export default function ParentDashboard() {
       ) : (
         <>
           {/* Child Selector Card */}
-          {children.length > 1 && (
+          {safeChildren.length > 1 && (
             <Card className="transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -186,7 +205,7 @@ export default function ParentDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-3">
-                  {children.map((child, idx) => (
+                  {safeChildren.map((child, idx) => (
                     <button
                       key={child.id}
                       onClick={() => setSelectedChildIndex(idx)}
@@ -280,7 +299,7 @@ export default function ParentDashboard() {
                       <TrendingUp className={`size-5 ${getGradeColor(average * 5, 100)}`} />
                     </div>
                   </div>
-                  {grades.length > 0 && (
+                  {safeGrades.length > 0 && (
                     <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-3">
                       <div
                         className={`h-full rounded-full bg-gradient-to-r ${getAverageProgressColor(average)} transition-all duration-700`}

@@ -33,16 +33,16 @@ export default function TeacherDashboard() {
       const coursesData = await coursesRes.json();
       const lessonsData = await lessonsRes.json();
 
-      setCourses(coursesData || []);
-      setLessons(lessonsData || []);
+      setCourses(Array.isArray(coursesData) ? coursesData : []);
+      setLessons(Array.isArray(lessonsData) ? lessonsData : []);
 
       // Count unique students across all courses
-      const classIds = [...new Set((coursesData || []).map((c: CourseInfo) => c.classId))];
+      const classIds = [...new Set((Array.isArray(coursesData) ? coursesData : []).map((c: CourseInfo) => c.classId))];
       let total = 0;
       for (const classId of classIds) {
         const studentsRes = await fetch(`/api/users?schoolId=${user.schoolId}&role=STUDENT&classId=${classId}`);
         const studentsData = await studentsRes.json();
-        total += (studentsData || []).length;
+        total += (Array.isArray(studentsData) ? studentsData : []).length;
       }
       setTotalStudents(total);
     } catch {
@@ -53,10 +53,10 @@ export default function TeacherDashboard() {
   };
 
   const today = new Date().toISOString().split('T')[0];
-  const todayLessons = lessons.filter((l) => l.createdAt?.startsWith(today));
-  const recentLessons = [...lessons]
+  const todayLessons = Array.isArray(lessons) ? lessons.filter((l) => l.createdAt?.startsWith(today)) : [];
+  const recentLessons = Array.isArray(lessons) ? [...lessons]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 5);
+    .slice(0, 5) : [];
 
   const todayStr = new Date().toLocaleDateString('fr-FR', {
     weekday: 'long',
@@ -100,9 +100,9 @@ export default function TeacherDashboard() {
             <div className="flex-1">
               <p className="text-sm text-muted-foreground">Mes cours</p>
               <div className="flex items-end gap-2">
-                <p className="text-2xl font-bold">
+                <div className="text-2xl font-bold">
                   {loading ? <Skeleton className="h-8 w-8 inline-block" /> : courses.length}
-                </p>
+                </div>
                 <span className="text-xs font-medium text-emerald-600 mb-1">+1</span>
               </div>
             </div>
@@ -117,9 +117,9 @@ export default function TeacherDashboard() {
             <div className="flex-1">
               <p className="text-sm text-muted-foreground">Mes élèves</p>
               <div className="flex items-end gap-2">
-                <p className="text-2xl font-bold">
+                <div className="text-2xl font-bold">
                   {loading ? <Skeleton className="h-8 w-8 inline-block" /> : totalStudents}
-                </p>
+                </div>
                 <span className="text-xs font-medium text-emerald-600 mb-1">+5%</span>
               </div>
             </div>
@@ -134,9 +134,9 @@ export default function TeacherDashboard() {
             <div className="flex-1">
               <p className="text-sm text-muted-foreground">Leçons aujourd&apos;hui</p>
               <div className="flex items-end gap-2">
-                <p className="text-2xl font-bold">
+                <div className="text-2xl font-bold">
                   {loading ? <Skeleton className="h-8 w-8 inline-block" /> : todayLessons.length}
-                </p>
+                </div>
               </div>
             </div>
           </CardContent>

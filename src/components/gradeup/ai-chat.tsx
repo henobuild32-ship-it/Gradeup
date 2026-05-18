@@ -63,10 +63,13 @@ export default function AiChat({ schoolId, userId, role }: AiChatProps) {
 
       const data = await res.json();
 
+      // Backend retourne data.reply
+      const replyContent = data.reply || data.message || data.response;
+
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: data.message || data.response || 'Désolé, une erreur est survenue.',
+        content: replyContent || (data.error ? `Erreur : ${data.error}` : 'Désolé, je n\'ai pas pu générer une réponse.'),
         timestamp: new Date().toISOString(),
       };
 
@@ -75,7 +78,7 @@ export default function AiChat({ schoolId, userId, role }: AiChatProps) {
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'Désolé, je ne peux pas répondre pour le moment. Veuillez réessayer.',
+        content: 'Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.',
         timestamp: new Date().toISOString(),
       };
       addChatMessage(chatKey, errorMessage);

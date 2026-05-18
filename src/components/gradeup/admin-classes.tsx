@@ -98,7 +98,7 @@ export default function AdminClasses() {
     try {
       const res = await fetch(`/api/classes?schoolId=${user?.schoolId}`);
       const data = await res.json();
-      setClasses(data.classes || []);
+      setClasses(Array.isArray(data.classes) ? data.classes : []);
     } catch {
       toast.error('Erreur lors du chargement des classes');
     } finally {

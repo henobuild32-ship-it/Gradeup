@@ -106,7 +106,7 @@ export default function AdminPayments() {
       if (activeTab !== 'ALL') url += `&status=${activeTab}`;
       const res = await fetch(url);
       const data = await res.json();
-      setPayments(data.payments || []);
+      setPayments(Array.isArray(data.payments) ? data.payments : []);
     } catch {
       toast.error('Erreur lors du chargement des paiements');
     } finally {
@@ -118,7 +118,7 @@ export default function AdminPayments() {
     try {
       const res = await fetch(`/api/users?schoolId=${user?.schoolId}&role=STUDENT`);
       const data = await res.json();
-      setStudents(data.users || []);
+      setStudents(Array.isArray(data.users) ? data.users : []);
     } catch {
       console.error('Failed to fetch students');
     }
@@ -128,7 +128,7 @@ export default function AdminPayments() {
     try {
       const res = await fetch(`/api/classes?schoolId=${user?.schoolId}`);
       const data = await res.json();
-      setClasses(data.classes || []);
+      setClasses(Array.isArray(data.classes) ? data.classes : []);
     } catch {
       console.error('Failed to fetch classes');
     }

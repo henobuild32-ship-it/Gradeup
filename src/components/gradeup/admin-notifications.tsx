@@ -101,7 +101,7 @@ export default function AdminNotifications() {
     try {
       const res = await fetch(`/api/notifications?schoolId=${user?.schoolId}`);
       const data = await res.json();
-      setNotifications(data.notifications || []);
+      setNotifications(Array.isArray(data.notifications) ? data.notifications : []);
     } catch {
       toast.error('Erreur lors du chargement des notifications');
     } finally {
@@ -113,7 +113,7 @@ export default function AdminNotifications() {
     try {
       const res = await fetch(`/api/classes?schoolId=${user?.schoolId}`);
       const data = await res.json();
-      setClasses(data.classes || []);
+      setClasses(Array.isArray(data.classes) ? data.classes : []);
     } catch {
       console.error('Failed to fetch classes');
     }

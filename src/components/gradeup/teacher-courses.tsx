@@ -32,7 +32,7 @@ export default function TeacherCourses() {
     try {
       const res = await fetch(`/api/courses?schoolId=${user.schoolId}&teacherId=${user.id}`);
       const data = await res.json();
-      setCourses(data || []);
+      setCourses(Array.isArray(data) ? data : []);
     } catch {
       toast.error('Erreur lors du chargement des cours');
     } finally {
@@ -50,8 +50,8 @@ export default function TeacherCourses() {
       ]);
       const studentsData = await studentsRes.json();
       const gradesData = await gradesRes.json();
-      setStudents(studentsData || []);
-      setGrades(gradesData || []);
+      setStudents(Array.isArray(studentsData) ? studentsData : []);
+      setGrades(Array.isArray(gradesData) ? gradesData : []);
     } catch {
       toast.error('Erreur lors du chargement des détails');
     } finally {

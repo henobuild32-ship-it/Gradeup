@@ -70,7 +70,7 @@ export default function ActivityFeed({ schoolId }: ActivityFeedProps) {
     try {
       const res = await fetch(`/api/notifications?schoolId=${schoolId}&limit=10`);
       const data = await res.json();
-      setNotifications(data.notifications || []);
+      setNotifications(Array.isArray(data.notifications) ? data.notifications : []);
     } catch {
       setNotifications([]);
     } finally {

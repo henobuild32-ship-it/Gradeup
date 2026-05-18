@@ -90,7 +90,7 @@ export default function AdminReports() {
     try {
       const res = await fetch(`/api/classes?schoolId=${user?.schoolId}`);
       const data = await res.json();
-      setClasses(data.classes || []);
+      setClasses(Array.isArray(data.classes) ? data.classes : []);
     } catch {
       console.error('Failed to fetch classes');
     }
@@ -106,9 +106,9 @@ export default function AdminReports() {
       const gradesData = await gradesRes.json();
       const attendanceData = await attendanceRes.json();
       const paymentsData = await paymentsRes.json();
-      setGrades(gradesData.grades || []);
-      setAttendance(attendanceData.attendance || []);
-      setPayments(paymentsData.payments || []);
+      setGrades(Array.isArray(gradesData.grades) ? gradesData.grades : []);
+      setAttendance(Array.isArray(attendanceData.attendance) ? attendanceData.attendance : []);
+      setPayments(Array.isArray(paymentsData.payments) ? paymentsData.payments : []);
     } catch {
       console.error('Failed to fetch report data');
     } finally {

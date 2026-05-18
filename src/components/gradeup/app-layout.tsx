@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
+import { usePWAInstall } from '@/hooks/use-pwa-install';
 import type { PageView, UserRole } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -40,6 +41,9 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useTheme } from 'next-themes';
 import CommandPalette from './command-palette';
+import { toast } from 'sonner';
+import { subscribeToNotifications } from '@/services/notifications/notificationListener';
+import { registerPushNotifications } from '@/services/notifications/pushRegistration';
 import {
   LayoutDashboard,
   Users,
@@ -64,6 +68,10 @@ import {
   Sun,
   Moon,
   Lightbulb,
+  Video,
+  Smartphone,
+  Apple,
+  IdCard
 } from 'lucide-react';
 
 interface NavItem {
@@ -79,9 +87,11 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Utilisateurs', page: 'admin-users', icon: Users, emoji: '👥' },
     { label: 'Classes', page: 'admin-classes', icon: School, emoji: '🏫' },
     { label: 'Paiements', page: 'admin-payments', icon: CreditCard, emoji: '💳' },
+    { label: 'Cartes Élèves', page: 'admin-cards', icon: IdCard, emoji: '🆔' },
     { label: 'Configuration', page: 'admin-config', icon: Settings, emoji: '⚙️' },
     { label: 'Rapports', page: 'admin-reports', icon: BarChart3, emoji: '📈' },
     { label: 'Notifications', page: 'admin-notifications', icon: Bell, emoji: '🔔' },
+    { label: 'Visioconférences', page: 'admin-conferences', icon: Video, emoji: '🎥' },
     { label: 'Messagerie', page: 'messages', icon: MessageSquare, emoji: '💬' },
     { label: 'Calendrier', page: 'calendar', icon: CalendarDays, emoji: '📆' },
     { label: 'Profil', page: 'profile', icon: User, emoji: '👤' },
@@ -149,6 +159,8 @@ const pageTitles: Record<PageView, string> = {
   'admin-config': 'Configuration',
   'admin-reports': 'Rapports',
   'admin-notifications': 'Notifications',
+  'admin-conferences': 'Visioconférences',
+  'admin-cards': 'Cartes d\'identité',
   'teacher-dashboard': 'Tableau de bord',
   'teacher-courses': 'Cours',
   'teacher-lessons': 'Leçons',
@@ -198,6 +210,8 @@ function SidebarContent({
     .join('')
     .toUpperCase()
     .slice(0, 2);
+
+  const { isInstallable, isAppInstalled, installPWA } = usePWAInstall();
 
   if (collapsed) {
     return (
@@ -309,6 +323,42 @@ function SidebarContent({
             );
           })}
         </nav>
+        
+        {/* PWA Download Buttons */}
+        {!isAppInstalled && (
+          <div className="px-4 mt-6 mb-2 flex flex-col gap-2">
+            <div className="text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider mb-1">
+              Application Mobile
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="w-full justify-start gap-2 text-xs bg-sidebar-accent/30 border-sidebar-border hover:bg-sidebar-accent/50"
+              onClick={async () => {
+                if (isInstallable) {
+                  await installPWA();
+                } else {
+                  // Fallback: the event might not have fired or the browser doesn't support programmatic install
+                  alert("Pour installer l'application sur Android, ouvrez le menu de votre navigateur Chrome et appuyez sur 'Ajouter à l'écran d'accueil'.");
+                }
+              }}
+            >
+              <Smartphone className="w-3.5 h-3.5 text-green-500" />
+              Télécharger sur Android
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="w-full justify-start gap-2 text-xs bg-sidebar-accent/30 border-sidebar-border hover:bg-sidebar-accent/50"
+              onClick={() => {
+                alert("Installation iOS: Apple ne permet pas l'installation automatique. Dans Safari, touchez l'icône Partager (carré avec flèche vers le haut) puis sélectionnez 'Sur l'écran d'accueil'.");
+              }}
+            >
+              <Apple className="w-3.5 h-3.5 text-slate-500 dark:text-slate-300" />
+              Télécharger sur iOS
+            </Button>
+          </div>
+        )}
       </ScrollArea>
 
       <Separator className="bg-sidebar-border" />
@@ -343,10 +393,92 @@ function SidebarContent({
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const { user, currentPage, setCurrentPage, sidebarOpen, setSidebarOpen, setUser } = useAppStore();
+  const { isInstallable, isAppInstalled, installPWA } = usePWAInstall();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Responsive device orientation and screen resize observer
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  const fetchUnreadNotifications = async () => {
+    if (!user) return;
+    try {
+      const roleParam = user.role !== 'ADMIN' ? `&targetRole=${user.role}` : '';
+      const res = await fetch(`/api/notifications?schoolId=${user.schoolId}${roleParam}`);
+      if (res.ok) {
+        const data = await res.json();
+        const notifs = Array.isArray(data) ? data : (Array.isArray(data.notifications) ? data.notifications : []);
+        const unread = notifs.filter((n: any) => !n.read).length;
+        setUnreadNotificationsCount(unread);
+      }
+    } catch {
+      // silently ignore
+    }
+  };
+
+  // Real-time notifications SSE subscription
+  useEffect(() => {
+    if (!user) return;
+
+    // Fetch initial count
+    fetchUnreadNotifications();
+
+    // Register background PWA Web Push notifications (prompt user permission / sync devices)
+    registerPushNotifications(user.id);
+
+    // Subscribe to SSE stream
+    const unsubscribe = subscribeToNotifications({
+      userId: user.id,
+      role: user.role,
+      schoolId: user.schoolId,
+      onNotification: (notif) => {
+        // Increment unread count
+        setUnreadNotificationsCount((prev) => prev + 1);
+
+        // Customize the emoji icon in premium toast
+        let icon = '🔔';
+        if (notif.type === 'CONFERENCE') icon = '🎥';
+        else if (notif.type === 'MESSAGE') icon = '💬';
+        else if (notif.type === 'CLASS') icon = '🏫';
+        else if (notif.type === 'CARD') icon = '🆔';
+        else if (notif.type === 'PROFILE') icon = '👤';
+        else if (notif.type === 'GRADE') icon = '📝';
+
+        // Show premium animated toast with Sonner
+        toast(notif.title || 'Notification GradeUp', {
+          description: notif.message,
+          icon: <span className="text-lg animate-bounce">{icon}</span>,
+          duration: 6000,
+          className: 'bg-card border border-border shadow-2xl rounded-xl p-4',
+        });
+      },
+    });
+
+    // Custom Event Listener to decrement/refresh count when marked read in pages
+    const handleEvents = () => {
+      fetchUnreadNotifications();
+    };
+    window.addEventListener('gradeup-notification-read', handleEvents);
+    window.addEventListener('gradeup-notification', handleEvents);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('gradeup-notification-read', handleEvents);
+      window.removeEventListener('gradeup-notification', handleEvents);
+    };
+  }, [user]);
 
   useEffect(() => {
     const timer = setTimeout(() => setMounted(true), 0);
@@ -387,7 +519,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const handleNavigate = (page: PageView) => {
     setCurrentPage(page);
     // Close mobile sheet
-    if (window.innerWidth < 1024) {
+    if (isMobile) {
       setSidebarOpen(false);
     }
   };
@@ -419,7 +551,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       </aside>
 
       {/* Mobile Sidebar */}
-      <Sheet open={sidebarOpen && typeof window !== 'undefined' && window.innerWidth < 1024} onOpenChange={setSidebarOpen}>
+      <Sheet open={sidebarOpen && isMobile} onOpenChange={setSidebarOpen}>
         <SheetContent side="left" className="w-72 p-0 bg-sidebar border-sidebar-border">
           <SheetHeader className="sr-only">
             <SheetTitle>Menu de navigation</SheetTitle>
@@ -486,15 +618,19 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   size="icon"
                   className="relative hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 hover:brightness-110 active:scale-[0.97]"
                   onClick={() => {
-                    const notifPage = `${user.role.toLowerCase()}-notifications` as PageView;
-                    setCurrentPage(notifPage);
+                    if (user.role === 'TEACHER') {
+                      toast.info('Pas de volet de notifications pour les professeurs pour le moment.');
+                    } else {
+                      const notifPage = `${user.role.toLowerCase()}-notifications` as PageView;
+                      setCurrentPage(notifPage);
+                    }
                   }}
                 >
                   <Bell className="w-4 h-4" />
-                  {/* Unread message badge */}
-                  {unreadMessages > 0 && (
+                  {/* Real-time notifications count badge */}
+                  {unreadNotificationsCount > 0 && (
                     <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white px-1 animate-scale-in">
-                      {unreadMessages > 99 ? '99+' : unreadMessages}
+                      {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
                     </span>
                   )}
                 </Button>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { notifyUser } from '@/services/notifications/notificationEngine';
 
 function generateParentCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -55,7 +56,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { schoolId, fullName, email, password, role, photoUrl, parentId, classId } = body;
+    const { schoolId, fullName, email, password, role, photoUrl, parentId, classId, className } = body;
 
     if (!schoolId || !fullName || !password || !role) {
       return NextResponse.json(
@@ -99,13 +100,34 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (classId && role === 'STUDENT') {
-      await db.enrolledClass.create({
-        data: {
-          userId: user.id,
-          classId,
-        },
-      });
+    if ((classId || className) && role === 'STUDENT') {
+      let assignedClassId = classId;
+      
+      // Auto-create or find by name if className is provided
+      if (!assignedClassId && className) {
+        let existingClass = await db.schoolClass.findFirst({
+          where: { schoolId, name: className }
+        });
+        if (!existingClass) {
+          existingClass = await db.schoolClass.create({
+            data: {
+              schoolId,
+              name: className,
+              level: 'N/A'
+            }
+          });
+        }
+        assignedClassId = existingClass.id;
+      }
+
+      if (assignedClassId) {
+        await db.enrolledClass.create({
+          data: {
+            userId: user.id,
+            classId: assignedClassId,
+          },
+        });
+      }
     }
 
     const userWithEnrollments = await db.user.findUnique({
@@ -129,7 +151,11 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId, active, fullName, email } = body;
+    const { 
+      userId, active, fullName, email,
+      postName, gender, birthDate, matricule, 
+      phone, parentPhone, parentPhone2, academicYear, section, photoUrl
+    } = body;
 
     if (!userId) {
       return NextResponse.json({ error: 'userId requis.' }, { status: 400 });
@@ -137,8 +163,18 @@ export async function PATCH(request: NextRequest) {
 
     const updateData: Record<string, unknown> = {};
     if (active !== undefined) updateData.active = active;
-    if (fullName) updateData.fullName = fullName;
+    if (fullName !== undefined) updateData.fullName = fullName;
     if (email !== undefined) updateData.email = email;
+    if (postName !== undefined) updateData.postName = postName;
+    if (gender !== undefined) updateData.gender = gender;
+    if (birthDate !== undefined) updateData.birthDate = birthDate;
+    if (matricule !== undefined) updateData.matricule = matricule;
+    if (phone !== undefined) updateData.phone = phone;
+    if (parentPhone !== undefined) updateData.parentPhone = parentPhone;
+    if (parentPhone2 !== undefined) updateData.parentPhone2 = parentPhone2;
+    if (academicYear !== undefined) updateData.academicYear = academicYear;
+    if (section !== undefined) updateData.section = section;
+    if (photoUrl !== undefined) updateData.photoUrl = photoUrl;
 
     const user = await db.user.update({
       where: { id: userId },
@@ -148,6 +184,17 @@ export async function PATCH(request: NextRequest) {
         classEnrollments: { include: { class: true } },
         children: true,
       },
+    });
+
+    // Notify the user in real-time that their profile was updated by admin
+    await notifyUser({
+      schoolId: user.schoolId,
+      userId: user.id,
+      title: 'Profil Modifié 👤',
+      message: 'Vos informations de profil ont été mises à jour par l\'administration.',
+      type: 'PROFILE',
+      priority: 'LOW',
+      metadata: { userId: user.id },
     });
 
     return NextResponse.json({ user });

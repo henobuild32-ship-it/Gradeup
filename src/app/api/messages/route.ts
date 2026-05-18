@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { notifyUser } from '@/services/notifications/notificationEngine';
 
 // GET: List conversations for current user
 export async function GET(request: NextRequest) {
@@ -117,6 +118,21 @@ export async function POST(request: NextRequest) {
           select: { id: true, fullName: true, role: true },
         },
       },
+    });
+
+    // Send a real-time message notification to the recipient
+    const senderName = message.sender?.fullName || 'Un utilisateur';
+    const preview = content.trim().substring(0, 80) + (content.trim().length > 80 ? '...' : '');
+    
+    await notifyUser({
+      schoolId,
+      userId: recipientId,
+      senderId,
+      title: `Nouveau message de ${senderName} 💬`,
+      message: preview,
+      type: 'MESSAGE',
+      priority: 'NORMAL',
+      metadata: { messageId: message.id, senderName },
     });
 
     return NextResponse.json(message, { status: 201 });

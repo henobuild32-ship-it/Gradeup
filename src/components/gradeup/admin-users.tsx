@@ -120,7 +120,7 @@ export default function AdminUsers() {
   const [formEmail, setFormEmail] = useState('');
   const [formPassword, setFormPassword] = useState('');
   const [formRole, setFormRole] = useState('STUDENT');
-  const [formClassId, setFormClassId] = useState('');
+  const [formClassName, setFormClassName] = useState('');
   const [formParentId, setFormParentId] = useState('');
 
   const fetchUsers = useCallback(async () => {
@@ -129,7 +129,7 @@ export default function AdminUsers() {
       if (activeTab !== 'ALL') url += `&role=${activeTab}`;
       const res = await fetch(url);
       const data = await res.json();
-      setUsers(data.users || []);
+      setUsers(Array.isArray(data.users) ? data.users : []);
     } catch {
       toast.error('Erreur lors du chargement des utilisateurs');
     } finally {
@@ -141,7 +141,7 @@ export default function AdminUsers() {
     try {
       const res = await fetch(`/api/classes?schoolId=${user?.schoolId}`);
       const data = await res.json();
-      setClasses(data.classes || []);
+      setClasses(Array.isArray(data.classes) ? data.classes : []);
     } catch {
       console.error('Failed to fetch classes');
     }
@@ -151,7 +151,7 @@ export default function AdminUsers() {
     try {
       const res = await fetch(`/api/users?schoolId=${user?.schoolId}&role=PARENT`);
       const data = await res.json();
-      setParents(data.users || []);
+      setParents(Array.isArray(data.users) ? data.users : []);
     } catch {
       console.error('Failed to fetch parents');
     }
@@ -171,7 +171,7 @@ export default function AdminUsers() {
     setFormEmail('');
     setFormPassword('');
     setFormRole('STUDENT');
-    setFormClassId('');
+    setFormClassName('');
     setFormParentId('');
     setEditingUser(null);
   };
@@ -187,7 +187,7 @@ export default function AdminUsers() {
     setFormEmail(u.email);
     setFormPassword('');
     setFormRole(u.role);
-    setFormClassId(u.classEnrollments?.[0]?.class?.id || '');
+    setFormClassName(u.classEnrollments?.[0]?.class?.name || '');
     setFormParentId('');
     setDialogOpen(true);
   };
@@ -229,7 +229,7 @@ export default function AdminUsers() {
           password: formPassword,
           role: formRole,
         };
-        if (formRole === 'STUDENT' && formClassId) body.classId = formClassId;
+        if (formRole === 'STUDENT' && formClassName) body.className = formClassName;
         if (formRole === 'STUDENT' && formParentId) body.parentId = formParentId;
 
         const res = await fetch('/api/users', {
@@ -516,18 +516,22 @@ export default function AdminUsers() {
               <>
                 <div className="space-y-2">
                   <Label htmlFor="form-class">Classe *</Label>
-                  <Select value={formClassId} onValueChange={setFormClassId}>
-                    <SelectTrigger id="form-class" className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
-                      <SelectValue placeholder="Sélectionner une classe" />
-                    </SelectTrigger>
-                    <SelectContent>
+                  <div className="relative">
+                    <Input
+                      id="form-class"
+                      list="class-list"
+                      placeholder="Sélectionnez ou tapez le nom de la classe"
+                      value={formClassName}
+                      onChange={(e) => setFormClassName(e.target.value)}
+                      className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    />
+                    <datalist id="class-list">
                       {classes.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}
-                        </SelectItem>
+                        <option key={c.id} value={c.name} />
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </datalist>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Si la classe n&apos;existe pas, elle sera créée automatiquement.</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="form-parent">Parent (optionnel)</Label>

@@ -44,8 +44,8 @@ export default function TeacherHomework() {
       ]);
       const homeworkData = await homeworkRes.json();
       const coursesData = await coursesRes.json();
-      setHomeworkList(homeworkData || []);
-      setCourses(coursesData || []);
+      setHomeworkList(Array.isArray(homeworkData) ? homeworkData : []);
+      setCourses(Array.isArray(coursesData) ? coursesData : []);
     } catch {
       toast.error('Erreur lors du chargement des données');
     } finally {

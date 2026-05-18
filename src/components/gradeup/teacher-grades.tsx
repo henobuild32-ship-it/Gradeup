@@ -44,7 +44,7 @@ export default function TeacherGrades() {
     try {
       const res = await fetch(`/api/courses?schoolId=${user.schoolId}&teacherId=${user.id}`);
       const data = await res.json();
-      setCourses(data || []);
+      setCourses(Array.isArray(data) ? data : []);
     } catch {
       // silent
     }
@@ -59,7 +59,7 @@ export default function TeacherGrades() {
       if (filterTrimester) url += `&trimester=${filterTrimester}`;
       const res = await fetch(url);
       const data = await res.json();
-      setGrades(data || []);
+      setGrades(Array.isArray(data) ? data : []);
     } catch {
       toast.error('Erreur lors du chargement des notes');
     } finally {
@@ -77,7 +77,7 @@ export default function TeacherGrades() {
       if (!course) return;
       const res = await fetch(`/api/users?schoolId=${user.schoolId}&role=STUDENT&classId=${course.classId}`);
       const data = await res.json();
-      setStudents(data || []);
+      setStudents(Array.isArray(data) ? data : []);
     } catch {
       setStudents([]);
     }
@@ -123,7 +123,7 @@ export default function TeacherGrades() {
     if (course && user) {
       fetch(`/api/users?schoolId=${user.schoolId}&role=STUDENT&classId=${course.classId}`)
         .then((res) => res.json())
-        .then((data) => setStudents(data || []))
+        .then((data) => setStudents(Array.isArray(data) ? data : []))
         .catch(() => {});
     }
     setDialogOpen(true);

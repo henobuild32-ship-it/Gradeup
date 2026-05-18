@@ -44,7 +44,7 @@ export default function TeacherAttendance() {
     try {
       const res = await fetch(`/api/courses?schoolId=${user.schoolId}&teacherId=${user.id}`);
       const data = await res.json();
-      setCourses(data || []);
+      setCourses(Array.isArray(data) ? data : []);
     } catch { /* silent */ }
   };
 
@@ -60,11 +60,11 @@ export default function TeacherAttendance() {
       const studentsData = await studentsRes.json();
       const attendanceRes = await fetch(`/api/attendance?schoolId=${user.schoolId}&date=${selectedDate}`);
       const attendanceData = await attendanceRes.json();
-      const mergedAttendance: StudentAttendance[] = (studentsData || []).map((student: UserInfo) => {
-        const existing = (attendanceData || []).find((a: AttendanceInfo) => a.studentId === student.id);
+      const mergedAttendance: StudentAttendance[] = (Array.isArray(studentsData) ? studentsData : []).map((student: UserInfo) => {
+        const existing = (Array.isArray(attendanceData) ? attendanceData : []).find((a: AttendanceInfo) => a.studentId === student.id);
         return { studentId: student.id, studentName: student.fullName, status: existing?.status || 'present', reason: existing?.reason || '', existingId: existing?.id };
       });
-      setStudents(studentsData || []);
+      setStudents(Array.isArray(studentsData) ? studentsData : []);
       setAttendance(mergedAttendance);
     } catch { toast.error('Erreur lors du chargement'); } finally { setLoading(false); }
   };
@@ -103,7 +103,7 @@ export default function TeacherAttendance() {
     try {
       const res = await fetch(`/api/attendance?schoolId=${user.schoolId}`);
       const data = await res.json();
-      setHistory((data || []).filter((a: AttendanceInfo) => a.teacherId === user.id).sort((a: AttendanceInfo, b: AttendanceInfo) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 50));
+      setHistory((Array.isArray(data) ? data : []).filter((a: AttendanceInfo) => a.teacherId === user.id).sort((a: AttendanceInfo, b: AttendanceInfo) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 50));
     } catch { /* silent */ }
   };
 

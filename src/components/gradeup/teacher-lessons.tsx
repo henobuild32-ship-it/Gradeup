@@ -46,8 +46,8 @@ export default function TeacherLessons() {
       ]);
       const lessonsData = await lessonsRes.json();
       const coursesData = await coursesRes.json();
-      setLessons(lessonsData || []);
-      setCourses(coursesData || []);
+      setLessons(Array.isArray(lessonsData) ? lessonsData : []);
+      setCourses(Array.isArray(coursesData) ? coursesData : []);
     } catch {
       toast.error('Erreur lors du chargement des données');
     } finally {
@@ -56,7 +56,7 @@ export default function TeacherLessons() {
   };
 
   const today = new Date().toISOString().split('T')[0];
-  const todayLessons = lessons.filter((l) => l.createdAt?.startsWith(today));
+  const todayLessons = Array.isArray(lessons) ? lessons.filter((l) => l.createdAt?.startsWith(today)) : [];
   const lessonsRemaining = 3 - todayLessons.length;
   const isNearLimit = lessonsRemaining === 1;
   const isAtLimit = lessonsRemaining <= 0;
@@ -125,9 +125,9 @@ export default function TeacherLessons() {
     }
   };
 
-  const sortedLessons = [...lessons].sort(
+  const sortedLessons = Array.isArray(lessons) ? [...lessons].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  ) : [];
 
   const getCourseName = (courseId: string) => {
     return courses.find((c) => c.id === courseId)?.name || 'Cours inconnu';

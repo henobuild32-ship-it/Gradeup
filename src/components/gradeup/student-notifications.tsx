@@ -21,12 +21,22 @@ export default function StudentNotifications() {
     try {
       const res = await fetch(`/api/notifications?schoolId=${user.schoolId}&targetRole=STUDENT`);
       const data = await res.json();
-      const sorted = (Array.isArray(data) ? data : []).sort((a: NotificationInfo, b: NotificationInfo) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      // Safe, flexible parsing supporting both flat array and object formats
+      const rawList = Array.isArray(data) ? data : (Array.isArray(data?.notifications) ? data.notifications : []);
+      const sorted = [...rawList].sort((a: NotificationInfo, b: NotificationInfo) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setNotifications(sorted);
     } catch (err) { console.error('Erreur chargement notifications:', err); } finally { setLoading(false); }
   }, [user?.schoolId]);
 
   useEffect(() => { setLoading(true); fetchNotifications(); }, [fetchNotifications]);
+
+  // Setup auto-update listeners for active page
+  useEffect(() => {
+    window.addEventListener('gradeup-notification', fetchNotifications);
+    return () => {
+      window.removeEventListener('gradeup-notification', fetchNotifications);
+    };
+  }, [fetchNotifications]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -34,7 +44,12 @@ export default function StudentNotifications() {
     if (notif.read) return;
     try {
       const res = await fetch(`/api/notifications/${notif.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ read: true }) });
-      if (res.ok) { setNotifications((prev) => prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n))); toast.success('Notification marquée comme lue'); }
+      if (res.ok) { 
+        setNotifications((prev) => prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n))); 
+        toast.success('Notification marquée comme lue');
+        // Notify the layout shell to refresh badge count
+        window.dispatchEvent(new CustomEvent('gradeup-notification-read'));
+      }
     } catch (err) { console.error('Erreur marquage notification:', err); toast.error('Impossible de marquer la notification comme lue'); }
   };
 
@@ -45,6 +60,8 @@ export default function StudentNotifications() {
       await Promise.all(unread.map((n) => fetch(`/api/notifications/${n.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ read: true }) })));
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
       toast.success('Toutes les notifications ont été marquées comme lues');
+      // Notify the layout shell to refresh badge count
+      window.dispatchEvent(new CustomEvent('gradeup-notification-read'));
     } catch (err) { console.error('Erreur marquage notifications:', err); toast.error('Impossible de marquer toutes les notifications'); }
   };
 
@@ -109,7 +126,7 @@ export default function StudentNotifications() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
-                      <p className={`text-sm leading-relaxed ${notif.read ? 'text-muted-foreground' : 'text-foreground font-medium'}`}>{notif.message}</p>
+                      <p className={`text-sm leading-relaxed break-words ${notif.read ? 'text-muted-foreground' : 'text-foreground font-medium'}`}>{notif.message}</p>
                       {!notif.read && <div className="h-2.5 w-2.5 rounded-full bg-blue-600 shrink-0 mt-1.5 animate-pulse" />}
                     </div>
                     <div className="flex items-center gap-1 mt-2">

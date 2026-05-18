@@ -70,7 +70,7 @@ export default function StudentDashboard() {
         setGrades(Array.isArray(gradesRes) ? gradesRes : []);
         setAttendance(Array.isArray(attendanceRes) ? attendanceRes : []);
         setPayments(Array.isArray(paymentsRes) ? paymentsRes : []);
-        setNotifications(Array.isArray(notifsRes) ? notifsRes : []);
+        setNotifications(Array.isArray(notifsRes) ? notifsRes : (Array.isArray(notifsRes?.notifications) ? notifsRes.notifications : []));
       } catch (err) {
         console.error('Erreur chargement dashboard:', err);
       } finally {

@@ -90,7 +90,10 @@ export async function POST(request: NextRequest) {
 
     // === MODE: join-school (Non-admin joins an existing school) ===
     if (mode === 'join-school') {
-      if (!fullName || !password || !inviteCode || !role) {
+      const cleanFullName = (fullName || '').trim();
+      const cleanInviteCode = (inviteCode || '').trim().toUpperCase();
+
+      if (!cleanFullName || !password || !cleanInviteCode || !role) {
         return NextResponse.json(
           { error: 'Veuillez remplir tous les champs obligatoires.' },
           { status: 400 }
@@ -104,19 +107,22 @@ export async function POST(request: NextRequest) {
       }
 
       // Find school by invite code
-      const school = await db.school.findUnique({ where: { inviteCode } });
+      const school = await db.school.findUnique({ where: { inviteCode: cleanInviteCode } });
       if (!school) {
         return NextResponse.json(
-          { error: 'Code école invalide. Veuillez vérifier et réessayer.' },
+          { error: 'Code école invalide. Vérifiez le code fourni par votre administrateur.' },
           { status: 404 }
         );
       }
 
-      // Check if user already exists in this school with same name and role
-      const existingUser = await db.user.findFirst({
-        where: { schoolId: school.id, fullName, role },
+      // Check if user already exists (case-insensitive name comparison)
+      const existingUsers = await db.user.findMany({
+        where: { schoolId: school.id, role },
       });
-      if (existingUser) {
+      const nameExists = existingUsers.some(
+        (u) => u.fullName.trim().toLowerCase() === cleanFullName.toLowerCase()
+      );
+      if (nameExists) {
         return NextResponse.json(
           { error: 'Un utilisateur avec ce nom et ce rôle existe déjà dans cette école.' },
           { status: 409 }
@@ -125,10 +131,10 @@ export async function POST(request: NextRequest) {
 
       const parentCodeVal = await generateUniqueParentCode();
 
-      // Build user data
+      // Build user data (use cleaned fullName)
       const userData: Record<string, unknown> = {
         schoolId: school.id,
-        fullName,
+        fullName: cleanFullName,
         password,
         role,
         parentCode: parentCodeVal,

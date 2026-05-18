@@ -70,7 +70,7 @@ export default function AdminDashboard() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<StudentResult | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Invite code
   const [inviteCode, setInviteCode] = useState(user?.school?.inviteCode || '');
@@ -102,7 +102,7 @@ export default function AdminDashboard() {
           `/api/users?schoolId=${user?.schoolId}&role=STUDENT&search=${encodeURIComponent(query.trim())}`
         );
         const data = await res.json();
-        setSearchResults(data.users || []);
+        setSearchResults(Array.isArray(data.users) ? data.users : []);
         setSearchOpen(true);
       } catch {
         setSearchResults([]);

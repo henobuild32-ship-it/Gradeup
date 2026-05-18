@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { notifyUser } from '@/services/notifications/notificationEngine';
 
 export async function GET(request: NextRequest) {
   try {
@@ -68,6 +69,17 @@ export async function POST(request: NextRequest) {
           },
         },
       },
+    });
+
+    // Broad broadcast to everyone in the school when a new class is added
+    await notifyUser({
+      schoolId,
+      title: 'Nouvelle Classe Créée 🏫',
+      message: `La classe "${name}" (${level || 'Primaire'}) a été officiellement ajoutée à l'établissement.`,
+      type: 'CLASS',
+      priority: 'NORMAL',
+      targetRole: 'ALL',
+      metadata: { classId: schoolClass.id, className: name, level },
     });
 
     return NextResponse.json({ class: schoolClass }, { status: 201 });

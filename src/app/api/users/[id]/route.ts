@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { notifyUser } from '@/services/notifications/notificationEngine';
 
 export async function GET(
   request: NextRequest,
@@ -84,6 +85,17 @@ export async function PUT(
           include: { class: true },
         },
       },
+    });
+
+    // Notify the user in real-time that their profile was updated
+    await notifyUser({
+      schoolId: user.schoolId,
+      userId: user.id,
+      title: 'Profil Modifié 👤',
+      message: 'Votre profil GradeUp a été mis à jour avec succès.',
+      type: 'PROFILE',
+      priority: 'LOW',
+      metadata: { userId: user.id },
     });
 
     return NextResponse.json({ user });

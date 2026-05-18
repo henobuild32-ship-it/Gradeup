@@ -20,6 +20,16 @@ export interface UserInfo {
   photoUrl: string;
   parentId?: string;
   parentCode?: string;
+  phone?: string;
+  parentPhone?: string;
+  parentPhone2?: string;
+  cardId?: string;
+  postName?: string;
+  gender?: string;
+  birthDate?: string;
+  matricule?: string;
+  academicYear?: string;
+  section?: string;
   active?: boolean;
   school?: SchoolInfo;
   classEnrollments?: EnrolledClassInfo[];
@@ -138,6 +148,19 @@ export interface NotificationInfo {
   createdAt: string;
 }
 
+export interface VideoConferenceInfo {
+  id: string;
+  schoolId: string;
+  title: string;
+  description: string;
+  date: string;
+  time: string;
+  roomUrl: string;
+  targetRole: string;
+  targetClassId: string;
+  createdAt: string;
+}
+
 export type PageView = 
   | 'auth'
   | 'register'
@@ -148,6 +171,8 @@ export type PageView =
   | 'admin-config'
   | 'admin-reports'
   | 'admin-notifications'
+  | 'admin-conferences'
+  | 'admin-cards'
   | 'teacher-dashboard'
   | 'teacher-courses'
   | 'teacher-lessons'

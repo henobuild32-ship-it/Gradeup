@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import { useToast } from '@/hooks/use-toast';
+import { usePWAInstall } from '@/hooks/use-pwa-install';
 import type { UserRole, PageView } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,6 +27,8 @@ import {
   Copy,
   Check,
   X,
+  Smartphone,
+  Apple,
 } from 'lucide-react';
 
 const roleDashboardMap: Record<UserRole, PageView> = {
@@ -78,6 +81,7 @@ function PasswordStrengthIndicator({ password }: { password: string }) {
 export default function AuthPage() {
   const { setUser, setCurrentPage, user } = useAppStore();
   const { toast } = useToast();
+  const { isInstallable, isAppInstalled, isIOS, installPWA } = usePWAInstall();
 
   // If already logged in, show nothing (AppLayout handles it)
   useEffect(() => {
@@ -93,6 +97,8 @@ export default function AuthPage() {
   const [loginPassword, setLoginPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [loginIsAdmin, setLoginIsAdmin] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('');
 
   // Register state
   const [regMode, setRegMode] = useState<'create' | 'join'>('create');
@@ -143,7 +149,7 @@ export default function AuthPage() {
           const classRes = await fetch(`/api/classes?schoolId=${data.school.id}`);
           if (classRes.ok) {
             const classData = await classRes.json();
-            setAvailableClasses(classData.classes || []);
+            setAvailableClasses(Array.isArray(classData.classes) ? classData.classes : []);
           }
         } else {
           setCodeVerified(false);
@@ -163,9 +169,16 @@ export default function AuthPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!loginInviteCode || !loginFullName || !loginPassword) {
-      toast({ title: 'Erreur', description: 'Veuillez remplir tous les champs.', variant: 'destructive' });
-      return;
+    if (loginIsAdmin) {
+      if (!loginEmail || !loginPassword) {
+        toast({ title: 'Erreur', description: 'Veuillez remplir votre email et mot de passe.', variant: 'destructive' });
+        return;
+      }
+    } else {
+      if (!loginInviteCode || !loginFullName || !loginPassword) {
+        toast({ title: 'Erreur', description: 'Veuillez remplir tous les champs.', variant: 'destructive' });
+        return;
+      }
     }
     setLoginLoading(true);
     try {
@@ -173,7 +186,9 @@ export default function AuthPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          inviteCode: loginInviteCode.toUpperCase(),
+          inviteCode: loginIsAdmin ? undefined : loginInviteCode.toUpperCase(),
+          email: loginIsAdmin ? loginEmail : undefined,
+          isAdminLogin: loginIsAdmin,
           fullName: loginFullName,
           password: loginPassword,
         }),
@@ -416,31 +431,71 @@ export default function AuthPage() {
 
                 {/* ===== LOGIN TAB ===== */}
                 <TabsContent value="login">
+                  <div className="flex gap-2 mb-6">
+                    <button
+                      type="button"
+                      onClick={() => setLoginIsAdmin(false)}
+                      className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-all duration-200 border-2 ${
+                        !loginIsAdmin
+                          ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300'
+                          : 'border-transparent bg-muted/50 text-muted-foreground hover:bg-muted'
+                      }`}
+                    >
+                      Utilisateur
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLoginIsAdmin(true)}
+                      className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-all duration-200 border-2 ${
+                        loginIsAdmin
+                          ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-300'
+                          : 'border-transparent bg-muted/50 text-muted-foreground hover:bg-muted'
+                      }`}
+                    >
+                      Administrateur
+                    </button>
+                  </div>
                   <form onSubmit={handleLogin} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="login-code" className="flex items-center gap-2">
-                        <Key className="w-3.5 h-3.5 text-blue-600" />
-                        Code école
-                      </Label>
-                      <Input
-                        id="login-code"
-                        placeholder="ECOLE-XXXXXX"
-                        value={loginInviteCode}
-                        onChange={(e) => setLoginInviteCode(e.target.value.toUpperCase())}
-                        className="h-11 rounded-xl font-mono tracking-wider"
-                      />
-                      <p className="text-xs text-muted-foreground">Le code fourni par votre administrateur</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="login-name">Nom complet</Label>
-                      <Input
-                        id="login-name"
-                        placeholder="Jean Dupont"
-                        value={loginFullName}
-                        onChange={(e) => setLoginFullName(e.target.value)}
-                        className="h-11 rounded-xl"
-                      />
-                    </div>
+                    {!loginIsAdmin ? (
+                      <div className="space-y-2 animate-in fade-in zoom-in-95 duration-200">
+                        <Label htmlFor="login-code" className="flex items-center gap-2">
+                          <Key className="w-3.5 h-3.5 text-blue-600" />
+                          Code école
+                        </Label>
+                        <Input
+                          id="login-code"
+                          placeholder="ECOLE-XXXXXX"
+                          value={loginInviteCode}
+                          onChange={(e) => setLoginInviteCode(e.target.value.toUpperCase())}
+                          className="h-11 rounded-xl font-mono tracking-wider"
+                        />
+                        <p className="text-xs text-muted-foreground">Le code fourni par votre administrateur</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 animate-in fade-in zoom-in-95 duration-200">
+                        <Label htmlFor="login-email">Email de l&apos;école</Label>
+                        <Input
+                          id="login-email"
+                          type="email"
+                          placeholder="admin@ecole.com"
+                          value={loginEmail}
+                          onChange={(e) => setLoginEmail(e.target.value)}
+                          className="h-11 rounded-xl"
+                        />
+                      </div>
+                    )}
+                    {!loginIsAdmin && (
+                      <div className="space-y-2">
+                        <Label htmlFor="login-name">Nom complet</Label>
+                        <Input
+                          id="login-name"
+                          placeholder="Jean Dupont"
+                          value={loginFullName}
+                          onChange={(e) => setLoginFullName(e.target.value)}
+                          className="h-11 rounded-xl"
+                        />
+                      </div>
+                    )}
                     <div className="space-y-2">
                       <Label htmlFor="login-password">Mot de passe</Label>
                       <div className="relative">
@@ -854,6 +909,55 @@ export default function AuthPage() {
               </Tabs>
             </CardContent>
           </Card>
+
+          {/* PWA Download Buttons */}
+          <div className="mt-8 flex flex-col sm:flex-row gap-3 animate-fade-in">
+            {(!isAppInstalled) && (
+              <>
+                <Button 
+                  type="button"
+                  variant="outline" 
+                  className="flex-1 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm border-blue-200 dark:border-blue-900 hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                  onClick={async () => {
+                    if (isInstallable) {
+                      const success = await installPWA();
+                      if (success) {
+                        toast({ title: "Succès", description: "Installation en cours..." });
+                      }
+                    } else {
+                      toast({
+                        title: "Application déjà installée ou non supportée",
+                        description: "Ouvrez le menu de votre navigateur (les 3 petits points) et cherchez 'Installer l'application' ou 'Ajouter à l'écran d'accueil'."
+                      });
+                    }
+                  }}
+                >
+                  <Smartphone className="w-4 h-4 mr-2 text-green-600" />
+                  Télécharger Android
+                </Button>
+                <Button 
+                  type="button"
+                  variant="outline" 
+                  className="flex-1 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm border-blue-200 dark:border-blue-900 hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                  onClick={() => {
+                    toast({
+                      title: "Installation iOS",
+                      description: "Apple ne permet pas l'installation automatique. Dans Safari, touchez l'icône Partager (carré avec une flèche) puis 'Sur l'écran d'accueil'."
+                    });
+                  }}
+                >
+                  <Apple className="w-4 h-4 mr-2 text-slate-700 dark:text-slate-300" />
+                  Télécharger iOS
+                </Button>
+              </>
+            )}
+            {isAppInstalled && (
+              <div className="w-full text-center py-2 bg-green-50/50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-green-700 dark:text-green-400 text-sm flex items-center justify-center gap-2">
+                <Check className="w-4 h-4" />
+                Application installée
+              </div>
+            )}
+          </div>
 
           <p className="text-sm text-muted-foreground text-center pt-8">
             © GradeUp – Créé par Axions Labs
