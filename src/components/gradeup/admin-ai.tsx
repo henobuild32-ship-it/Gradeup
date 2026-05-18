@@ -3,8 +3,8 @@
 import { useAppStore } from '@/lib/store';
 import GradieChat from './gradie/GradieChat';
 
-export default function TeacherAi() {
-  const { user } = useAppStore();
+export default function AdminAi() {
+  const user = useAppStore((s) => s.user);
 
   if (!user) return null;
 
@@ -13,10 +13,10 @@ export default function TeacherAi() {
       <div className="mb-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 p-6">
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-lg">🤖</span>
-          IA Gradie — Assistant Professeur
+          IA Gradie — Assistant Administrateur
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Analysez vos classes, partagez des documents et obtenez des conseils pédagogiques personnalisés.
+          Automatisez vos tâches administratives : gestion des utilisateurs, paiements, classes, rapports et bien plus.
         </p>
       </div>
 
@@ -24,7 +24,7 @@ export default function TeacherAi() {
         <GradieChat
           schoolId={user.schoolId}
           userId={user.id}
-          userRole="TEACHER"
+          userRole="ADMIN"
           userName={user.fullName}
         />
       </div>

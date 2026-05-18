@@ -1,8 +1,7 @@
 'use client';
 
 import { useAppStore } from '@/lib/store';
-import AiChat from './ai-chat';
-import { Card, CardContent } from '@/components/ui/card';
+import GradieChat from './gradie/GradieChat';
 
 export default function StudentAi() {
   const user = useAppStore((s) => s.user);
@@ -10,22 +9,25 @@ export default function StudentAi() {
   if (!user) return null;
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="mb-6 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 p-6">
+    <div className="flex flex-col space-y-4 animate-fade-in h-full">
+      <div className="mb-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 p-6">
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-lg">🤖</span>
-          IA Gradie - Mon Assistant
+          IA Gradie — Mon Assistante
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Obtenez des conseils personnalisés, analysez vos performances et découvrez des exercices adaptés.
+          Posez vos questions sur vos cours, partagez des documents et obtenez un suivi personnalisé de vos performances.
         </p>
       </div>
 
-      <Card className="border-0 shadow-lg shadow-blue-500/5">
-        <CardContent className="p-0 h-[600px]">
-          <AiChat schoolId={user.schoolId} userId={user.id} role="STUDENT" />
-        </CardContent>
-      </Card>
+      <div className="flex-1 min-h-0">
+        <GradieChat
+          schoolId={user.schoolId}
+          userId={user.id}
+          userRole="STUDENT"
+          userName={user.fullName}
+        />
+      </div>
     </div>
   );
 }

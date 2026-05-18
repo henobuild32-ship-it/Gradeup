@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { db } from '@/lib/db';
 import { randomUUID } from 'crypto';
 import { notifyUser } from '@/services/notifications/notificationEngine';
 
-const prisma = new PrismaClient();
+const prisma = db;
 
 export async function GET(req: Request) {
   try {

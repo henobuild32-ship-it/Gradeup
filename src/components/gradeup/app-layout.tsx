@@ -95,6 +95,7 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Messagerie', page: 'messages', icon: MessageSquare, emoji: '💬' },
     { label: 'Calendrier', page: 'calendar', icon: CalendarDays, emoji: '📆' },
     { label: 'Profil', page: 'profile', icon: User, emoji: '👤' },
+    { label: 'IA Gradie', page: 'admin-ai', icon: Bot, emoji: '🤖' },
     { label: 'Aide', page: 'help', icon: Lightbulb, emoji: '💡' },
   ],
   TEACHER: [
@@ -161,6 +162,7 @@ const pageTitles: Record<PageView, string> = {
   'admin-notifications': 'Notifications',
   'admin-conferences': 'Visioconférences',
   'admin-cards': 'Cartes d\'identité',
+  'admin-ai': 'IA Gradie',
   'teacher-dashboard': 'Tableau de bord',
   'teacher-courses': 'Cours',
   'teacher-lessons': 'Leçons',
@@ -727,7 +729,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
         {/* Content with fade-in animation */}
         <main className="flex-1 overflow-y-auto">
-          <div className="p-4 lg:p-6 animate-fade-in" key={currentPage}>
+          <div className="p-4 lg:p-6 animate-fade-in min-h-full flex flex-col" key={currentPage}>
             {children}
           </div>
         </main>

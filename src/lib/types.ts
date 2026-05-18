@@ -173,6 +173,7 @@ export type PageView =
   | 'admin-notifications'
   | 'admin-conferences'
   | 'admin-cards'
+  | 'admin-ai'
   | 'teacher-dashboard'
   | 'teacher-courses'
   | 'teacher-lessons'

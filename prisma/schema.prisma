@@ -69,6 +69,7 @@ model User {
   children          User[]          @relation("ParentChild")
   school            School          @relation(fields: [schoolId], references: [id])
   pushSubscriptions PushSubscription[]
+  conversations     AiConversation[]
 
   @@unique([schoolId, fullName, role])
 }
@@ -245,4 +246,42 @@ model PushSubscription {
   auth      String
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────────
+// Gradie – Mémoire conversationnelle persistante
+// ─────────────────────────────────────────────
+
+model AiConversation {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String        @default("Nouvelle conversation")
+  salutationDone Boolean    @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  messages    AiMessage[]
+  documents   AiDocument[]
+}
+
+model AiMessage {
+  id             String         @id @default(cuid())
+  conversationId String
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String         // "user" | "assistant" | "system"
+  content        String
+  createdAt      DateTime       @default(now())
+}
+
+model AiDocument {
+  id             String         @id @default(cuid())
+  conversationId String
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  name           String
+  mimeType       String
+  url            String
+  size           Int
+  extractedText  String         @default("")
+  summary        String         @default("")
+  createdAt      DateTime       @default(now())
 }

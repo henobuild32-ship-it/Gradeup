@@ -134,14 +134,15 @@ export default function AuthPage() {
 
   // Verify invite code and fetch classes
   const verifyInviteCode = async (code: string) => {
-    if (!code || code.length < 8) {
+    const cleanCode = (code || '').trim().toUpperCase();
+    if (!cleanCode || cleanCode.length < 8) {
       setAvailableClasses([]);
       setCodeVerified(false);
       return;
     }
     setVerifyingCode(true);
     try {
-      const checkRes = await fetch(`/api/config?inviteCode=${code}`);
+      const checkRes = await fetch(`/api/config?inviteCode=${cleanCode}`);
       if (checkRes.ok) {
         const data = await checkRes.json();
         if (data.school) {
@@ -186,10 +187,10 @@ export default function AuthPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          inviteCode: loginIsAdmin ? undefined : loginInviteCode.toUpperCase(),
-          email: loginIsAdmin ? loginEmail : undefined,
+          inviteCode: loginIsAdmin ? undefined : loginInviteCode.toUpperCase().trim(),
+          email: loginIsAdmin ? loginEmail.trim() : undefined,
           isAdminLogin: loginIsAdmin,
-          fullName: loginFullName,
+          fullName: loginFullName.trim(),
           password: loginPassword,
         }),
       });
@@ -282,12 +283,12 @@ export default function AuthPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: 'join-school',
-          fullName: joinFullName,
+          fullName: joinFullName.trim(),
           password: joinPassword,
-          inviteCode: joinInviteCode.toUpperCase(),
+          inviteCode: joinInviteCode.trim().toUpperCase(),
           role: joinRole,
           classIds: joinRole === 'STUDENT' ? joinClassIds : joinRole === 'TEACHER' ? joinClassIds : undefined,
-          parentCode: joinRole === 'PARENT' ? joinParentCode.toUpperCase() : undefined,
+          parentCode: joinRole === 'PARENT' ? joinParentCode.trim().toUpperCase() : undefined,
         }),
       });
       const data = await res.json();
@@ -676,9 +677,10 @@ export default function AuthPage() {
                             placeholder="ECOLE-XXXXXX"
                             value={joinInviteCode}
                             onChange={(e) => {
-                              const code = e.target.value.toUpperCase();
-                              setJoinInviteCode(code);
-                              if (code.length >= 12) {
+                              const val = e.target.value.toUpperCase();
+                              setJoinInviteCode(val);
+                              const code = val.trim();
+                              if (code.length >= 8) {
                                 verifyInviteCode(code);
                               } else {
                                 setCodeVerified(false);
@@ -698,7 +700,7 @@ export default function AuthPage() {
                             </div>
                           )}
                         </div>
-                        {joinInviteCode && !codeVerified && joinInviteCode.length >= 12 && (
+                        {joinInviteCode && !codeVerified && joinInviteCode.trim().length >= 8 && (
                           <p className="text-xs text-red-500">Code invalide. Vérifiez avec votre administrateur.</p>
                         )}
                         <p className="text-xs text-muted-foreground">Le code fourni par votre administrateur</p>

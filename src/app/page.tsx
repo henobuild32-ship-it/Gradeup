@@ -14,6 +14,7 @@ import AdminReports from '@/components/gradeup/admin-reports';
 import AdminNotifications from '@/components/gradeup/admin-notifications';
 import AdminConferences from '@/components/gradeup/admin-conferences';
 import AdminCards from '@/components/gradeup/admin-cards';
+import AdminAi from '@/components/gradeup/admin-ai';
 import TeacherDashboard from '@/components/gradeup/teacher-dashboard';
 import TeacherCourses from '@/components/gradeup/teacher-courses';
 import TeacherLessons from '@/components/gradeup/teacher-lessons';
@@ -50,6 +51,7 @@ function PageRouter({ page }: { page: PageView }) {
   if (page === 'admin-notifications') return <AdminNotifications />;
   if (page === 'admin-conferences') return <AdminConferences />;
   if (page === 'admin-cards') return <AdminCards />;
+  if (page === 'admin-ai') return <AdminAi />;
   if (page === 'teacher-dashboard') return <TeacherDashboard />;
   if (page === 'teacher-courses') return <TeacherCourses />;
   if (page === 'teacher-lessons') return <TeacherLessons />;
