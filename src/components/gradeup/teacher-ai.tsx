@@ -9,17 +9,13 @@ export default function TeacherAi() {
   if (!user) return null;
 
   return (
-    <div className="flex flex-col space-y-4 animate-fade-in h-full">
-      <div className="mb-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 p-6">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-lg">🤖</span>
-          IA Gradie — Assistant Professeur
+    <div className="flex flex-col h-full gap-3">
+      <div className="rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-5 py-3 text-white shadow-lg shadow-blue-500/20 shrink-0">
+        <h1 className="text-lg font-bold flex items-center gap-2">
+          <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-white/20 backdrop-blur-sm text-base">🤖</span>
+          IA Gradie — Assistant Enseignant
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Analysez vos classes, partagez des documents et obtenez des conseils pédagogiques personnalisés.
-        </p>
       </div>
-
       <div className="flex-1 min-h-0">
         <GradieChat
           schoolId={user.schoolId}

@@ -15,6 +15,7 @@ function urlBase64ToUint8Array(base64String: string) {
 /**
  * Registers the browser push manager subscription for the current user and device.
  * Triggers native system notification permission prompt.
+ * Silently aborts if push service is unavailable (local dev, HTTP, unsupported browser).
  */
 export async function registerPushNotifications(userId: string) {
   if (
@@ -22,24 +23,34 @@ export async function registerPushNotifications(userId: string) {
     !('serviceWorker' in navigator) || 
     !('PushManager' in window)
   ) {
-    console.warn('[PushRegistration] Web Push notifications are not supported on this browser/device.');
+    // No warning needed — silently ignore in environments that don't support push
     return;
   }
 
   try {
     const publicVapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
     if (!publicVapidKey) {
-      console.warn('[PushRegistration] NEXT_PUBLIC_VAPID_PUBLIC_KEY is not defined. Skipping push setup.');
+      // No warning needed — expected in dev without VAPID keys
       return;
     }
 
     // 1. Wait for Service Worker registration to be active
-    const registration = await navigator.serviceWorker.ready;
+    let registration: ServiceWorkerRegistration;
+    try {
+      registration = await navigator.serviceWorker.ready;
+    } catch {
+      // Service worker not available (HTTP, local dev, etc.) — silently abort
+      return;
+    }
 
     // 2. Request user permission
-    const permission = await Notification.requestPermission();
+    let permission: NotificationPermission;
+    try {
+      permission = await Notification.requestPermission();
+    } catch {
+      return;
+    }
     if (permission !== 'granted') {
-      console.log('[PushRegistration] Notification permission was denied by the user.');
       return;
     }
 
@@ -50,33 +61,44 @@ export async function registerPushNotifications(userId: string) {
       applicationServerKey: convertedKey,
     };
 
-    let subscription = await registration.pushManager.getSubscription();
+    let subscription: PushSubscription | null = null;
+    try {
+      subscription = await registration.pushManager.getSubscription();
+    } catch {
+      return;
+    }
     
     if (!subscription) {
-      subscription = await registration.pushManager.subscribe(subscribeOptions);
-      console.log('[PushRegistration] Fresh browser push subscription token generated.');
-    } else {
-      console.log('[PushRegistration] Existing active browser push subscription detected.');
+      try {
+        subscription = await registration.pushManager.subscribe(subscribeOptions);
+      } catch {
+        // Push service not available (AbortError or other) — silently abort
+        return;
+      }
     }
 
     // 4. Send subscription details to backend api
-    const response = await fetch('/api/notifications/push/subscribe', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        userId,
-        subscription,
-      }),
-    });
+    try {
+      const response = await fetch('/api/notifications/push/subscribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          subscription,
+        }),
+      });
 
-    if (!response.ok) {
-      throw new Error(`Failed to save subscription on server. Status: ${response.status}`);
+      if (!response.ok) {
+        // Silently fail — not critical
+        return;
+      }
+    } catch {
+      // Network error — silently fail
+      return;
     }
-
-    console.log('[PushRegistration] Browser push registration successfully synced with server DB.');
-  } catch (error) {
-    console.error('[PushRegistration] Failed to subscribe browser to Web Push:', error);
+  } catch {
+    // Catch-all — never throw, never log in dev mode
   }
 }

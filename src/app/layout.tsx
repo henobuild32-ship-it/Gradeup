@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
+import Script from "next/script";
 
 // Local fallback variables to guarantee 100% offline build capability without network dependencies
 const geistSans = {
@@ -41,10 +42,12 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           {children}
           <Toaster />
-          <script
+          <Script
+            id="sw-register"
+            strategy="afterInteractive"
             dangerouslySetInnerHTML={{
               __html: `
-                if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+                if ('serviceWorker' in navigator) {
                   window.addEventListener('load', function() {
                     navigator.serviceWorker.register('/sw.js').then(function(reg) {
                       console.log('[PWA] Service Worker registered successfully:', reg.scope);

@@ -291,9 +291,9 @@ export default function ChatPage() {
   if (!user) return null;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] gap-4">
+    <div className="flex flex-col h-full gap-3">
       {/* Gradient Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-xl px-5 py-3 text-white shadow-lg shadow-blue-500/20">
+      <div className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-xl px-5 py-3 text-white shadow-lg shadow-blue-500/20 shrink-0">
         <div className="flex items-center gap-3">
           <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm">
             <MessageCircle className="w-5 h-5" />
@@ -305,8 +305,8 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {/* Chat Container */}
-      <Card className="flex-1 overflow-hidden border shadow-sm">
+      {/* Chat Container - prend tout l'espace restant */}
+      <div className="flex-1 overflow-hidden border rounded-xl shadow-sm bg-card min-h-0">
         <div className="flex h-full">
           {/* Left Panel - Contact List */}
           <div
@@ -575,7 +575,7 @@ export default function ChatPage() {
             )}
           </div>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }

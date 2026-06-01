@@ -14,7 +14,6 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
 } from '@/components/ui/sheet';
 import {
   Tooltip,
@@ -91,11 +90,12 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Configuration', page: 'admin-config', icon: Settings, emoji: '⚙️' },
     { label: 'Rapports', page: 'admin-reports', icon: BarChart3, emoji: '📈' },
     { label: 'Notifications', page: 'admin-notifications', icon: Bell, emoji: '🔔' },
+    { label: 'Cours', page: 'admin-courses', icon: BookOpen, emoji: '📚' },
+    { label: 'IA Gradie', page: 'admin-ai', icon: Bot, emoji: '🤖' },
     { label: 'Visioconférences', page: 'admin-conferences', icon: Video, emoji: '🎥' },
     { label: 'Messagerie', page: 'messages', icon: MessageSquare, emoji: '💬' },
     { label: 'Calendrier', page: 'calendar', icon: CalendarDays, emoji: '📆' },
     { label: 'Profil', page: 'profile', icon: User, emoji: '👤' },
-    { label: 'IA Gradie', page: 'admin-ai', icon: Bot, emoji: '🤖' },
     { label: 'Aide', page: 'help', icon: Lightbulb, emoji: '💡' },
   ],
   TEACHER: [
@@ -162,6 +162,7 @@ const pageTitles: Record<PageView, string> = {
   'admin-notifications': 'Notifications',
   'admin-conferences': 'Visioconférences',
   'admin-cards': 'Cartes d\'identité',
+  'admin-courses': 'Cours',
   'admin-ai': 'IA Gradie',
   'teacher-dashboard': 'Tableau de bord',
   'teacher-courses': 'Cours',
@@ -340,7 +341,6 @@ function SidebarContent({
                 if (isInstallable) {
                   await installPWA();
                 } else {
-                  // Fallback: the event might not have fired or the browser doesn't support programmatic install
                   alert("Pour installer l'application sur Android, ouvrez le menu de votre navigateur Chrome et appuyez sur 'Ajouter à l'écran d'accueil'.");
                 }
               }}
@@ -437,8 +437,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
     // Fetch initial count
     fetchUnreadNotifications();
 
-    // Register background PWA Web Push notifications (prompt user permission / sync devices)
-    registerPushNotifications(user.id);
+    // Register background PWA Web Push notifications (only on HTTPS)
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+      registerPushNotifications(user.id);
+    }
 
     // Subscribe to SSE stream
     const unsubscribe = subscribeToNotifications({
@@ -534,7 +536,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
     .slice(0, 2);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    // ✅ Container principal: utilise h-dvh pour la hauteur dynamique du viewport
+    <div className="flex h-dvh bg-background">
       {/* Desktop Sidebar */}
       <aside
         className={`hidden lg:flex shrink-0 transition-all duration-300 ${
@@ -567,9 +570,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </SheetContent>
       </Sheet>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Top Header with backdrop blur */}
+      {/* Main Content Container - Flex column pour structure verticale */}
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
+        {/* Top Header with backdrop blur - shrink-0 pour qu'il ne se réduise pas */}
         <header className="h-14 border-b bg-card/80 backdrop-blur-xl shrink-0 flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30">
           <div className="flex items-center gap-3">
             {/* Mobile hamburger */}
@@ -727,14 +730,15 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </div>
         </header>
 
-        {/* Content with fade-in animation */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="p-4 lg:p-6 animate-fade-in min-h-full flex flex-col" key={currentPage}>
+        {/* ✅ Main content: overflow-y-auto pour le scroll, min-h-0 pour flexibilité */}
+        <main className="flex-1 overflow-y-auto min-h-0">
+          {/* ✅ Suppression de min-h-full qui cause des espaces vides */}
+          <div className="p-4 lg:p-6 animate-fade-in flex flex-col" key={currentPage}>
             {children}
           </div>
         </main>
 
-        {/* Footer with gradient divider */}
+        {/* ✅ Footer avec shrink-0 pour rester en bas */}
         <footer className="shrink-0 relative">
           <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-300 to-transparent" />
           <div className="py-3 px-4 lg:px-6 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjAuNSIgZmlsbD0icmdiYSgwLDAsMCwwLjAzKSIvPjwvc3ZnPg==')] bg-repeat">

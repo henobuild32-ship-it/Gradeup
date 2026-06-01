@@ -6,8 +6,9 @@ import { db } from '@/lib/db';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get('userId');
 
@@ -16,7 +17,7 @@ export async function GET(
   }
 
   const conversation = await db.aiConversation.findFirst({
-    where: { id: params.id, userId },
+    where: { id, userId },
     include: {
       messages: { orderBy: { createdAt: 'asc' } },
       documents: { select: { id: true, name: true, mimeType: true, size: true, summary: true, createdAt: true } },
@@ -32,8 +33,9 @@ export async function GET(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get('userId');
 
@@ -42,14 +44,14 @@ export async function DELETE(
   }
 
   const conversation = await db.aiConversation.findFirst({
-    where: { id: params.id, userId },
+    where: { id, userId },
   });
 
   if (!conversation) {
     return NextResponse.json({ error: 'Conversation introuvable' }, { status: 404 });
   }
 
-  await db.aiConversation.delete({ where: { id: params.id } });
+  await db.aiConversation.delete({ where: { id } });
 
   return NextResponse.json({ success: true });
 }

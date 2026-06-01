@@ -9,82 +9,89 @@ datasource db {
 }
 
 model School {
-  id               String            @id @default(cuid())
+  id               String             @id @default(cuid())
   name             String
-  email            String            @unique
+  email            String             @unique
   password         String
-  inviteCode       String            @unique
-  currency         String            @default("USD")
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  inviteCode       String             @unique
+  currency         String             @default("USD")
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
   attendance       Attendance[]
   courses          Course[]
+  courseWithPoints CourseWithPoints[]
+  detailedGrades   DetailedGrade[]
   grades           Grade[]
   homework         Homework[]
   lessons          Lesson[]
   messages         Message[]
   notifications    Notification[]
   payments         Payment[]
+  reportCards      ReportCard[]
   classes          SchoolClass[]
   users            User[]
   videoConferences VideoConference[]
 }
 
 model User {
-  id                String          @id @default(cuid())
+  id                String             @id @default(cuid())
   schoolId          String
   fullName          String
-  email             String          @default("")
+  email             String             @default("")
   password          String
-  role              String          @default("STUDENT")
-  photoUrl          String          @default("")
-  parentCode        String          @unique
-  active            Boolean         @default(true)
+  role              String             @default("STUDENT")
+  photoUrl          String             @default("")
+  parentCode        String             @unique
+  active            Boolean            @default(true)
   parentId          String?
-  phone             String          @default("")
-  parentPhone       String          @default("")
-  parentPhone2      String          @default("")
-  cardId            String?         @unique
-  postName          String          @default("")
-  gender            String          @default("M")
-  birthDate         String          @default("")
-  matricule         String          @default("")
-  academicYear      String          @default("2025-2026")
-  section           String          @default("")
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-  attendanceStudent Attendance[]    @relation("AttendanceStudent")
-  attendanceTeacher Attendance[]    @relation("AttendanceTeacher")
+  phone             String             @default("")
+  parentPhone       String             @default("")
+  parentPhone2      String             @default("")
+  cardId            String?            @unique
+  postName          String             @default("")
+  gender            String             @default("M")
+  birthDate         String             @default("")
+  matricule         String             @default("")
+  academicYear      String             @default("2025-2026")
+  section           String             @default("")
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  conversations     AiConversation[]
+  attendanceStudent Attendance[]       @relation("AttendanceStudent")
+  attendanceTeacher Attendance[]       @relation("AttendanceTeacher")
   courses           Course[]
+  detailedGrades    DetailedGrade[]
   classEnrollments  EnrolledClass[]
-  gradesStudent     Grade[]         @relation("GradeStudent")
-  gradesTeacher     Grade[]         @relation("GradeTeacher")
+  gradesStudent     Grade[]            @relation("GradeStudent")
+  gradesTeacher     Grade[]            @relation("GradeTeacher")
   homework          Homework[]
   lessons           Lesson[]
-  receivedMessages  Message[]       @relation("ReceivedMessages")
-  sentMessages      Message[]       @relation("SentMessages")
-  notifications     Notification[]  @relation("UserNotifications")
+  receivedMessages  Message[]          @relation("ReceivedMessages")
+  sentMessages      Message[]          @relation("SentMessages")
+  notifications     Notification[]     @relation("UserNotifications")
   payments          Payment[]
-  parent            User?           @relation("ParentChild", fields: [parentId], references: [id])
-  children          User[]          @relation("ParentChild")
-  school            School          @relation(fields: [schoolId], references: [id])
   pushSubscriptions PushSubscription[]
-  conversations     AiConversation[]
+  reportCards       ReportCard[]
+  parent            User?              @relation("ParentChild", fields: [parentId], references: [id])
+  children          User[]             @relation("ParentChild")
+  school            School             @relation(fields: [schoolId], references: [id])
 
   @@unique([schoolId, fullName, role])
 }
 
 model SchoolClass {
-  id          String          @id @default(cuid())
-  schoolId    String
-  name        String
-  level       String          @default("Primaire")
-  fees        Float           @default(0)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  courses     Course[]
-  enrollments EnrolledClass[]
-  school      School          @relation(fields: [schoolId], references: [id])
+  id               String             @id @default(cuid())
+  schoolId         String
+  name             String
+  level            String             @default("Primaire")
+  fees             Float              @default(0)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  courses          Course[]
+  courseWithPoints CourseWithPoints[]
+  enrollments      EnrolledClass[]
+  reportCards      ReportCard[]
+  school           School             @relation(fields: [schoolId], references: [id])
 }
 
 model EnrolledClass {
@@ -248,35 +255,30 @@ model PushSubscription {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// ─────────────────────────────────────────────
-// Gradie – Mémoire conversationnelle persistante
-// ─────────────────────────────────────────────
-
 model AiConversation {
-  id          String        @id @default(cuid())
-  userId      String
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title       String        @default("Nouvelle conversation")
-  salutationDone Boolean    @default(false)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  messages    AiMessage[]
-  documents   AiDocument[]
+  id             String       @id @default(cuid())
+  userId         String
+  title          String       @default("Nouvelle conversation")
+  salutationDone Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documents      AiDocument[]
+  messages       AiMessage[]
 }
 
 model AiMessage {
   id             String         @id @default(cuid())
   conversationId String
-  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  role           String         // "user" | "assistant" | "system"
+  role           String
   content        String
   createdAt      DateTime       @default(now())
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 }
 
 model AiDocument {
   id             String         @id @default(cuid())
   conversationId String
-  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   name           String
   mimeType       String
   url            String
@@ -284,4 +286,82 @@ model AiDocument {
   extractedText  String         @default("")
   summary        String         @default("")
   createdAt      DateTime       @default(now())
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+model ReportCard {
+  id                   String      @id @default(cuid())
+  reportNumber         String      @unique
+  schoolId             String
+  classId              String
+  studentId            String
+  trimester            String
+  academicYear         String      @default("2025-2026")
+  studentName          String
+  studentGender        String
+  studentBirthDate     String
+  studentPhotoUrl      String      @default("")
+  permanentNumber      String      @default("")
+  totalPointsObtained  Float
+  totalPointsPossible  Float
+  overallPercentage    Float
+  averageGrade         Float
+  classRank            Int
+  mention              String
+  gradesData           Json
+  studentSignatureUrl  String      @default("")
+  parentSignatureUrl   String      @default("")
+  teacherSignatureUrl  String      @default("")
+  directorSignatureUrl String      @default("")
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+  class                SchoolClass @relation(fields: [classId], references: [id])
+  school               School      @relation(fields: [schoolId], references: [id])
+  student              User        @relation(fields: [studentId], references: [id])
+
+  @@unique([schoolId, reportNumber])
+}
+
+model ReportCounter {
+  id           String   @id @default(cuid())
+  year         Int      @unique
+  currentCount Int      @default(0)
+  maxLimit     Int      @default(1000000)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model CourseWithPoints {
+  id               String          @id @default(cuid())
+  schoolId         String
+  classId          String
+  name             String
+  points           Int             @default(1)
+  maxScore         Float           @default(20)
+  trimester1Weight Float           @default(0.5)
+  trimester2Weight Float           @default(0.5)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  class            SchoolClass     @relation(fields: [classId], references: [id])
+  school           School          @relation(fields: [schoolId], references: [id])
+  detailedGrades   DetailedGrade[]
+}
+
+model DetailedGrade {
+  id        String           @id @default(cuid())
+  schoolId  String
+  studentId String
+  courseId  String
+  trimester String
+  semester  String
+  dailyWork Float            @default(0)
+  exam      Float            @default(0)
+  total     Float            @default(0)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  course    CourseWithPoints @relation(fields: [courseId], references: [id])
+  school    School           @relation(fields: [schoolId], references: [id])
+  student   User             @relation(fields: [studentId], references: [id])
+
+  @@unique([studentId, courseId, trimester, semester])
 }
