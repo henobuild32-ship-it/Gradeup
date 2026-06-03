@@ -41,7 +41,7 @@ export default function ParentPayments() {
       const res = await fetch(`/api/users?schoolId=${schoolId}&role=STUDENT&parentId=${user.id}`);
       if (res.ok) { 
         const data = await res.json(); 
-        const childrenArray = Array.isArray(data) ? data : [];
+        const childrenArray = Array.isArray(data.users) ? data.users : [];
         setChildren(childrenArray); 
         if (childrenArray.length > 0 && !selectedChildId) { 
           setSelectedChildId(childrenArray[0].id); 
@@ -64,7 +64,7 @@ export default function ParentPayments() {
       const res = await fetch(`/api/payments?schoolId=${schoolId}&studentId=${selectedChildId}`);
       if (res.ok) { 
         const data = await res.json();
-        setPayments(Array.isArray(data) ? data : []);
+        setPayments(Array.isArray(data.payments) ? data.payments : []);
       } else {
         setPayments([]);
       }

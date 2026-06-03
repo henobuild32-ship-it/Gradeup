@@ -32,7 +32,7 @@ export default function TeacherCourses() {
     try {
       const res = await fetch(`/api/courses?schoolId=${user.schoolId}&teacherId=${user.id}`);
       const data = await res.json();
-      setCourses(Array.isArray(data) ? data : []);
+      setCourses(Array.isArray(data.courses) ? data.courses : []);
     } catch {
       toast.error('Erreur lors du chargement des cours');
     } finally {

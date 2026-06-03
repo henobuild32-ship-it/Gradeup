@@ -24,7 +24,7 @@ export default function StudentPayments() {
       try {
         const res = await fetch(`/api/payments?schoolId=${user.schoolId}&studentId=${user.id}`);
         const data = await res.json();
-        const sorted = (Array.isArray(data) ? data : []).sort((a: PaymentInfo, b: PaymentInfo) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        const sorted = (Array.isArray(data.payments) ? data.payments : []).sort((a: PaymentInfo, b: PaymentInfo) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         setPayments(sorted);
       } catch (err) { console.error('Erreur chargement paiements:', err); } finally { setLoading(false); }
     };

@@ -26,7 +26,7 @@ export default function StudentGrades() {
       try {
         const res = await fetch(`/api/grades?schoolId=${user.schoolId}&studentId=${user.id}&trimester=${trimester}`);
         const data = await res.json();
-        setGrades(Array.isArray(data) ? data : []);
+        setGrades(Array.isArray(data.grades) ? data.grades : []);
       } catch (err) { console.error('Erreur chargement notes:', err); } finally { setLoading(false); }
     };
     fetchGrades();

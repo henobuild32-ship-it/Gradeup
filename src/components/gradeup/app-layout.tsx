@@ -421,7 +421,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       const res = await fetch(`/api/notifications?schoolId=${user.schoolId}${roleParam}`);
       if (res.ok) {
         const data = await res.json();
-        const notifs = Array.isArray(data) ? data : (Array.isArray(data.notifications) ? data.notifications : []);
+        const notifs = Array.isArray(data.notifications) ? data.notifications : [];
         const unread = notifs.filter((n: any) => !n.read).length;
         setUnreadNotificationsCount(unread);
       }

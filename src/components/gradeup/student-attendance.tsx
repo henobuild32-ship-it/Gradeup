@@ -30,7 +30,7 @@ export default function StudentAttendance() {
       try {
         const res = await fetch(`/api/attendance?schoolId=${user.schoolId}&studentId=${user.id}`);
         const data = await res.json();
-        const sorted = (Array.isArray(data) ? data : []).sort((a: AttendanceInfo, b: AttendanceInfo) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const sorted = (Array.isArray(data.attendance) ? data.attendance : []).sort((a: AttendanceInfo, b: AttendanceInfo) => new Date(b.date).getTime() - new Date(a.date).getTime());
         setAttendance(sorted);
       } catch (err) { console.error('Erreur chargement présences:', err); } finally { setLoading(false); }
     };

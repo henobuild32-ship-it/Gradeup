@@ -44,7 +44,7 @@ export default function TeacherAttendance() {
     try {
       const res = await fetch(`/api/courses?schoolId=${user.schoolId}&teacherId=${user.id}`);
       const data = await res.json();
-      setCourses(Array.isArray(data) ? data : []);
+      setCourses(Array.isArray(data.courses) ? data.courses : []);
     } catch { /* silent */ }
   };
 
@@ -103,7 +103,7 @@ export default function TeacherAttendance() {
     try {
       const res = await fetch(`/api/attendance?schoolId=${user.schoolId}`);
       const data = await res.json();
-      setHistory((Array.isArray(data) ? data : []).filter((a: AttendanceInfo) => a.teacherId === user.id).sort((a: AttendanceInfo, b: AttendanceInfo) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 50));
+      setHistory((Array.isArray(data.attendance) ? data.attendance : []).filter((a: AttendanceInfo) => a.teacherId === user.id).sort((a: AttendanceInfo, b: AttendanceInfo) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 50));
     } catch { /* silent */ }
   };
 

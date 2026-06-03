@@ -63,8 +63,8 @@ export default function ParentDashboard() {
       const res = await fetch(`/api/users?schoolId=${schoolId}&role=STUDENT&parentId=${user.id}`);
       if (res.ok) {
         const data = await res.json();
-        // API peut retourner { users: [...] } ou directement un tableau
-        const list = Array.isArray(data) ? data : (Array.isArray(data?.users) ? data.users : []);
+        // API retourne { users: [...] }
+        const list = Array.isArray(data.users) ? data.users : [];
         setChildren(list);
       }
     } catch {

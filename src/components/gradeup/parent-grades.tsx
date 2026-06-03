@@ -42,7 +42,7 @@ export default function ParentGrades() {
       const res = await fetch(`/api/users?schoolId=${schoolId}&role=STUDENT&parentId=${user.id}`);
       if (res.ok) { 
         const data = await res.json(); 
-        const childrenArray = Array.isArray(data) ? data : [];
+        const childrenArray = Array.isArray(data.users) ? data.users : [];
         setChildren(childrenArray); 
         if (childrenArray.length > 0 && !selectedChildId) { 
           setSelectedChildId(childrenArray[0].id); 
@@ -65,7 +65,7 @@ export default function ParentGrades() {
       const res = await fetch(`/api/grades?schoolId=${schoolId}&studentId=${selectedChildId}&trimester=${trimester}`);
       if (res.ok) { 
         const data = await res.json();
-        setGrades(Array.isArray(data) ? data : []);
+        setGrades(Array.isArray(data.grades) ? data.grades : []);
       } else {
         setGrades([]);
       }

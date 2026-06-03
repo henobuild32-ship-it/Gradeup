@@ -92,7 +92,7 @@ export default function StudentDashboard() {
             try {
               const res = await fetch(`/api/lessons?schoolId=${user.schoolId}&courseId=${course.id}`);
               const data = await res.json();
-              if (Array.isArray(data)) allLessons.push(...data);
+              if (Array.isArray(data.lessons)) allLessons.push(...data.lessons);
             } catch { /* skip */ }
           })
         );
