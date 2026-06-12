@@ -142,6 +142,7 @@ export async function POST(request: NextRequest) {
       };
 
       // Role-specific logic
+      let linkedStudent: { id: string; fullName: string } | null = null;
       if (role === 'PARENT') {
         if (!parentCode) {
           return NextResponse.json(
@@ -157,7 +158,7 @@ export async function POST(request: NextRequest) {
             { status: 404 }
           );
         }
-        userData.parentId = student.id;
+        linkedStudent = { id: student.id, fullName: student.fullName };
       }
 
       const user = await db.user.create({
@@ -201,6 +202,14 @@ export async function POST(request: NextRequest) {
             });
           }
         }
+      }
+
+      // If parent, link student to this parent
+      if (linkedStudent) {
+        await db.user.update({
+          where: { id: linkedStudent.id },
+          data: { parentId: user.id },
+        });
       }
 
       // Refresh user with enrollments

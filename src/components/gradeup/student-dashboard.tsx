@@ -32,6 +32,7 @@ const motivationalQuotes = [
 
 export default function StudentDashboard() {
   const user = useAppStore((s) => s.user);
+  const setCurrentPage = useAppStore((s) => s.setCurrentPage);
   const [courses, setCourses] = useState<CourseInfo[]>([]);
   const [grades, setGrades] = useState<GradeInfo[]>([]);
   const [attendance, setAttendance] = useState<AttendanceInfo[]>([]);
@@ -355,18 +356,19 @@ export default function StudentDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 group">
+        <Card className="overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 group cursor-pointer" onClick={() => setCurrentPage('student-ai')}>
           <CardContent className="p-5 flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <CardDescription className="text-sm">Paiements en attente</CardDescription>
-              <div className="p-2 rounded-lg bg-amber-50 group-hover:bg-amber-100 transition-colors duration-300">
-                <CreditCard className="h-4 w-4 text-amber-500" />
+              <CardDescription className="text-sm">IA Gradie</CardDescription>
+              <div className="p-2 rounded-lg bg-purple-50 group-hover:bg-purple-100 transition-colors duration-300">
+                <Sparkles className="h-4 w-4 text-purple-500" />
               </div>
             </div>
-            <p className="text-3xl font-bold text-amber-600">{pendingPayments}</p>
-            <p className="text-xs text-muted-foreground">paiement(s)</p>
+            <p className="text-lg font-bold text-purple-600">Étudier avec Grady</p>
+            <p className="text-xs text-muted-foreground">Posez vos questions, préparez vos examens</p>
           </CardContent>
         </Card>
+
       </div>
 
       {/* Bottom Section */}

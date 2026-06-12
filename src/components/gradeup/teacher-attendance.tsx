@@ -60,14 +60,17 @@ export default function TeacherAttendance() {
       const studentsData = await studentsRes.json();
       const attendanceRes = await fetch(`/api/attendance?schoolId=${user.schoolId}&date=${selectedDate}`);
       const attendanceData = await attendanceRes.json();
-      const mergedAttendance: StudentAttendance[] = (Array.isArray(studentsData) ? studentsData : []).map((student: UserInfo) => {
-        const existing = (Array.isArray(attendanceData) ? attendanceData : []).find((a: AttendanceInfo) => a.studentId === student.id);
+      const studentsList = Array.isArray(studentsData.users) ? studentsData.users : (Array.isArray(studentsData) ? studentsData : []);
+      const attendanceList = Array.isArray(attendanceData.attendance) ? attendanceData.attendance : (Array.isArray(attendanceData) ? attendanceData : []);
+      const mergedAttendance: StudentAttendance[] = studentsList.map((student: UserInfo) => {
+        const existing = attendanceList.find((a: AttendanceInfo) => a.studentId === student.id);
         return { studentId: student.id, studentName: student.fullName, status: existing?.status || 'present', reason: existing?.reason || '', existingId: existing?.id };
       });
-      setStudents(Array.isArray(studentsData) ? studentsData : []);
+      setStudents(studentsList);
       setAttendance(mergedAttendance);
     } catch { toast.error('Erreur lors du chargement'); } finally { setLoading(false); }
   };
+
 
   const updateStatus = (studentId: string, status: AttendanceStatus) => {
     setAttendance((prev) => prev.map((a) => a.studentId === studentId ? { ...a, status } : a));

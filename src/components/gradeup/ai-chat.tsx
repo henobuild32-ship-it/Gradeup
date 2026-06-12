@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { useAppStore } from '@/lib/store';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,107 @@ const suggestedPrompts = [
   { icon: GraduationCap, text: 'Quels sont les élèves en difficulté ?', color: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' },
   { icon: Sparkles, text: 'Aide-moi à préparer un cours', color: 'bg-purple-100 text-purple-700 hover:bg-purple-200' },
 ];
+
+// Renders markdown-like text from Grady cleanly without raw symbols
+function MarkdownMessage({ content }: { content: string }) {
+  const lines = content.split('\n');
+  const elements: ReactNode[] = [];
+  let i = 0;
+
+  const parseInline = (text: string): ReactNode => {
+    // Remove trailing/leading spaces
+    text = text.trim();
+    // Replace **bold**, *italic*, `code`
+    const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
+    return parts.map((part, idx) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={idx} className="font-semibold text-foreground">{part.slice(2, -2)}</strong>;
+      }
+      if (part.startsWith('*') && part.endsWith('*')) {
+        return <em key={idx}>{part.slice(1, -1)}</em>;
+      }
+      if (part.startsWith('`') && part.endsWith('`')) {
+        return <code key={idx} className="bg-slate-200 text-slate-800 px-1 py-0.5 rounded text-xs font-mono">{part.slice(1, -1)}</code>;
+      }
+      return part;
+    });
+  };
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Skip empty lines between blocks — only add spacing if next line is not empty
+    if (line.trim() === '') {
+      i++;
+      continue;
+    }
+
+    // Horizontal rule
+    if (/^[-*_]{3,}$/.test(line.trim())) {
+      elements.push(<hr key={i} className="border-slate-200 my-2" />);
+      i++;
+      continue;
+    }
+
+    // Headers
+    const h3Match = line.match(/^###\s+(.+)/);
+    const h2Match = line.match(/^##\s+(.+)/);
+    const h1Match = line.match(/^#\s+(.+)/);
+    if (h1Match) {
+      elements.push(<p key={i} className="font-bold text-base text-foreground mt-2 mb-1">{parseInline(h1Match[1])}</p>);
+      i++; continue;
+    }
+    if (h2Match) {
+      elements.push(<p key={i} className="font-semibold text-sm text-foreground mt-2 mb-1">{parseInline(h2Match[1])}</p>);
+      i++; continue;
+    }
+    if (h3Match) {
+      elements.push(<p key={i} className="font-medium text-sm text-foreground mt-1.5 mb-0.5">{parseInline(h3Match[1])}</p>);
+      i++; continue;
+    }
+
+    // Bullet list — collect consecutive bullet lines
+    if (/^[-*+]\s/.test(line)) {
+      const listItems: ReactNode[] = [];
+      while (i < lines.length && /^[-*+]\s/.test(lines[i])) {
+        listItems.push(
+          <li key={i} className="flex items-start gap-2">
+            <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />
+            <span>{parseInline(lines[i].replace(/^[-*+]\s/, ''))}</span>
+          </li>
+        );
+        i++;
+      }
+      elements.push(<ul key={`ul-${i}`} className="space-y-1 my-1.5 pl-1">{listItems}</ul>);
+      continue;
+    }
+
+    // Numbered list
+    if (/^\d+\.\s/.test(line)) {
+      const listItems: React.ReactNode[] = [];
+      let num = 1;
+      while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
+        listItems.push(
+          <li key={i} className="flex items-start gap-2">
+            <span className="mt-0.5 text-xs font-bold text-blue-500 shrink-0 min-w-[1.2rem]">{num}.</span>
+            <span>{parseInline(lines[i].replace(/^\d+\.\s/, ''))}</span>
+          </li>
+        );
+        i++; num++;
+      }
+      elements.push(<ol key={`ol-${i}`} className="space-y-1 my-1.5 pl-1">{listItems}</ol>);
+      continue;
+    }
+
+    // Normal paragraph
+    elements.push(<p key={i} className="mb-1">{parseInline(line)}</p>);
+    i++;
+  }
+
+  return <div className="space-y-0.5 text-sm leading-relaxed">{elements}</div>;
+}
+
+
 
 export default function AiChat({ schoolId, userId, role }: AiChatProps) {
   const { chatMessages, addChatMessage, clearChatMessages } = useAppStore();
@@ -150,30 +251,35 @@ export default function AiChat({ schoolId, userId, role }: AiChatProps) {
             )}
 
             {messages.map((msg) => (
-              <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-scale-in`}>
-                {msg.role === 'assistant' && (
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white mt-1 shadow-sm">
-                    <Bot className="h-4 w-4" />
+                <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-scale-in`}>
+                  {msg.role === 'assistant' && (
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white mt-1 shadow-sm">
+                      <Bot className="h-4 w-4" />
+                    </div>
+                  )}
+                  <div
+                    className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
+                      msg.role === 'user'
+                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-br-md'
+                        : 'bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-bl-md'
+                    }`}
+                  >
+                    {msg.role === 'user' ? (
+                      <div className="whitespace-pre-wrap">{msg.content}</div>
+                    ) : (
+                      <MarkdownMessage content={msg.content} />
+                    )}
+                    <div className={`text-[10px] mt-2 ${msg.role === 'user' ? 'text-blue-200' : 'text-muted-foreground'}`}>
+                      {new Date(msg.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                    </div>
                   </div>
-                )}
-                <div
-                  className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
-                    msg.role === 'user'
-                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-br-md'
-                      : 'bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-bl-md'
-                  }`}
-                >
-                  <div className="whitespace-pre-wrap">{msg.content}</div>
-                  <div className={`text-[10px] mt-2 ${msg.role === 'user' ? 'text-blue-200' : 'text-muted-foreground'}`}>
-                    {new Date(msg.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                  </div>
+                  {msg.role === 'user' && (
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white mt-1 shadow-sm">
+                      <User className="h-4 w-4" />
+                    </div>
+                  )}
                 </div>
-                {msg.role === 'user' && (
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white mt-1 shadow-sm">
-                    <User className="h-4 w-4" />
-                  </div>
-                )}
-              </div>
+
             ))}
 
             {loading && (

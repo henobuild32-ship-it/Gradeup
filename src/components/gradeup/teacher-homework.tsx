@@ -44,14 +44,15 @@ export default function TeacherHomework() {
       ]);
       const homeworkData = await homeworkRes.json();
       const coursesData = await coursesRes.json();
-      setHomeworkList(Array.isArray(homeworkData) ? homeworkData : []);
-      setCourses(Array.isArray(coursesData) ? coursesData : []);
+      setHomeworkList(Array.isArray(homeworkData) ? homeworkData : (Array.isArray(homeworkData.homework) ? homeworkData.homework : []));
+      setCourses(Array.isArray(coursesData.courses) ? coursesData.courses : []);
     } catch {
       toast.error('Erreur lors du chargement des données');
     } finally {
       setLoading(false);
     }
   };
+
 
   const getDaysRemaining = (dueDate: string): number => {
     const due = new Date(dueDate);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '@/lib/store';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,11 +25,12 @@ export default function TeacherLessons() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Form state
   const [formCourseId, setFormCourseId] = useState('');
   const [formTitle, setFormTitle] = useState('');
   const [formContent, setFormContent] = useState('');
   const [formFileName, setFormFileName] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
 
   useEffect(() => {
     if (!user) return;
@@ -46,8 +47,9 @@ export default function TeacherLessons() {
       ]);
       const lessonsData = await lessonsRes.json();
       const coursesData = await coursesRes.json();
-      setLessons(Array.isArray(lessonsData) ? lessonsData : []);
-      setCourses(Array.isArray(coursesData) ? coursesData : []);
+      setLessons(Array.isArray(lessonsData) ? lessonsData : (Array.isArray(lessonsData.lessons) ? lessonsData.lessons : []));
+      setCourses(Array.isArray(coursesData.courses) ? coursesData.courses : []);
+
     } catch {
       toast.error('Erreur lors du chargement des données');
     } finally {
@@ -314,22 +316,51 @@ export default function TeacherLessons() {
             </div>
 
             <div className="space-y-2">
-              <Label>Fichier (nom)</Label>
+              <Label>Fichier joint (optionnel)</Label>
+              {/* Hidden native file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) setFormFileName(file.name);
+                }}
+              />
               <div className="flex gap-2">
                 <Input
-                  placeholder="Nom du fichier (ex: cours_chap3.pdf)"
+                  placeholder="Aucun fichier sélectionné"
                   value={formFileName}
-                  onChange={(e) => setFormFileName(e.target.value)}
-                  className="focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:border-blue-500 transition-all"
+                  readOnly
+                  className="focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:border-blue-500 transition-all cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()}
                 />
-                <Button type="button" variant="outline" size="icon" className="shrink-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0 border-blue-200 text-blue-600 hover:bg-blue-50"
+                  onClick={() => fileInputRef.current?.click()}
+                >
                   <Upload className="h-4 w-4" />
                 </Button>
+                {formFileName && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0 text-muted-foreground hover:text-red-500"
+                    onClick={() => { setFormFileName(''); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                  >
+                    ✕
+                  </Button>
+                )}
               </div>
               <p className="text-xs text-muted-foreground">
-                Saisissez le nom du fichier à joindre
+                Cliquez pour ouvrir le gestionnaire de fichiers
               </p>
             </div>
+
           </div>
 
           <DialogFooter>

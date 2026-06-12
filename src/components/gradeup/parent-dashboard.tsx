@@ -23,11 +23,23 @@ import {
   Send,
   Shield,
   Heart,
+  Link2,
+  Loader2,
+  Plus,
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 
 export default function ParentDashboard() {
-  const { user } = useAppStore();
+  const { user, setCurrentPage } = useAppStore();
   const [children, setChildren] = useState<UserInfo[]>([]);
   const [selectedChildIndex, setSelectedChildIndex] = useState(0);
   const [grades, setGrades] = useState<GradeInfo[]>([]);
@@ -35,6 +47,9 @@ export default function ParentDashboard() {
   const [payments, setPayments] = useState<PaymentInfo[]>([]);
   const [notifications, setNotifications] = useState<NotificationInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [parentCodeInput, setParentCodeInput] = useState('');
+  const [linking, setLinking] = useState(false);
 
   // ✅ Correction : Sécurisation de children avant d'accéder à l'index
   const safeChildren = Array.isArray(children) ? children : [];
@@ -112,6 +127,35 @@ export default function ParentDashboard() {
     }
   };
 
+  const handleLinkChild = async () => {
+    const code = parentCodeInput.trim().toUpperCase();
+    if (!code) {
+      toast.error('Veuillez entrer un code de parrainage');
+      return;
+    }
+    setLinking(true);
+    try {
+      const res = await fetch('/api/parent-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parentCode: code, parentUserId: user!.id }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(`${data.student.fullName} a été ajouté à votre suivi`);
+        setParentCodeInput('');
+        setLinkDialogOpen(false);
+        await fetchChildren();
+      } else {
+        toast.error(data.error || 'Erreur lors de l\'ajout');
+      }
+    } catch {
+      toast.error('Erreur lors de la liaison');
+    } finally {
+      setLinking(false);
+    }
+  };
+
   const safeGrades = Array.isArray(grades) ? grades : [];
   const safeAttendance = Array.isArray(attendance) ? attendance : [];
   const safePayments = Array.isArray(payments) ? payments : [];
@@ -186,58 +230,183 @@ export default function ParentDashboard() {
               <Users className="h-12 w-12 text-blue-300" />
             </div>
             <p className="text-muted-foreground text-center max-w-sm">
-              Aucun enfant trouvé. Veuillez contacter l&apos;administration pour lier votre compte.
+              Aucun enfant lié pour le moment.
             </p>
+            <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-blue-600 hover:bg-blue-700 mt-2">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Ajouter un enfant avec son code
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Link2 className="h-5 w-5 text-blue-600" />
+                    Lier un enfant par code de parrainage
+                  </DialogTitle>
+                  <DialogDescription>
+                    Entrez le code de parrainage unique de votre enfant (ex: P-ABCDEF) pour le suivre depuis votre tableau de bord.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 pt-2">
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">Code de parrainage</label>
+                    <Input
+                      placeholder="P-XXXXXX"
+                      value={parentCodeInput}
+                      onChange={(e) => setParentCodeInput(e.target.value.toUpperCase())}
+                      className="uppercase tracking-wider font-mono"
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleLinkChild(); }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Ce code se trouve dans le tableau de bord de votre enfant, section &quot;Code Parent&quot;.
+                  </p>
+                  <div className="flex justify-end gap-3 pt-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => { setLinkDialogOpen(false); setParentCodeInput(''); }}
+                      disabled={linking}
+                    >
+                      Annuler
+                    </Button>
+                    <Button
+                      onClick={handleLinkChild}
+                      disabled={linking || !parentCodeInput.trim()}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      {linking ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Liaison en cours...
+                        </>
+                      ) : (
+                        <>
+                          <Link2 className="h-4 w-4 mr-2" />
+                          Lier l&apos;enfant
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </CardContent>
         </Card>
       ) : (
         <>
           {/* Child Selector Card */}
-          {safeChildren.length > 1 && (
-            <Card className="transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-blue-50">
-                    <Users className="h-4 w-4 text-blue-500" />
-                  </div>
-                  Mes enfants
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-3">
-                  {safeChildren.map((child, idx) => (
-                    <button
-                      key={child.id}
-                      onClick={() => setSelectedChildIndex(idx)}
-                      className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all duration-300 hover:shadow-md ${
-                        selectedChildIndex === idx
-                          ? 'border-blue-400 bg-blue-50 shadow-md shadow-blue-100'
-                          : 'border-transparent bg-muted/40 hover:bg-muted/60 hover:border-blue-200'
-                      }`}
-                    >
-                      <Avatar className="size-10 ring-2 ring-white shadow-sm">
-                        <AvatarImage src={child.photoUrl} alt={child.fullName} />
-                        <AvatarFallback className="text-xs bg-blue-100 text-blue-700 font-semibold">
-                          {child.fullName.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="text-left">
-                        <p className={`text-sm font-semibold ${selectedChildIndex === idx ? 'text-blue-700' : 'text-foreground'}`}>
-                          {child.fullName}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {child.classEnrollments?.[0]?.class?.name || 'Non assigné'}
-                        </p>
-                      </div>
-                      {selectedChildIndex === idx && (
-                        <div className="h-2 w-2 rounded-full bg-blue-500 ml-2 animate-pulse-soft" />
-                      )}
-                    </button>
-                  ))}
+          <Card className="transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-blue-50">
+                  <Users className="h-4 w-4 text-blue-500" />
                 </div>
-              </CardContent>
-            </Card>
-          )}
+                Mes enfants
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-3">
+                {safeChildren.map((child, idx) => (
+                  <button
+                    key={child.id}
+                    onClick={() => setSelectedChildIndex(idx)}
+                    className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all duration-300 hover:shadow-md ${
+                      selectedChildIndex === idx
+                        ? 'border-blue-400 bg-blue-50 shadow-md shadow-blue-100'
+                        : 'border-transparent bg-muted/40 hover:bg-muted/60 hover:border-blue-200'
+                    }`}
+                  >
+                    <Avatar className="size-10 ring-2 ring-white shadow-sm">
+                      <AvatarImage src={child.photoUrl} alt={child.fullName} />
+                      <AvatarFallback className="text-xs bg-blue-100 text-blue-700 font-semibold">
+                        {child.fullName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="text-left">
+                      <p className={`text-sm font-semibold ${selectedChildIndex === idx ? 'text-blue-700' : 'text-foreground'}`}>
+                        {child.fullName}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {child.classEnrollments?.[0]?.class?.name || 'Non assigné'}
+                      </p>
+                    </div>
+                    {selectedChildIndex === idx && (
+                      <div className="h-2 w-2 rounded-full bg-blue-500 ml-2 animate-pulse-soft" />
+                    )}
+                  </button>
+                ))}
+                <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+                  <DialogTrigger asChild>
+                    <button
+                      className="flex items-center gap-3 p-3 rounded-xl border-2 border-dashed border-blue-300 bg-blue-50/30 hover:bg-blue-50 hover:border-blue-400 transition-all duration-300 hover:shadow-md group"
+                    >
+                      <div className="size-10 rounded-xl bg-blue-100 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                        <Plus className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div className="text-left">
+                        <p className="text-sm font-semibold text-blue-700">Ajouter un enfant</p>
+                        <p className="text-xs text-blue-400">Avec son code de parrainage</p>
+                      </div>
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <Link2 className="h-5 w-5 text-blue-600" />
+                        Lier un enfant par code de parrainage
+                      </DialogTitle>
+                      <DialogDescription>
+                        Entrez le code de parrainage unique de votre enfant (ex: P-ABCDEF) pour le suivre depuis votre tableau de bord.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 pt-2">
+                      <div>
+                        <label className="text-sm font-medium mb-1.5 block">Code de parrainage</label>
+                        <Input
+                          placeholder="P-XXXXXX"
+                          value={parentCodeInput}
+                          onChange={(e) => setParentCodeInput(e.target.value.toUpperCase())}
+                          className="uppercase tracking-wider font-mono"
+                          onKeyDown={(e) => { if (e.key === 'Enter') handleLinkChild(); }}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Ce code se trouve dans le tableau de bord de votre enfant, section &quot;Code Parent&quot;.
+                      </p>
+                      <div className="flex justify-end gap-3 pt-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => { setLinkDialogOpen(false); setParentCodeInput(''); }}
+                          disabled={linking}
+                        >
+                          Annuler
+                        </Button>
+                        <Button
+                          onClick={handleLinkChild}
+                          disabled={linking || !parentCodeInput.trim()}
+                          className="bg-blue-600 hover:bg-blue-700"
+                        >
+                          {linking ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Liaison en cours...
+                            </>
+                          ) : (
+                            <>
+                              <Link2 className="h-4 w-4 mr-2" />
+                              Lier l&apos;enfant
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Child Info Card */}
           {selectedChild && (
@@ -495,6 +664,7 @@ export default function ParentDashboard() {
                     <Button
                       size="sm"
                       variant="outline"
+                      onClick={() => setCurrentPage('messages')}
                       className="mt-3 border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300 hover:scale-[1.02] transition-all duration-300"
                     >
                       <Send className="h-3 w-3 mr-1.5" />
@@ -514,6 +684,7 @@ export default function ParentDashboard() {
                     <Button
                       size="sm"
                       variant="outline"
+                      onClick={() => setCurrentPage('messages')}
                       className="mt-3 border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300 hover:scale-[1.02] transition-all duration-300"
                     >
                       <Send className="h-3 w-3 mr-1.5" />

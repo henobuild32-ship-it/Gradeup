@@ -1,25 +1,19 @@
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
+import { generateLocalResponse } from '@/lib/ai/local-provider';
 
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions';
+const AI_PROVIDER = (process.env.AI_PROVIDER || 'local').toLowerCase();
 
 export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
-  // Diagnostic logging pour vérifier la disponibilité de la clé en prod
-  console.log('[AI API] Diagnostic:', {
-    hasDeepseekKey: !!DEEPSEEK_API_KEY,
-    keyLength: DEEPSEEK_API_KEY?.length || 0,
-    keyPrefix: DEEPSEEK_API_KEY?.slice(0, 10) || 'N/A',
-    env: process.env.NODE_ENV,
-    timestamp: new Date().toISOString(),
-  });
+  const useLocal = AI_PROVIDER === 'local' || (AI_PROVIDER === 'auto' && !DEEPSEEK_API_KEY);
 
-  if (!DEEPSEEK_API_KEY) {
-    console.error('[AI API ERROR] DEEPSEEK_API_KEY est undefined ou vide');
+  if (!useLocal && !DEEPSEEK_API_KEY) {
     return new Response(
-      JSON.stringify({ error: "Clé API DeepSeek non configurée." }),
+      JSON.stringify({ error: "Aucun fournisseur IA configuré." }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
@@ -196,7 +190,7 @@ export async function POST(request: NextRequest) {
     ? `Bonjour ${user?.fullName || 'utilisateur'} ! `
     : '';
 
-  const systemPrompt = `${greeting}Tu es Gradie, une intelligence artificielle créée par Axions Labs, développée par Henock et Advice. Tu es intégrée dans GradeUp, une plateforme de gestion scolaire moderne.
+  const systemPrompt = `${greeting}Tu es Gradie, une intelligence artificielle créée par Axion Labs Technologies, développée par Henock et Advice. Tu es intégrée dans GradeUp, une plateforme de gestion scolaire moderne.
 
 Ton rôle est d'aider tous les utilisateurs de l'école : administrateurs, professeurs, élèves et parents. Tu réponds à TOUTES leurs questions — scolaires, organisationnelles, de conseil ou de soutien — de façon bienveillante, précise et professionnelle.
 
@@ -229,15 +223,48 @@ Réponds toujours de façon utile, claire, humaine et bienveillante.`;
     });
   }
 
-  // ─── Appel DeepSeek en streaming ──────────────────────────────────────────
-  let deepseekResponse: Response;
-  try {
-    console.log('[AI API] Appel DeepSeek API...', {
-      url: DEEPSEEK_API_URL,
-      model: 'deepseek-chat',
-      messageCount: historyMessages.length + 1,
+  // ─── Génération de la réponse ─────────────────────────────────────────────
+  const conversationIdFinal = conversation.id;
+  const encoder = new TextEncoder();
+
+  if (useLocal) {
+    const reply = await generateLocalResponse({
+      message,
+      schoolContext,
+      userName: user?.fullName || 'utilisateur',
+      userRole: user?.role || 'USER',
+      historyMessages,
     });
 
+    await db.aiMessage.create({
+      data: { conversationId: conversationIdFinal, role: 'assistant', content: reply },
+    });
+    await db.aiConversation.update({
+      where: { id: conversationIdFinal },
+      data: { updatedAt: new Date() },
+    });
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ token: reply, conversationId: conversationIdFinal })}\n\n`));
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, conversationId: conversationIdFinal })}\n\n`));
+        controller.close();
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'X-Conversation-Id': conversationIdFinal,
+      },
+    });
+  }
+
+  // ─── DeepSeek en streaming ─────────────────────────────────────────────────
+  let deepseekResponse: Response;
+  try {
     deepseekResponse = await fetch(DEEPSEEK_API_URL, {
       method: 'POST',
       headers: {
@@ -256,17 +283,7 @@ Réponds toujours de façon utile, claire, humaine et bienveillante.`;
         ],
       }),
     });
-
-    console.log('[AI API] DeepSeek réponse reçue:', {
-      status: deepseekResponse.status,
-      statusText: deepseekResponse.statusText,
-      ok: deepseekResponse.ok,
-    });
-  } catch (error) {
-    console.error('[AI API ERROR] Erreur lors de l\'appel DeepSeek:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : 'N/A',
-    });
+  } catch {
     return new Response(
       JSON.stringify({ error: "Impossible de contacter le service IA." }),
       { status: 503, headers: { 'Content-Type': 'application/json' } }
@@ -275,20 +292,12 @@ Réponds toujours de façon utile, claire, humaine et bienveillante.`;
 
   if (!deepseekResponse.ok) {
     const errorText = await deepseekResponse.text();
-    console.error('[AI API ERROR] DeepSeek retourne une erreur:', {
-      status: deepseekResponse.status,
-      statusText: deepseekResponse.statusText,
-      body: errorText.slice(0, 500),
-    });
     return new Response(
       JSON.stringify({ error: "Le service IA est temporairement indisponible.", details: errorText.slice(0, 200) }),
       { status: 503, headers: { 'Content-Type': 'application/json' } }
     );
   }
 
-  // ─── Stream SSE vers le client ─────────────────────────────────────────────
-  const conversationIdFinal = conversation.id;
-  const encoder = new TextEncoder();
   let fullReply = '';
 
   const stream = new ReadableStream({
@@ -320,7 +329,6 @@ Réponds toujours de façon utile, claire, humaine et bienveillante.`;
         }
       } finally {
         reader.releaseLock();
-        // Sauvegarder la réponse complète en base
         if (fullReply) {
           await db.aiMessage.create({
             data: { conversationId: conversationIdFinal, role: 'assistant', content: fullReply },

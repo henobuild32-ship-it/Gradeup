@@ -104,6 +104,7 @@ const roleIcons: Record<string, typeof Users> = {
 export default function AdminUsers() {
   const { user } = useAppStore();
   const [users, setUsers] = useState<UserItem[]>([]);
+  const [allUsers, setAllUsers] = useState<UserItem[]>([]); // For counting across roles
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [parents, setParents] = useState<{ id: string; fullName: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -137,6 +138,17 @@ export default function AdminUsers() {
     }
   }, [user?.schoolId, activeTab]);
 
+  // Load all users (without role filter) for accurate tab counters
+  const fetchAllUsers = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/users?schoolId=${user?.schoolId}`);
+      const data = await res.json();
+      setAllUsers(Array.isArray(data.users) ? data.users : []);
+    } catch {
+      // silent
+    }
+  }, [user?.schoolId]);
+
   const fetchClasses = useCallback(async () => {
     try {
       const res = await fetch(`/api/classes?schoolId=${user?.schoolId}`);
@@ -161,10 +173,11 @@ export default function AdminUsers() {
     if (user?.schoolId) {
       setLoading(true);
       fetchUsers();
+      fetchAllUsers();
       fetchClasses();
       fetchParents();
     }
-  }, [fetchUsers, fetchClasses, fetchParents, user?.schoolId]);
+  }, [fetchUsers, fetchAllUsers, fetchClasses, fetchParents, user?.schoolId]);
 
   const resetForm = () => {
     setFormName('');
@@ -245,6 +258,7 @@ export default function AdminUsers() {
       setDialogOpen(false);
       resetForm();
       fetchUsers();
+      fetchAllUsers();
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : 'Erreur lors de l\'opération');
     } finally {
@@ -262,6 +276,8 @@ export default function AdminUsers() {
       setDeleteDialogOpen(false);
       setDeletingUser(null);
       fetchUsers();
+      fetchAllUsers();
+
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : 'Erreur lors de la suppression');
     }
@@ -292,9 +308,10 @@ export default function AdminUsers() {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
+  // Use allUsers (full list) to compute accurate counts regardless of active tab
   const getCountByRole = (role: string) => {
-    if (role === 'ALL') return users.length;
-    return users.filter(u => u.role === role).length;
+    if (role === 'ALL') return allUsers.length;
+    return allUsers.filter(u => u.role === role).length;
   };
 
   return (

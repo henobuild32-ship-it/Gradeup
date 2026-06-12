@@ -20,8 +20,8 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "GradeUp – Plateforme Scolaire Intelligente",
   description: "GradeUp est une plateforme intelligente pour gérer votre école, suivre les performances, gérer les paiements et utiliser l'IA Gradie.",
-  keywords: ["GradeUp", "école", "school management", "Axions Labs"],
-  authors: [{ name: "Axions Labs" }],
+  keywords: ["GradeUp", "école", "school management", "Axion Labs Technologies"],
+  authors: [{ name: "Axion Labs Technologies" }],
   icons: {
     icon: "/logo-gradeup.png",
     apple: "/icon-192x192.png",

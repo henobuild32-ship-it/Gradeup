@@ -484,7 +484,7 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
           </div>
           <div className="min-w-0">
             <p className="text-white font-semibold text-xs sm:text-sm truncate">Gradie</p>
-            <p className="text-white/40 text-[10px] sm:text-xs hidden sm:block">IA · Axions Labs</p>
+            <p className="text-white/40 text-[10px] sm:text-xs hidden sm:block">IA · Axion Labs Technologies</p>
           </div>
           {activeConversation && (
             <div className="ml-auto flex items-center gap-2 min-w-0">
@@ -680,7 +680,7 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
             }}
           />
           <p className="text-white/15 text-[9px] sm:text-[10px] text-center mt-2">
-            Gradie peut faire des erreurs. Vérifiez les informations importantes. · Axions Labs
+            Gradie peut faire des erreurs. Vérifiez les informations importantes. · Axion Labs Technologies
           </p>
         </div>
       </div>

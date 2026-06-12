@@ -2,6 +2,7 @@
 
 import { useAppStore } from '@/lib/store';
 import type { PageView } from '@/lib/types';
+import { useState, useEffect } from 'react';
 
 import AuthPage from '@/components/gradeup/auth-page';
 import AppLayout from '@/components/gradeup/app-layout';
@@ -80,8 +81,46 @@ function PageRouter({ page }: { page: PageView }) {
   return <AuthPage />;
 }
 
+// Splash screen shown during Zustand rehydration to avoid flash of auth page
+function SplashScreen() {
+  return (
+    <div className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-600 z-50">
+      <div className="flex flex-col items-center gap-6 animate-fade-in">
+        <div className="relative">
+          <img
+            src="/logo-gradeup.png"
+            alt="GradeUp"
+            className="w-24 h-24 rounded-2xl object-contain drop-shadow-2xl"
+          />
+          <div className="absolute inset-0 rounded-2xl bg-white/10 animate-pulse" />
+        </div>
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-white tracking-tight">GradeUp</h1>
+          <p className="text-blue-200 text-sm mt-1">Chargement en cours...</p>
+        </div>
+        <div className="flex gap-2">
+          <div className="h-2 w-2 rounded-full bg-white/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+          <div className="h-2 w-2 rounded-full bg-white/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+          <div className="h-2 w-2 rounded-full bg-white/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function HomePage() {
   const { currentPage, user } = useAppStore();
+  const [hydrated, setHydrated] = useState(false);
+
+  // Wait for Zustand to rehydrate from localStorage before rendering anything
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  // Show splash screen while rehydrating — avoids the flash to auth page
+  if (!hydrated) {
+    return <SplashScreen />;
+  }
 
   if (!user) {
     return <AuthPage />;
@@ -93,3 +132,4 @@ export default function HomePage() {
     </AppLayout>
   );
 }
+

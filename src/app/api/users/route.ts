@@ -17,6 +17,8 @@ export async function GET(request: NextRequest) {
     const schoolId = searchParams.get('schoolId');
     const role = searchParams.get('role');
     const classId = searchParams.get('classId');
+    const parentId = searchParams.get('parentId');
+    const search = searchParams.get('search');
 
     if (!schoolId) {
       return NextResponse.json({ error: 'schoolId is required' }, { status: 400 });
@@ -32,6 +34,19 @@ export async function GET(request: NextRequest) {
       where.classEnrollments = {
         some: { classId },
       };
+    }
+
+    // Security: filter children by parentId so parents only see their own children
+    if (parentId) {
+      where.parentId = parentId;
+    }
+
+    // Full-text search on fullName or email
+    if (search) {
+      where.OR = [
+        { fullName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+      ];
     }
 
     const users = await db.user.findMany({

@@ -16,7 +16,7 @@ Work Log:
 Stage Summary:
 - Complete GradeUp platform built with full CRUD for all entities
 - 4 user roles: Admin, Teacher, Student, Parent
-- Modern blue-themed design with signature "© GradeUp – Créé par Axions Labs"
+- Modern blue-themed design with signature "© GradeUp – Créé par Axion Labs Technologies"
 
 ---
 ## Task ID: qa-features
