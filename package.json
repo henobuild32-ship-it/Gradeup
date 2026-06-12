@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
-    "build": "npx esbuild src/app/sw.ts --bundle --minify --outfile=public/sw.js --platform=browser && next build",
+    "build": "next build",
     "start": "NODE_ENV=production bun .next/standalone/server.js",
     "lint": "eslint .",
     "postinstall": "prisma generate",
