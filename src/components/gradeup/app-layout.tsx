@@ -70,7 +70,8 @@ import {
   Video,
   Smartphone,
   Apple,
-  IdCard
+  IdCard,
+  DollarSign
 } from 'lucide-react';
 
 interface NavItem {
@@ -86,6 +87,7 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Utilisateurs', page: 'admin-users', icon: Users, emoji: '👥' },
     { label: 'Classes', page: 'admin-classes', icon: School, emoji: '🏫' },
     { label: 'Paiements', page: 'admin-payments', icon: CreditCard, emoji: '💳' },
+    { label: 'Frais scolaires', page: 'admin-tuition', icon: DollarSign, emoji: '💰' },
     { label: 'Cartes Élèves', page: 'admin-cards', icon: IdCard, emoji: '🆔' },
     { label: 'Configuration', page: 'admin-config', icon: Settings, emoji: '⚙️' },
     { label: 'Rapports', page: 'admin-reports', icon: BarChart3, emoji: '📈' },
@@ -163,6 +165,7 @@ const pageTitles: Record<PageView, string> = {
   'admin-cards': 'Cartes d\'identité',
   'admin-courses': 'Cours',
   'admin-ai': 'IA Gradie',
+  'admin-tuition': 'Frais scolaires',
   'teacher-dashboard': 'Tableau de bord',
   'teacher-courses': 'Cours',
   'teacher-lessons': 'Leçons',

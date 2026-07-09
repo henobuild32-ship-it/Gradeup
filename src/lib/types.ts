@@ -175,6 +175,7 @@ export type PageView =
   | 'admin-cards'
   | 'admin-courses'
   | 'admin-ai'
+  | 'admin-tuition'
   | 'teacher-dashboard'
   | 'teacher-courses'
   | 'teacher-lessons'

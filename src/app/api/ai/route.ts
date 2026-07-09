@@ -1,20 +1,73 @@
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { generateLocalResponse } from '@/lib/ai/local-provider';
+import { generateOpenRouterResponse } from '@/lib/ai/openrouter-provider';
 
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
-const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions';
-const AI_PROVIDER = (process.env.AI_PROVIDER || 'local').toLowerCase();
+const AI_PROVIDER = (process.env.AI_PROVIDER || 'openrouter').toLowerCase();
+const HAS_OPENROUTER_KEY = !!process.env.OPENROUTER_API_KEY;
 
 export const runtime = 'nodejs';
 
-export async function POST(request: NextRequest) {
-  const useLocal = AI_PROVIDER === 'local' || (AI_PROVIDER === 'auto' && !DEEPSEEK_API_KEY);
+function buildSystemPrompt(
+  userName: string,
+  userRole: string,
+  schoolContext: string,
+  isFirstMessage: boolean,
+): string {
+  const greeting = isFirstMessage
+    ? `Bonjour ${userName || 'utilisateur'} ! `
+    : '';
 
-  if (!useLocal && !DEEPSEEK_API_KEY) {
+  const roleGuidance: Record<string, string> = {
+    STUDENT:
+      "Tu es un assistant pédagogique bienveillant. Aide l'élève à comprendre ses notes, suivre ses absences, gérer ses paiements, et l'encourage dans sa scolarité. Tu peux expliquer les concepts scolaires, donner des conseils d'étude et motiver l'élève.",
+    TEACHER:
+      "Tu es un assistant pour professeurs. Aide-le à gérer ses cours, suivre ses élèves, publier des leçons, prendre les présences, et noter les évaluations. Tu peux aussi suggérer des activités pédagogiques et des méthodes d'enseignement.",
+    PARENT:
+      "Tu es un assistant pour parents. Donne des informations sur le suivi des enfants (notes, absences, paiements), aide à comprendre le code de parrainage, et facilite la communication avec l'école. Sois rassurant et clair.",
+    ADMIN:
+      "Tu es un assistant de direction pour administrateur scolaire. Tu peux fournir une vue d'ensemble complète de l'école (effectifs, finances, classes, inscriptions). Tu aides aussi à la gestion quotidienne : suivi des frais de scolarité, blocage/déblocage d'accès, création de classes, inscriptions. Tu parles comme un vrai conseiller de direction.",
+  };
+
+  const guidance = roleGuidance[userRole] || roleGuidance.STUDENT;
+
+  return `${greeting}Tu es Gradie, une intelligence artificielle experte en gestion scolaire et pédagogique, créée par Axion Labs Technologies, développée par Henock et Advice. Tu es intégrée dans GradeUp, une plateforme de gestion scolaire moderne de premier plan.
+
+IDENTITÉ :
+- Ton nom est Gradie.
+- Tu as été créée par Axion Labs Technologies.
+- Tu es intégrée dans GradeUp.
+- Tu parles français de façon naturelle et professionnelle.
+
+TON RÔLE SPÉCIFIQUE :
+${guidance}
+
+RÈGLES DE CONDUITE :
+1. Réponds TOUJOURS en français (sauf si l'utilisateur pose une question dans une autre langue).
+2. Utilise le contexte scolaire ci-dessous pour personnaliser ta réponse. Si le contexte est vide, réponds de façon générale mais utile.
+3. Ne répète PAS de formule de bienvenue ou salutation si l'utilisateur a déjà été salué dans cette session (isFirstMessage=false).
+4. Utilise des émojis avec modération et pertinence (📚 pour les cours, 📊 pour les stats, 💰 pour paiements, ✅ pour validation, etc.).
+5. Sois précis, bienveillant et professionnel. Ne donne jamais d'informations fausses — si tu ne sais pas, dis-le honnêtement.
+6. Pour les demandes administratives complexes (paiements, blocages, inscriptions), guide l'utilisateur vers la section appropriée de l'interface.
+7. Adapte ton langage à ton interlocuteur : simple et encourageant pour un élève, technique et complet pour un administrateur.
+8. Quand l'administrateur te demande des actions ou des analyses, propose toujours des solutions concrètes avec des recommandations chiffrées.
+9. Tu peux générer des rapports verbaux détaillés sur n'importe quel aspect de l'école.
+10. N'utilise JAMAIS de salutation (Bonjour, etc.) si tu n'es pas en train de commencer la conversation.
+
+Contexte scolaire actuel :
+${schoolContext}
+
+Réponds toujours de façon utile, claire, humaine et bienveillante.`;
+}
+
+export async function POST(request: NextRequest) {
+  const useLocal = AI_PROVIDER === 'local';
+  const useOpenRouter = AI_PROVIDER === 'openrouter' || (AI_PROVIDER === 'auto' && HAS_OPENROUTER_KEY);
+
+  if (!useLocal && !useOpenRouter) {
     return new Response(
       JSON.stringify({ error: "Aucun fournisseur IA configuré." }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      { status: 500, headers: { 'Content-Type': 'application/json' } },
     );
   }
 
@@ -24,11 +77,10 @@ export async function POST(request: NextRequest) {
   if (!message || !schoolId || !userId) {
     return new Response(
       JSON.stringify({ error: 'Champs requis manquants : message, schoolId, userId' }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
+      { status: 400, headers: { 'Content-Type': 'application/json' } },
     );
   }
 
-  // ─── Récupération ou création de la conversation ──────────────────────────
   let conversation;
   if (conversationId) {
     conversation = await db.aiConversation.findFirst({
@@ -43,13 +95,11 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // ─── Informations sur l'utilisateur ──────────────────────────────────────
   const user = await db.user.findUnique({
     where: { id: userId },
     select: { fullName: true, role: true },
   });
 
-  // ─── Contexte scolaire ────────────────────────────────────────────────────
   let schoolContext = '';
   try {
     if (context === 'grades') {
@@ -75,14 +125,14 @@ export async function POST(request: NextRequest) {
       });
       const present = attendance.filter((a) => a.status === 'present').length;
       const absent = attendance.filter((a) => a.status === 'absent').length;
-      schoolContext = `Présences : ${present} présents, ${absent} absents sur ${attendance.length} enregistrements.\n`;
+      const late = attendance.filter((a) => a.status === 'late').length;
+      schoolContext = `Présences : ${present} présents, ${absent} absents, ${late} retards sur ${attendance.length} enregistrements.\n`;
     } else if (context === 'payments') {
       const payments = await db.payment.findMany({ where: { schoolId, studentId: userId } });
       const paid = payments.filter((p) => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
       const pending = payments.filter((p) => p.status === 'pending').reduce((s, p) => s + p.amount, 0);
       schoolContext = `Paiements : ${paid} payés, ${pending} en attente.\n`;
     } else if (context === 'teacher') {
-      // Contexte pour les professeurs : leurs cours et classes
       const courses = await db.course.findMany({
         where: { schoolId, teacherId: userId },
         include: { class: { select: { name: true, level: true } } },
@@ -97,8 +147,18 @@ export async function POST(request: NextRequest) {
       });
       schoolContext += `\nTotal : ${courses.length} cours, ${classIds.length} classes, ${studentCount} élèves.\n`;
     } else if (context === 'admin') {
-      // Contexte complet pour l'administrateur : vue d'ensemble de l'école
-      const [studentCount, teacherCount, parentCount, classCount, courseCount, paymentStats, pendingUsers] = await Promise.all([
+      const [
+        studentCount,
+        teacherCount,
+        parentCount,
+        classCount,
+        courseCount,
+        paymentStats,
+        pendingUsers,
+        pendingPayments,
+        overduePayments,
+        blockedStudents,
+      ] = await Promise.all([
         db.user.count({ where: { schoolId, role: 'STUDENT' } }),
         db.user.count({ where: { schoolId, role: 'TEACHER' } }),
         db.user.count({ where: { schoolId, role: 'PARENT' } }),
@@ -109,14 +169,18 @@ export async function POST(request: NextRequest) {
           _sum: { amount: true },
         }),
         db.user.count({ where: { schoolId, active: false } }),
+        db.payment.count({ where: { schoolId, status: 'pending' } }),
+        db.payment.count({ where: { schoolId, status: 'overdue' } }),
+        db.user.count({ where: { schoolId, role: 'STUDENT', active: false } }),
       ]);
 
-      const totalRevenue = paymentStats._sum.amount || 0;
+      const totalRevenue = paymentStats._sum?.amount || 0;
 
-      // Récupérer les classes avec leurs effectifs
       const classes = await db.schoolClass.findMany({
         where: { schoolId },
-        include: { _count: { select: { enrollments: true, courses: true } } },
+        include: {
+          _count: { select: { enrollments: true, courses: true } },
+        },
       });
 
       schoolContext = `Administrateur : ${user?.fullName}\n`;
@@ -128,24 +192,19 @@ export async function POST(request: NextRequest) {
       schoolContext += `  - 📚 Cours : ${courseCount}\n`;
       schoolContext += `  - 💰 Revenus totaux : ${totalRevenue} FCFA\n`;
       schoolContext += `  - ⏳ Utilisateurs en attente d'activation : ${pendingUsers}\n`;
+      schoolContext += `  - 🔒 Élèves bloqués (inactifs) : ${blockedStudents}\n`;
 
-      schoolContext += `\n📋 DÉTAIL DES CLASSES :\n`;
-      classes.forEach((c) => {
-        schoolContext += `  - ${c.name} (Niveau : ${c.level}) : ${c._count.enrollments} élèves, ${c._count.courses} cours\n`;
-      });
-
-      // Récupérer les paiements en attente
-      const pendingPayments = await db.payment.count({
-        where: { schoolId, status: 'pending' },
-      });
-      const overduePayments = await db.payment.count({
-        where: { schoolId, status: 'overdue' },
-      });
       schoolContext += `\n💰 STATUT DES PAIEMENTS :\n`;
       schoolContext += `  - En attente : ${pendingPayments}\n`;
       schoolContext += `  - En retard : ${overduePayments}\n`;
 
-      // Récupérer les dernières inscriptions
+      if (classes.length > 0) {
+        schoolContext += `\n📋 DÉTAIL DES CLASSES :\n`;
+        classes.forEach((c) => {
+          schoolContext += `  - ${c.name} (Niveau : ${c.level}) : ${c._count.enrollments} élèves, ${c._count.courses} cours\n`;
+        });
+      }
+
       const recentStudents = await db.user.findMany({
         where: { schoolId, role: 'STUDENT' },
         orderBy: { createdAt: 'desc' },
@@ -158,6 +217,34 @@ export async function POST(request: NextRequest) {
           schoolContext += `  - ${s.fullName} (${new Date(s.createdAt).toLocaleDateString('fr-FR')})\n`;
         });
       }
+    } else if (context === 'tuition') {
+      const students = await db.user.findMany({
+        where: { schoolId, role: 'STUDENT' },
+        include: {
+          payments: { orderBy: { createdAt: 'desc' } },
+          classEnrollments: { include: { class: true } },
+        },
+      });
+      const totalStudents = students.length;
+      const paidStudents = students.filter((s) =>
+        s.payments.some((p) => p.status === 'paid'),
+      ).length;
+      const totalCollected = students.reduce(
+        (sum, s) => sum + s.payments.filter((p) => p.status === 'paid').reduce((a, p) => a + p.amount, 0),
+        0,
+      );
+      schoolContext = `Administrateur - Suivi des frais de scolarité :\n`;
+      schoolContext += `  - Total élèves : ${totalStudents}\n`;
+      schoolContext += `  - Ayant payé : ${paidStudents}\n`;
+      schoolContext += `  - N'ayant pas payé : ${totalStudents - paidStudents}\n`;
+      schoolContext += `  - Total collecté : ${totalCollected} FCFA\n\n`;
+      schoolContext += `Liste des élèves :\n`;
+      students.slice(0, 50).forEach((s) => {
+        const lastPaid = s.payments.find((p) => p.status === 'paid');
+        const status = lastPaid ? 'Payé' : 'Non payé';
+        const cls = s.classEnrollments[0]?.class?.name || 'Non assignée';
+        schoolContext += `  - ${s.fullName} (${cls}) : ${status}\n`;
+      });
     } else {
       const [studentCount, teacherCount, classCount] = await Promise.all([
         db.user.count({ where: { schoolId, role: 'STUDENT' } }),
@@ -170,7 +257,6 @@ export async function POST(request: NextRequest) {
     schoolContext = '';
   }
 
-  // ─── Contenu des documents attachés à la conversation ─────────────────────
   if (conversation.documents.length > 0) {
     schoolContext += `\nDocuments partagés dans cette conversation :\n`;
     conversation.documents.forEach((doc) => {
@@ -178,35 +264,24 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // ─── Historique des messages de la conversation ────────────────────────────
   const historyMessages = conversation.messages.slice(-10).map((m) => ({
     role: m.role as 'user' | 'assistant',
     content: m.content,
   }));
 
-  // ─── Prompt système ────────────────────────────────────────────────────────
   const isFirstMessage = !conversation.salutationDone;
-  const greeting = isFirstMessage
-    ? `Bonjour ${user?.fullName || 'utilisateur'} ! `
-    : '';
 
-  const systemPrompt = `${greeting}Tu es Gradie, une intelligence artificielle créée par Axion Labs Technologies, développée par Henock et Advice. Tu es intégrée dans GradeUp, une plateforme de gestion scolaire moderne.
+  const systemPrompt = buildSystemPrompt(
+    user?.fullName || 'utilisateur',
+    user?.role || 'USER',
+    schoolContext,
+    isFirstMessage,
+  );
 
-Ton rôle est d'aider tous les utilisateurs de l'école : administrateurs, professeurs, élèves et parents. Tu réponds à TOUTES leurs questions — scolaires, organisationnelles, de conseil ou de soutien — de façon bienveillante, précise et professionnelle.
-
-Tu parles principalement en français. Tu utilises le contexte scolaire fourni pour des réponses personnalisées. N'utilise JAMAIS une formule de bienvenue ou salutation si l'utilisateur a déjà été salué dans cette session.
-
-Contexte scolaire actuel :
-${schoolContext}
-
-Réponds toujours de façon utile, claire, humaine et bienveillante.`;
-
-  // Sauvegarder le message utilisateur
   await db.aiMessage.create({
     data: { conversationId: conversation.id, role: 'user', content: message },
   });
 
-  // Marquer la salutation comme faite
   if (isFirstMessage) {
     await db.aiConversation.update({
       where: { id: conversation.id },
@@ -214,7 +289,6 @@ Réponds toujours de façon utile, claire, humaine et bienveillante.`;
     });
   }
 
-  // Mettre à jour le titre de la conversation si c'est la première fois
   if (conversation.messages.length === 0) {
     const title = message.length > 50 ? message.slice(0, 50) + '…' : message;
     await db.aiConversation.update({
@@ -223,7 +297,6 @@ Réponds toujours de façon utile, claire, humaine et bienveillante.`;
     });
   }
 
-  // ─── Génération de la réponse ─────────────────────────────────────────────
   const conversationIdFinal = conversation.id;
   const encoder = new TextEncoder();
 
@@ -246,8 +319,16 @@ Réponds toujours de façon utile, claire, humaine et bienveillante.`;
 
     const stream = new ReadableStream({
       async start(controller) {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ token: reply, conversationId: conversationIdFinal })}\n\n`));
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, conversationId: conversationIdFinal })}\n\n`));
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({ token: reply, conversationId: conversationIdFinal })}\n\n`,
+          ),
+        );
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({ done: true, conversationId: conversationIdFinal })}\n\n`,
+          ),
+        );
         controller.close();
       },
     });
@@ -262,39 +343,31 @@ Réponds toujours de façon utile, claire, humaine et bienveillante.`;
     });
   }
 
-  // ─── DeepSeek en streaming ─────────────────────────────────────────────────
-  let deepseekResponse: Response;
+  let aiResponse: Response;
   try {
-    deepseekResponse = await fetch(DEEPSEEK_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'deepseek-chat',
-        stream: true,
-        temperature: 0.7,
-        max_tokens: 1500,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...historyMessages,
-          { role: 'user', content: message },
-        ],
-      }),
+    aiResponse = await generateOpenRouterResponse({
+      message,
+      schoolContext,
+      userName: user?.fullName || 'utilisateur',
+      userRole: user?.role || 'USER',
+      historyMessages,
+      systemPrompt,
     });
   } catch {
     return new Response(
-      JSON.stringify({ error: "Impossible de contacter le service IA." }),
-      { status: 503, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: 'Impossible de contacter le service IA.' }),
+      { status: 503, headers: { 'Content-Type': 'application/json' } },
     );
   }
 
-  if (!deepseekResponse.ok) {
-    const errorText = await deepseekResponse.text();
+  if (!aiResponse.ok) {
+    const errorText = await aiResponse.text();
     return new Response(
-      JSON.stringify({ error: "Le service IA est temporairement indisponible.", details: errorText.slice(0, 200) }),
-      { status: 503, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({
+        error: 'Le service IA est temporairement indisponible.',
+        details: errorText.slice(0, 200),
+      }),
+      { status: 503, headers: { 'Content-Type': 'application/json' } },
     );
   }
 
@@ -302,8 +375,11 @@ Réponds toujours de façon utile, claire, humaine et bienveillante.`;
 
   const stream = new ReadableStream({
     async start(controller) {
-      const reader = deepseekResponse.body?.getReader();
-      if (!reader) { controller.close(); return; }
+      const reader = aiResponse.body?.getReader();
+      if (!reader) {
+        controller.close();
+        return;
+      }
 
       const decoder = new TextDecoder();
       try {
@@ -319,12 +395,17 @@ Réponds toujours de façon utile, claire, humaine et bienveillante.`;
             if (data === '[DONE]') continue;
             try {
               const parsed = JSON.parse(data);
-              const token = parsed.choices?.[0]?.delta?.content || '';
+              const token =
+                parsed.choices?.[0]?.delta?.content || '';
               if (token) {
                 fullReply += token;
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ token, conversationId: conversationIdFinal })}\n\n`));
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({ token, conversationId: conversationIdFinal })}\n\n`,
+                  ),
+                );
               }
-            } catch { /* token invalide, ignorer */ }
+            } catch {}
           }
         }
       } finally {
@@ -338,7 +419,11 @@ Réponds toujours de façon utile, claire, humaine et bienveillante.`;
             data: { updatedAt: new Date() },
           });
         }
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, conversationId: conversationIdFinal })}\n\n`));
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({ done: true, conversationId: conversationIdFinal })}\n\n`,
+          ),
+        );
         controller.close();
       }
     },
