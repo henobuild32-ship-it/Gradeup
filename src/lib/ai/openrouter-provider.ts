@@ -8,8 +8,8 @@ interface OpenRouterInput {
 }
 
 export async function generateOpenRouterResponse(input: OpenRouterInput): Promise<Response> {
-  const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-  const MODEL = process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat-v3-0324:free';
+  const OPENROUTER_API_KEY = process.env.OR_API_KEY;
+  const MODEL = process.env.OR_MODEL || 'deepseek/deepseek-chat-v3-0324:free';
 
   const messages = [
     { role: 'system', content: input.systemPrompt },

@@ -4,7 +4,7 @@ import { generateLocalResponse } from '@/lib/ai/local-provider';
 import { generateOpenRouterResponse } from '@/lib/ai/openrouter-provider';
 
 const AI_PROVIDER = (process.env.AI_PROVIDER || 'openrouter').toLowerCase();
-const HAS_OPENROUTER_KEY = !!process.env.OPENROUTER_API_KEY;
+const HAS_OPENROUTER_KEY = !!process.env.OR_API_KEY;
 
 export const runtime = 'nodejs';
 
