@@ -295,6 +295,7 @@ model ReportCard {
   schoolId             String
   classId              String
   studentId            String
+  teacherId            String?
   trimester            String
   academicYear         String      @default("2025-2026")
   studentName          String
@@ -308,6 +309,7 @@ model ReportCard {
   averageGrade         Float
   classRank            Int
   mention              String
+  status               String      @default("draft")
   gradesData           Json
   studentSignatureUrl  String      @default("")
   parentSignatureUrl   String      @default("")

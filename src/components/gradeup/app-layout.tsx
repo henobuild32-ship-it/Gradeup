@@ -71,7 +71,9 @@ import {
   Smartphone,
   Apple,
   IdCard,
-  DollarSign
+  DollarSign,
+  GraduationCap,
+  ScrollText,
 } from 'lucide-react';
 
 interface NavItem {
@@ -95,6 +97,7 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Cours', page: 'admin-courses', icon: BookOpen, emoji: '📚' },
     { label: 'IA Gradie', page: 'admin-ai', icon: Bot, emoji: '🤖' },
     { label: 'Visioconférences', page: 'admin-conferences', icon: Video, emoji: '🎥' },
+    { label: 'Fin du cursus', page: 'admin-end-of-year', icon: GraduationCap, emoji: '🎓' },
     { label: 'Messagerie', page: 'messages', icon: MessageSquare, emoji: '💬' },
     { label: 'Calendrier', page: 'calendar', icon: CalendarDays, emoji: '📆' },
     { label: 'Profil', page: 'profile', icon: User, emoji: '👤' },
@@ -108,6 +111,8 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Devoirs', page: 'teacher-homework', icon: ClipboardCheck, emoji: '📋' },
     { label: 'Absences', page: 'teacher-attendance', icon: Calendar, emoji: '📅' },
     { label: 'IA Gradie', page: 'teacher-ai', icon: Bot, emoji: '🤖' },
+    { label: 'Rapports', page: 'teacher-reports', icon: ScrollText, emoji: '📄' },
+    { label: 'Fin du cursus', page: 'teacher-end-of-year', icon: GraduationCap, emoji: '🎓' },
     { label: 'Messagerie', page: 'messages', icon: MessageSquare, emoji: '💬' },
     { label: 'Calendrier', page: 'calendar', icon: CalendarDays, emoji: '📆' },
     { label: 'Profil', page: 'profile', icon: User, emoji: '👤' },
@@ -166,6 +171,7 @@ const pageTitles: Record<PageView, string> = {
   'admin-courses': 'Cours',
   'admin-ai': 'IA Gradie',
   'admin-tuition': 'Frais scolaires',
+  'admin-end-of-year': 'Fin du cursus',
   'teacher-dashboard': 'Tableau de bord',
   'teacher-courses': 'Cours',
   'teacher-lessons': 'Leçons',
@@ -173,6 +179,8 @@ const pageTitles: Record<PageView, string> = {
   'teacher-homework': 'Devoirs',
   'teacher-attendance': 'Absences',
   'teacher-ai': 'IA Gradie',
+  'teacher-reports': 'Rapports',
+  'teacher-end-of-year': 'Fin du cursus',
   'student-dashboard': 'Tableau de bord',
   'student-courses': 'Cours',
   'student-lessons': 'Leçons',
