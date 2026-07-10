@@ -54,6 +54,7 @@ model User {
   matricule         String             @default("")
   academicYear      String             @default("2025-2026")
   section           String             @default("")
+  aiPreferences     String             @default("{}")
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   conversations     AiConversation[]
