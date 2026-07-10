@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAppStore } from '@/lib/store';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,12 +10,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Edit, Trash2, GraduationCap, Filter, Calculator } from 'lucide-react';
+import { Plus, Edit, Trash2, GraduationCap, Filter, Calculator, Sparkles, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import type { CourseInfo, GradeInfo, UserInfo } from '@/lib/types';
 
@@ -30,13 +29,18 @@ export default function TeacherGrades() {
   const [submitting, setSubmitting] = useState(false);
 
   const [filterCourseId, setFilterCourseId] = useState<string>('');
-  const [filterTrimester, setFilterTrimester] = useState<string>('');
+  const [filterTrimester, setFilterTrimester] = useState<string>('1');
+
+  // Quick grading grid states
+  const [gridStudents, setGridStudents] = useState<UserInfo[]>([]);
+  const [gridScores, setGridScores] = useState<Record<string, string>>({});
+  const [gridComments, setGridComments] = useState<Record<string, string>>({});
 
   const [formCourseId, setFormCourseId] = useState('');
   const [formStudentId, setFormStudentId] = useState('');
   const [formScore, setFormScore] = useState('');
   const [formMaxScore, setFormMaxScore] = useState('20');
-  const [formTrimester, setFormTrimester] = useState('');
+  const [formTrimester, setFormTrimester] = useState('1');
   const [formComment, setFormComment] = useState('');
 
   const fetchCourses = useCallback(async () => {
@@ -45,9 +49,7 @@ export default function TeacherGrades() {
       const res = await fetch(`/api/courses?schoolId=${user.schoolId}&teacherId=${user.id}`);
       const data = await res.json();
       setCourses(Array.isArray(data.courses) ? data.courses : []);
-    } catch {
-      // silent
-    }
+    } catch { /* silent */ }
   }, [user]);
 
   const fetchGrades = useCallback(async () => {
@@ -96,12 +98,42 @@ export default function TeacherGrades() {
     if (formCourseId) fetchStudents(formCourseId);
   }, [formCourseId, fetchStudents]);
 
+  // Load students for grid mode when course/trimester changes
+  useEffect(() => {
+    if (!filterCourseId || !user) {
+      setGridStudents([]);
+      return;
+    }
+    const loadGridStudents = async () => {
+      try {
+        const course = courses.find((c) => c.id === filterCourseId);
+        if (!course) return;
+        const res = await fetch(`/api/users?schoolId=${user.schoolId}&role=STUDENT&classId=${course.classId}`);
+        const data = await res.json();
+        const studentsList = Array.isArray(data.users) ? data.users : (Array.isArray(data) ? data : []);
+        setGridStudents(studentsList);
+
+        // Prepopulate gridScores and comments
+        const scores: Record<string, string> = {};
+        const comments: Record<string, string> = {};
+        studentsList.forEach((s: UserInfo) => {
+          const matching = grades.find((g) => g.studentId === s.id && g.courseId === filterCourseId && g.trimester === filterTrimester);
+          scores[s.id] = matching ? String(matching.score) : '';
+          comments[s.id] = matching ? matching.comment : '';
+        });
+        setGridScores(scores);
+        setGridComments(comments);
+      } catch { /* silent */ }
+    };
+    loadGridStudents();
+  }, [filterCourseId, filterTrimester, courses, grades, user]);
+
   const resetForm = () => {
     setFormCourseId('');
     setFormStudentId('');
     setFormScore('');
     setFormMaxScore('20');
-    setFormTrimester('');
+    setFormTrimester('1');
     setFormComment('');
     setEditingGrade(null);
   };
@@ -180,6 +212,48 @@ export default function TeacherGrades() {
     }
   };
 
+  const handleAutoSave = async (studentId: string, scoreStr: string, commentStr: string) => {
+    if (!user || !filterCourseId) return;
+    if (scoreStr === '') return;
+    
+    const score = parseFloat(scoreStr);
+    if (isNaN(score)) return;
+
+    try {
+      const matchingGrade = grades.find((g) => g.studentId === studentId && g.courseId === filterCourseId && g.trimester === filterTrimester);
+      
+      const body = {
+        schoolId: user.schoolId,
+        courseId: filterCourseId,
+        studentId,
+        teacherId: user.id,
+        score,
+        maxScore: 20,
+        trimester: filterTrimester,
+        comment: commentStr.trim(),
+      };
+
+      const url = matchingGrade ? `/api/grades/${matchingGrade.id}` : '/api/grades';
+      const method = matchingGrade ? 'PUT' : 'POST';
+      
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        toast.success(`Note de ${gridStudents.find(s => s.id === studentId)?.fullName} enregistrée`);
+        // Refresh local grades query
+        const gradesRes = await fetch(`/api/grades?schoolId=${user.schoolId}&teacherId=${user.id}&courseId=${filterCourseId}&trimester=${filterTrimester}`);
+        const data = await gradesRes.json();
+        setGrades(Array.isArray(data.grades) ? data.grades : []);
+      }
+    } catch {
+      toast.error('Erreur lors de l\'enregistrement automatique');
+    }
+  };
+
   const handleDelete = async (id: string) => {
     try {
       const res = await fetch(`/api/grades/${id}`, { method: 'DELETE' });
@@ -195,13 +269,11 @@ export default function TeacherGrades() {
   };
 
   const getStudentName = (studentId: string) => {
-    return grades.find((g) => g.studentId === studentId)?.student?.fullName ||
-      students.find((s) => s.id === studentId)?.fullName || 'Inconnu';
+    return grades.find((g) => g.studentId === studentId)?.student?.fullName || 'Inconnu';
   };
 
   const getCourseName = (courseId: string) => {
-    return grades.find((g) => g.courseId === courseId)?.course?.name ||
-      courses.find((c) => c.id === courseId)?.name || 'Inconnu';
+    return courses.find((c) => c.id === courseId)?.name || 'Inconnu';
   };
 
   const getClassAverage = () => {
@@ -211,6 +283,15 @@ export default function TeacherGrades() {
   };
 
   const getPassCount = () => grades.filter((g) => (g.score / g.maxScore) * 20 >= 10).length;
+
+  // Real-time Class Grid stats
+  const gridStats = useMemo(() => {
+    const scores = Object.values(gridScores).map(s => parseFloat(s)).filter(s => !isNaN(s));
+    const total = gridStudents.length;
+    const graded = scores.length;
+    const average = graded > 0 ? (scores.reduce((sum, s) => sum + s, 0) / graded).toFixed(2) : '—';
+    return { total, graded, average };
+  }, [gridScores, gridStudents]);
 
   if (!user) return null;
 
@@ -233,139 +314,244 @@ export default function TeacherGrades() {
         </div>
       </div>
 
-      {/* Filters */}
-      <Card className="shadow-sm">
+      {/* Controls / Filter Bar */}
+      <Card className="shadow-sm border border-border bg-card">
         <CardContent className="flex items-center gap-4 flex-wrap py-4">
           <Filter className="h-4 w-4 text-muted-foreground" />
-          <Select value={filterCourseId} onValueChange={(v) => setFilterCourseId(v === '__all__' ? '' : v)}>
-            <SelectTrigger className="w-48 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
-              <SelectValue placeholder="Tous les cours" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Tous les cours</SelectItem>
-              {courses.map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={filterTrimester} onValueChange={(v) => setFilterTrimester(v === '__all__' ? '' : v)}>
-            <SelectTrigger className="w-40 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
-              <SelectValue placeholder="Trimestre" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Tous les trimestres</SelectItem>
-              <SelectItem value="1">Trimestre 1</SelectItem>
-              <SelectItem value="2">Trimestre 2</SelectItem>
-              <SelectItem value="3">Trimestre 3</SelectItem>
-            </SelectContent>
-          </Select>
-          <div className="ml-auto flex items-center gap-4 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <Calculator className="h-4 w-4 text-blue-500" />
-              Moyenne: <strong className="text-foreground">{getClassAverage()}</strong>/20
-            </span>
-            <span>Au-dessus de 10: <strong className="text-emerald-600">{getPassCount()}</strong>/{grades.length}</span>
-          </div>
+          
+          {/* iOS native style select menu for Course */}
+          <select
+            value={filterCourseId}
+            onChange={(e) => setFilterCourseId(e.target.value)}
+            className="w-48 h-10 border border-input rounded-lg px-3 bg-background text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer font-medium"
+          >
+            <option value="">Tous les cours</option>
+            {courses.map((c) => (
+              <option key={c.id} value={c.id}>{c.name} — {c.class?.name}</option>
+            ))}
+          </select>
+
+          {/* iOS native style select menu for Trimester */}
+          <select
+            value={filterTrimester}
+            onChange={(e) => setFilterTrimester(e.target.value)}
+            className="w-40 h-10 border border-input rounded-lg px-3 bg-background text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer font-medium"
+          >
+            <option value="1">Trimestre 1</option>
+            <option value="2">Trimestre 2</option>
+            <option value="3">Trimestre 3</option>
+          </select>
+
+          {!filterCourseId && (
+            <div className="ml-auto flex items-center gap-4 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <Calculator className="h-4 w-4 text-blue-500" />
+                Moyenne globale: <strong className="text-foreground">{getClassAverage()}</strong>/20
+              </span>
+              <span>Réussites: <strong className="text-emerald-600">{getPassCount()}</strong>/{grades.length}</span>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Grades Table */}
-      {loading ? (
-        <div className="space-y-2">
-          {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full rounded-md" />
-          ))}
-        </div>
-      ) : grades.length === 0 ? (
-        <div className="text-center py-20">
-          <div className="mx-auto w-24 h-24 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-            <GraduationCap className="h-12 w-12 text-muted-foreground/50" />
+      {/* Grid Quick Grading Mode vs List Mode */}
+      {filterCourseId ? (
+        <div className="space-y-6">
+          {/* Grid Mode Stats & Progress bar */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Card className="p-4 bg-gradient-to-br from-blue-50 to-white dark:from-blue-950/20 border-blue-150">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] text-blue-700/80 uppercase font-bold tracking-wider">Moyenne de classe</p>
+                  <p className="text-3xl font-extrabold text-blue-600 mt-1">{gridStats.average}<span className="text-xs font-normal text-muted-foreground ml-0.5">/20</span></p>
+                </div>
+                <Calculator className="h-8 w-8 text-blue-500 opacity-60" />
+              </div>
+            </Card>
+            
+            <Card className="p-4 sm:col-span-2">
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Progression de la notation</p>
+                  <p className="text-base font-bold mt-0.5">{gridStats.graded} sur {gridStats.total} élèves notés</p>
+                </div>
+                <Sparkles className="h-5 w-5 text-amber-500" />
+              </div>
+              <div className="w-full bg-muted h-2.5 rounded-full overflow-hidden">
+                <div 
+                  className="bg-gradient-to-r from-blue-500 to-indigo-500 h-full rounded-full transition-all duration-500" 
+                  style={{ width: `${gridStats.total > 0 ? (gridStats.graded / gridStats.total) * 100 : 0}%` }}
+                />
+              </div>
+            </Card>
           </div>
-          <h3 className="text-xl font-semibold mb-2">Aucune note enregistrée</h3>
-          <p className="text-muted-foreground mb-4">Ajoutez des notes pour vos élèves</p>
-          <Button onClick={openCreateDialog} variant="outline" className="hover:scale-[1.02] active:scale-[0.98] transition-all gap-2">
-            <Plus className="h-4 w-4" />
-            Ajouter une note
-          </Button>
+
+          {/* Saisie rapide table */}
+          <Card className="shadow-sm overflow-hidden">
+            <CardHeader className="bg-muted/20 border-b pb-4">
+              <CardTitle className="text-base flex items-center gap-2">🟢 Grille de notation rapide</CardTitle>
+              <CardDescription>Saisissez les notes. La validation s'effectue automatiquement lorsque vous quittez la case (perte de focus).</CardDescription>
+            </CardHeader>
+            <div className="overflow-x-auto">
+              <Table className="text-sm min-w-[700px]">
+                <TableHeader>
+                  <TableRow className="bg-muted/30">
+                    <TableHead className="pl-6">Élève</TableHead>
+                    <TableHead className="text-center w-36">Note (/20)</TableHead>
+                    <TableHead className="w-80">Appréciation / Commentaire</TableHead>
+                    <TableHead className="text-center w-24">Statut</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {gridStudents.map((student) => {
+                    const score = gridScores[student.id] || '';
+                    const comment = gridComments[student.id] || '';
+                    const hasGrade = score !== '';
+                    
+                    return (
+                      <TableRow key={student.id} className="hover:bg-muted/10">
+                        <TableCell className="pl-6 font-semibold">{student.fullName}</TableCell>
+                        <TableCell className="text-center">
+                          <Input
+                            type="number"
+                            inputMode="decimal"
+                            step="0.25"
+                            min="0"
+                            max="20"
+                            placeholder="—"
+                            className="text-center font-bold text-sm h-10 w-24 mx-auto rounded-lg focus:ring-2 focus:ring-blue-500/20"
+                            value={score}
+                            onChange={(e) => setGridScores({ ...gridScores, [student.id]: e.target.value })}
+                            onBlur={() => handleAutoSave(student.id, score, comment)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            placeholder="Ajouter une appréciation..."
+                            className="h-10 rounded-lg text-xs"
+                            value={comment}
+                            onChange={(e) => setGridComments({ ...gridComments, [student.id]: e.target.value })}
+                            onBlur={() => handleAutoSave(student.id, score, comment)}
+                          />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {hasGrade ? (
+                            <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 gap-1"><Check className="w-3 h-3" /> Validé</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-muted-foreground bg-muted/40">À saisir</Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
         </div>
       ) : (
-        <Card className="shadow-sm">
-          <ScrollArea className="max-h-[500px]">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/30 hover:bg-muted/30">
-                  <TableHead>Élève</TableHead>
-                  <TableHead>Cours</TableHead>
-                  <TableHead className="text-center">Note</TableHead>
-                  <TableHead className="text-center">Note max</TableHead>
-                  <TableHead>Trimestre</TableHead>
-                  <TableHead className="hidden sm:table-cell">Commentaire</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {grades.map((grade) => {
-                  const normalizedScore = (grade.score / grade.maxScore) * 20;
-                  return (
-                    <TableRow key={grade.id} className="even:bg-muted/20 hover:bg-blue-50/50 transition-colors">
-                      <TableCell className="font-medium">
-                        {grade.student?.fullName || getStudentName(grade.studentId)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="text-xs">
-                          {grade.course?.name || getCourseName(grade.courseId)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span
-                          className={`inline-flex items-center justify-center rounded-lg px-3 py-1 text-sm font-bold shadow-sm ${
-                            normalizedScore >= 10
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : normalizedScore >= 7
-                              ? 'bg-amber-100 text-amber-700'
-                              : 'bg-red-100 text-red-700'
-                          }`}
-                        >
-                          {grade.score}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center text-muted-foreground">{grade.maxScore}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs border-blue-200 text-blue-600 bg-blue-50">T{grade.trimester}</Badge>
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell max-w-[200px] truncate text-muted-foreground text-xs">
-                        {grade.comment || '—'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-blue-50 hover:text-blue-600 transition-colors" onClick={() => openEditDialog(grade)}>
-                            <Edit className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-red-50 hover:text-red-600 transition-colors" onClick={() => handleDelete(grade.id)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-                {/* Average Row */}
-                <TableRow className="bg-gradient-to-r from-blue-50 to-indigo-50 font-bold">
-                  <TableCell colSpan={2} className="text-blue-700">Moyenne</TableCell>
-                  <TableCell className="text-center">
-                    <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-sm">
-                      {getClassAverage()}/20
-                    </Badge>
-                  </TableCell>
-                  <TableCell colSpan={4}></TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </ScrollArea>
-        </Card>
+        /* Standard Grade List View */
+        <div className="space-y-4">
+          {loading ? (
+            <div className="space-y-2">
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full rounded-md" />
+              ))}
+            </div>
+          ) : grades.length === 0 ? (
+            <div className="text-center py-20">
+              <div className="mx-auto w-24 h-24 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                <GraduationCap className="h-12 w-12 text-muted-foreground/50" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Aucune note enregistrée</h3>
+              <p className="text-muted-foreground mb-4">Sélectionnez un cours ci-dessus pour accéder à la grille de notation rapide ou créez une note individuelle.</p>
+              <Button onClick={openCreateDialog} variant="outline" className="hover:scale-[1.02] active:scale-[0.98] transition-all gap-2">
+                <Plus className="h-4 w-4" />
+                Ajouter une note
+              </Button>
+            </div>
+          ) : (
+            <Card className="shadow-sm">
+              <ScrollArea className="max-h-[500px]">
+                <div className="overflow-x-auto">
+                  <Table className="min-w-[650px]">
+                    <TableHeader>
+                      <TableRow className="bg-muted/30 hover:bg-muted/30">
+                        <TableHead>Élève</TableHead>
+                        <TableHead>Cours</TableHead>
+                        <TableHead className="text-center">Note</TableHead>
+                        <TableHead className="text-center">Note max</TableHead>
+                        <TableHead>Trimestre</TableHead>
+                        <TableHead className="hidden sm:table-cell">Commentaire</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {grades.map((grade) => {
+                        const normalizedScore = (grade.score / grade.maxScore) * 20;
+                        return (
+                          <TableRow key={grade.id} className="even:bg-muted/20 hover:bg-blue-50/50 transition-colors">
+                            <TableCell className="font-medium">
+                              {grade.student?.fullName || getStudentName(grade.studentId)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className="text-xs">
+                                {grade.course?.name || getCourseName(grade.courseId)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span
+                                className={`inline-flex items-center justify-center rounded-lg px-2.5 py-1 text-sm font-bold shadow-sm ${
+                                  normalizedScore >= 16 ? 'bg-green-50 text-green-700 border border-green-200' :
+                                  normalizedScore >= 14 ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                                  normalizedScore >= 12 ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' :
+                                  normalizedScore >= 10 ? 'bg-orange-50 text-orange-700 border border-orange-200' :
+                                  'bg-red-50 text-red-700 border border-red-200'
+                                }`}
+                              >
+                                {grade.score}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-center text-muted-foreground">{grade.maxScore}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs border-blue-200 text-blue-600 bg-blue-50">T{grade.trimester}</Badge>
+                            </TableCell>
+                            <TableCell className="hidden sm:table-cell max-w-[200px] truncate text-muted-foreground text-xs">
+                              {grade.comment || '—'}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-blue-50 hover:text-blue-600 transition-colors" onClick={() => openEditDialog(grade)}>
+                                  <Edit className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-red-50 hover:text-red-600 transition-colors" onClick={() => handleDelete(grade.id)}>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      {/* Average Row */}
+                      <TableRow className="bg-gradient-to-r from-blue-50 to-indigo-50 font-bold">
+                        <TableCell colSpan={2} className="text-blue-700">Moyenne</TableCell>
+                        <TableCell className="text-center">
+                          <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-sm">
+                            {getClassAverage()}/20
+                          </Badge>
+                        </TableCell>
+                        <TableCell colSpan={4}></TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              </ScrollArea>
+            </Card>
+          )}
+        </div>
       )}
 
-      {/* Create/Edit Grade Dialog */}
+      {/* Create/Edit Individual Grade Dialog */}
       <Dialog open={dialogOpen} onOpenChange={(open) => !open && resetForm()}>
         <DialogContent className="sm:max-w-lg">
           <div className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-t-lg -mx-6 -mt-6 mb-0" />
@@ -382,34 +568,35 @@ export default function TeacherGrades() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Cours *</Label>
-              <Select value={formCourseId} onValueChange={(v) => { setFormCourseId(v); setFormStudentId(''); }}>
-                <SelectTrigger className="w-full focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
-                  <SelectValue placeholder="Sélectionner un cours" />
-                </SelectTrigger>
-                <SelectContent>
-                  {courses.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name} — {c.class?.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <select
+                value={formCourseId}
+                onChange={(e) => { setFormCourseId(e.target.value); setFormStudentId(''); }}
+                className="w-full h-10 border border-input rounded-lg px-3 bg-background text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+              >
+                <option value="">Sélectionner un cours</option>
+                {courses.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name} — {c.class?.name}</option>
+                ))}
+              </select>
             </div>
             <div className="space-y-2">
               <Label>Élève *</Label>
-              <Select value={formStudentId} onValueChange={setFormStudentId} disabled={!formCourseId}>
-                <SelectTrigger className="w-full focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
-                  <SelectValue placeholder={formCourseId ? 'Sélectionner un élève' : 'Sélectionnez d\'abord un cours'} />
-                </SelectTrigger>
-                <SelectContent>
-                  {students.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.fullName}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <select
+                value={formStudentId}
+                onChange={(e) => setFormStudentId(e.target.value)}
+                disabled={!formCourseId}
+                className="w-full h-10 border border-input rounded-lg px-3 bg-background text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+              >
+                <option value="">{formCourseId ? 'Sélectionner un élève' : 'Sélectionnez d\'abord un cours'}</option>
+                {students.map((s) => (
+                  <option key={s.id} value={s.id}>{s.fullName}</option>
+                ))}
+              </select>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Note *</Label>
-                <Input type="number" placeholder="0" min="0" max={formMaxScore} step="0.25" value={formScore} onChange={(e) => setFormScore(e.target.value)} className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" />
+                <Input type="number" inputMode="decimal" placeholder="0" min="0" max={formMaxScore} step="0.25" value={formScore} onChange={(e) => setFormScore(e.target.value)} className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" />
               </div>
               <div className="space-y-2">
                 <Label>Note max</Label>
@@ -418,16 +605,15 @@ export default function TeacherGrades() {
             </div>
             <div className="space-y-2">
               <Label>Trimestre *</Label>
-              <Select value={formTrimester} onValueChange={setFormTrimester}>
-                <SelectTrigger className="w-full focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
-                  <SelectValue placeholder="Sélectionner le trimestre" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">Trimestre 1</SelectItem>
-                  <SelectItem value="2">Trimestre 2</SelectItem>
-                  <SelectItem value="3">Trimestre 3</SelectItem>
-                </SelectContent>
-              </Select>
+              <select
+                value={formTrimester}
+                onChange={(e) => setFormTrimester(e.target.value)}
+                className="w-full h-10 border border-input rounded-lg px-3 bg-background text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+              >
+                <option value="1">Trimestre 1</option>
+                <option value="2">Trimestre 2</option>
+                <option value="3">Trimestre 3</option>
+              </select>
             </div>
             <div className="space-y-2">
               <Label>Commentaire</Label>

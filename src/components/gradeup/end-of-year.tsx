@@ -55,8 +55,11 @@ interface StudentAnalysis {
 }
 
 export default function EndOfYear() {
-  const { schoolId, user } = useAppStore();
+  const user = useAppStore((s) => s.user);
+  const schoolId = user?.schoolId;
   const { toast } = useToast();
+
+  if (!user) return null;
   const [classes, setClasses] = useState<ClassAnalysis[]>([]);
   const [students, setStudents] = useState<StudentAnalysis[]>([]);
   const [selectedClass, setSelectedClass] = useState<string | null>(null);
@@ -83,14 +86,14 @@ export default function EndOfYear() {
     } finally {
       setLoading(false);
     }
-  }, [schoolId, user.id, isTeacher, toast]);
+  }, [schoolId, user?.id, isTeacher, toast]);
 
   const fetchStudents = useCallback(async (classId: string) => {
     setStudentLoading(true);
     setSelectedClass(classId);
     try {
-      const params = new URLSearchParams({ schoolId, classId });
-      if (isTeacher) params.set('teacherId', user.id);
+      const params = new URLSearchParams({ schoolId: schoolId ?? '', classId });
+      if (isTeacher && user) params.set('teacherId', user.id);
       const res = await fetch(`/api/end-of-year?${params}`);
       const data = await res.json();
       setStudents(data.students || []);
@@ -102,7 +105,7 @@ export default function EndOfYear() {
     } finally {
       setStudentLoading(false);
     }
-  }, [schoolId, isTeacher, user.id, toast]);
+  }, [schoolId, isTeacher, user?.id, toast]);
 
   useEffect(() => { fetchClasses(); }, [fetchClasses]);
 
@@ -115,7 +118,7 @@ export default function EndOfYear() {
         body: JSON.stringify({ action: 'lock-year', schoolId, adminId: user.id }),
       });
       if (!res.ok) throw new Error();
-      toast.success('Année scolaire verrouillée');
+      toast({ title: 'Succès', description: 'Année scolaire verrouillée' });
       setLockDialog(false);
     } catch {
       toast({ title: 'Erreur', description: 'Échec du verrouillage', variant: 'destructive' });
@@ -142,7 +145,7 @@ export default function EndOfYear() {
         }),
       });
       if (!res.ok) throw new Error();
-      toast.success('Classes générées pour la nouvelle année');
+      toast({ title: 'Succès', description: 'Classes générées pour la nouvelle année' });
       setGenerateDialog(false);
       fetchClasses();
     } catch {

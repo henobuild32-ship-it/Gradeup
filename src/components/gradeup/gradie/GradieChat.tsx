@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MessageSquare, Plus, Send, Paperclip, Trash2, X, Menu, ChevronLeft } from 'lucide-react';
+import { MessageSquare, Plus, Send, Paperclip, Trash2, X, Menu, ChevronLeft, FileText, Image, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -40,6 +40,20 @@ interface GradieChatProps {
   userName?: string;
 }
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const MAX_FILE_SIZE_MB = 20;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
+const ACCEPTED_TYPES = [
+  { mime: 'application/pdf', ext: '.pdf', label: 'PDF', icon: 'pdf' },
+  { mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', ext: '.docx', label: 'Word', icon: 'doc' },
+  { mime: 'text/plain', ext: '.txt', label: 'Texte', icon: 'txt' },
+  { mime: 'image/jpeg', ext: '.jpg', label: 'JPEG', icon: 'img' },
+  { mime: 'image/png', ext: '.png', label: 'PNG', icon: 'img' },
+  { mime: 'image/webp', ext: '.webp', label: 'WebP', icon: 'img' },
+];
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatDate(iso: string) {
@@ -57,12 +71,186 @@ function formatSize(bytes: number) {
 }
 
 function renderMessage(content: string) {
-  // Rendu Markdown basique
   return content
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
     .replace(/`(.*?)`/g, '<code class="bg-black/10 dark:bg-white/10 px-1 rounded text-sm font-mono">$1</code>')
     .replace(/\n/g, '<br/>');
+}
+
+// ─── iOS Typing Indicator ─────────────────────────────────────────────────────
+
+function TypingIndicator() {
+  return (
+    <div className="flex justify-start animate-ios-fade-in">
+      <div className="flex items-end gap-1.5">
+        {/* Avatar Gradie */}
+        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center flex-shrink-0 mb-0.5">
+          <span className="text-white text-[9px] font-bold">G</span>
+        </div>
+        {/* Bubble avec 3 points style iMessage */}
+        <div className="bg-[#E9E9EB] dark:bg-white/15 rounded-[18px] rounded-bl-[4px] px-4 py-3 shadow-sm">
+          <div className="flex gap-[5px] items-center h-4">
+            <span
+              className="w-2 h-2 rounded-full bg-[#8E8E93] dark:bg-white/40"
+              style={{ animation: 'iosTypingDot 1.2s ease-in-out infinite', animationDelay: '0ms' }}
+            />
+            <span
+              className="w-2 h-2 rounded-full bg-[#8E8E93] dark:bg-white/40"
+              style={{ animation: 'iosTypingDot 1.2s ease-in-out infinite', animationDelay: '200ms' }}
+            />
+            <span
+              className="w-2 h-2 rounded-full bg-[#8E8E93] dark:bg-white/40"
+              style={{ animation: 'iosTypingDot 1.2s ease-in-out infinite', animationDelay: '400ms' }}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Upload Action Sheet (style iOS) ─────────────────────────────────────────
+
+interface UploadActionSheetProps {
+  onClose: () => void;
+  onSelectFile: (file: File) => void;
+}
+
+function UploadActionSheet({ onClose, onSelectFile }: UploadActionSheetProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleFile = (file: File) => {
+    setError(null);
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      setError(`Fichier trop volumineux. Limite : ${MAX_FILE_SIZE_MB} Mo (votre fichier : ${formatSize(file.size)})`);
+      return;
+    }
+    onSelectFile(file);
+    onClose();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  };
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/50 z-50 animate-ios-fade-in"
+        onClick={onClose}
+      />
+      {/* Sheet */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 animate-ios-sheet-up">
+        <div className="bg-[#F2F2F7] dark:bg-[#1C1C1E] rounded-t-[16px] overflow-hidden shadow-2xl max-w-lg mx-auto">
+          {/* En-tête */}
+          <div className="px-4 pt-4 pb-3 border-b border-black/10 dark:border-white/10">
+            <div className="w-9 h-1 rounded-full bg-black/20 dark:bg-white/20 mx-auto mb-3" />
+            <h3 className="text-[15px] font-semibold text-center text-black dark:text-white">
+              Joindre un fichier
+            </h3>
+            <p className="text-[12px] text-[#8E8E93] text-center mt-0.5">
+              Limite : {MAX_FILE_SIZE_MB} Mo par fichier
+            </p>
+          </div>
+
+          {/* Zone de dépôt */}
+          <div className="p-4">
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              className={`
+                border-2 border-dashed rounded-[12px] p-6 text-center cursor-pointer transition-all
+                ${dragOver
+                  ? 'border-blue-500 bg-blue-500/10'
+                  : 'border-black/15 dark:border-white/15 hover:border-blue-400 hover:bg-blue-500/5'
+                }
+              `}
+            >
+              <Paperclip className="w-8 h-8 text-[#8E8E93] mx-auto mb-2" />
+              <p className="text-[14px] font-medium text-black dark:text-white">
+                Appuyez ou glissez-déposez
+              </p>
+              <p className="text-[12px] text-[#8E8E93] mt-1">
+                PDF, Word, Texte, Images
+              </p>
+            </div>
+
+            {/* Types acceptés */}
+            <div className="grid grid-cols-3 gap-2 mt-3">
+              {[
+                { label: 'PDF', icon: <FileText className="w-4 h-4 text-red-500" />, ext: '.pdf' },
+                { label: 'Word', icon: <FileText className="w-4 h-4 text-blue-500" />, ext: '.docx' },
+                { label: 'Texte', icon: <FileText className="w-4 h-4 text-gray-500" />, ext: '.txt' },
+                { label: 'JPEG', icon: <Image className="w-4 h-4 text-orange-500" />, ext: '.jpg' },
+                { label: 'PNG', icon: <Image className="w-4 h-4 text-purple-500" />, ext: '.png' },
+                { label: 'WebP', icon: <Image className="w-4 h-4 text-green-500" />, ext: '.webp' },
+              ].map((t) => (
+                <div
+                  key={t.ext}
+                  className="flex items-center gap-1.5 bg-white dark:bg-white/5 rounded-[8px] px-2.5 py-2 border border-black/8 dark:border-white/8"
+                >
+                  {t.icon}
+                  <span className="text-[11px] font-medium text-black dark:text-white">{t.label}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Avertissement taille */}
+            <div className="flex items-start gap-2 mt-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-[10px] px-3 py-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-[12px] font-semibold text-amber-700 dark:text-amber-400">
+                  Limite de {MAX_FILE_SIZE_MB} Mo
+                </p>
+                <p className="text-[11px] text-amber-600 dark:text-amber-500/80 mt-0.5">
+                  Les fichiers dépassant cette limite seront refusés pour garantir des performances optimales.
+                </p>
+              </div>
+            </div>
+
+            {/* Erreur */}
+            {error && (
+              <div className="flex items-start gap-2 mt-2 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-[10px] px-3 py-2.5">
+                <X className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                <p className="text-[12px] text-red-600 dark:text-red-400">{error}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Bouton annuler */}
+          <div className="px-4 pb-safe pb-4">
+            <button
+              onClick={onClose}
+              className="w-full bg-white dark:bg-white/10 rounded-[12px] py-[14px] text-[17px] font-semibold text-[#007AFF] active:opacity-70 transition-opacity"
+            >
+              Annuler
+            </button>
+          </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.webp"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleFile(file);
+              e.target.value = '';
+            }}
+          />
+        </div>
+      </div>
+    </>
+  );
 }
 
 // ─── Composant principal ───────────────────────────────────────────────────────
@@ -79,9 +267,10 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
   const [error, setError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [showUploadSheet, setShowUploadSheet] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
@@ -96,7 +285,6 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
         setSidebarOpen(false);
       }
     };
-    
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
@@ -107,8 +295,8 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
-  useEffect(() => { 
-    scrollToBottom(); 
+  useEffect(() => {
+    scrollToBottom();
   }, [activeConversation?.messages, streamingContent, scrollToBottom]);
 
   // ─── Ajustement auto de la hauteur du textarea ──────────────────────────
@@ -256,7 +444,6 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
             }
             if (parsed.conversationId) finalConvId = parsed.conversationId;
             if (parsed.done) {
-              // Ajouter la réponse complète aux messages
               const assistantMsg: AiMessage = {
                 id: (Date.now() + 1).toString(),
                 role: 'assistant',
@@ -287,6 +474,12 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
   const handleFileUpload = async (file: File) => {
     if (!file) return;
 
+    // Vérification taille côté client
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      setError(`Fichier trop volumineux (${formatSize(file.size)}). Limite : ${MAX_FILE_SIZE_MB} Mo.`);
+      return;
+    }
+
     let convId = activeConversation?.id;
     if (!convId) {
       const res = await fetch('/api/ai/conversations', {
@@ -301,6 +494,7 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
     }
 
     setUploadProgress(0);
+    setError(null);
     const formData = new FormData();
     formData.append('file', file);
     formData.append('conversationId', convId!);
@@ -312,6 +506,8 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
       setUploadProgress(80);
       if (res.ok) {
         setUploadProgress(100);
+        setUploadSuccess(file.name);
+        setTimeout(() => setUploadSuccess(null), 3000);
         await loadConversation(convId!);
         await loadConversations();
       } else {
@@ -343,7 +539,7 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
     }
   };
 
-  // ─── Rendu du sidebar ──────────────────────────────────────────────────────
+  // ─── Sidebar ──────────────────────────────────────────────────────────────
   const renderSidebar = () => (
     <div className="h-full flex flex-col bg-black/30 backdrop-blur-xl border-r border-white/10">
       <div className="p-3 sm:p-4 flex items-center justify-between border-b border-white/10 flex-shrink-0">
@@ -354,10 +550,7 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
           <span className="font-bold text-white text-sm tracking-wide hidden sm:inline">Gradie</span>
         </div>
         {isMobile && (
-          <button
-            onClick={() => setMobileSidebarOpen(false)}
-            className="text-white/60 hover:text-white p-1"
-          >
+          <button onClick={() => setMobileSidebarOpen(false)} className="text-white/60 hover:text-white p-1">
             <X className="w-5 h-5" />
           </button>
         )}
@@ -413,7 +606,7 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
               </div>
               <button
                 onClick={(e) => { e.stopPropagation(); deleteConversation(conv.id, e); }}
-                className="opacity-0 group-hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 text-red-400 hover:text-red-300 p-1 rounded transition-all flex-shrink-0"
+                className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 p-1 rounded transition-all flex-shrink-0"
                 style={{ opacity: isMobile ? 1 : undefined }}
               >
                 <Trash2 className="w-3 h-3" />
@@ -437,286 +630,335 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
 
   // ─── Rendu principal ───────────────────────────────────────────────────────
   return (
-    <div className="flex h-full bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 rounded-xl overflow-hidden shadow-2xl relative">
-      
-      {/* ── Overlay mobile ────────────────────────────────────────────────── */}
-      {isMobile && mobileSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
-          onClick={() => setMobileSidebarOpen(false)}
-        />
-      )}
+    <>
+      {/* Styles globaux pour animations iOS */}
+      <style>{`
+        @keyframes iosTypingDot {
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+          30% { transform: translateY(-4px); opacity: 1; }
+        }
+        @keyframes iosFadeIn {
+          from { opacity: 0; transform: translateY(6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes iosSheetUp {
+          from { transform: translateY(100%); }
+          to { transform: translateY(0); }
+        }
+        .animate-ios-fade-in {
+          animation: iosFadeIn 0.25s ease-out;
+        }
+        .animate-ios-sheet-up {
+          animation: iosSheetUp 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+        .scrollbar-gradie::-webkit-scrollbar { width: 4px; height: 4px; }
+        .scrollbar-gradie::-webkit-scrollbar-track { background: transparent; }
+        .scrollbar-gradie::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 9999px; }
+        .scrollbar-gradie::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+        /* Masque le caret iMessage sur mobile en bas */
+        .imessage-user-bubble { border-radius: 18px 18px 4px 18px; }
+        .imessage-ai-bubble { border-radius: 18px 18px 18px 4px; }
+      `}</style>
 
-      {/* ── Sidebar desktop ───────────────────────────────────────────────── */}
-      {!isMobile && (
-        <aside className={`${sidebarOpen ? 'w-72' : 'w-0'} transition-all duration-300 flex-shrink-0 overflow-hidden`}>
-          {renderSidebar()}
-        </aside>
-      )}
+      <div className="flex h-full bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 rounded-xl overflow-hidden shadow-2xl relative">
 
-      {/* ── Sidebar mobile ────────────────────────────────────────────────── */}
-      {isMobile && (
-        <div className={`fixed inset-y-0 left-0 w-80 max-w-[85vw] z-50 transform transition-transform duration-300 ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-          {renderSidebar()}
-        </div>
-      )}
+        {/* ── Upload Action Sheet ──────────────────────────────────────────── */}
+        {showUploadSheet && (
+          <UploadActionSheet
+            onClose={() => setShowUploadSheet(false)}
+            onSelectFile={handleFileUpload}
+          />
+        )}
 
-      {/* ── Zone principale ────────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0 h-full">
-        
-        {/* En-tête */}
-        <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 border-b border-white/10 bg-black/20 backdrop-blur flex-shrink-0">
-          <button
-            onClick={() => isMobile ? setMobileSidebarOpen(true) : setSidebarOpen(!sidebarOpen)}
-            className="text-white/60 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-all flex-shrink-0"
-          >
-            {isMobile && !mobileSidebarOpen ? (
-              <Menu className="w-5 h-5" />
-            ) : !isMobile && !sidebarOpen ? (
-              <Menu className="w-5 h-5" />
-            ) : (
-              <ChevronLeft className="w-5 h-5 hidden sm:block" />
+        {/* ── Overlay mobile sidebar ───────────────────────────────────────── */}
+        {isMobile && mobileSidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            onClick={() => setMobileSidebarOpen(false)}
+          />
+        )}
+
+        {/* ── Sidebar desktop ───────────────────────────────────────────────── */}
+        {!isMobile && (
+          <aside className={`${sidebarOpen ? 'w-72' : 'w-0'} transition-all duration-300 flex-shrink-0 overflow-hidden`}>
+            {renderSidebar()}
+          </aside>
+        )}
+
+        {/* ── Sidebar mobile ────────────────────────────────────────────────── */}
+        {isMobile && (
+          <div className={`fixed inset-y-0 left-0 w-80 max-w-[85vw] z-50 transform transition-transform duration-300 ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+            {renderSidebar()}
+          </div>
+        )}
+
+        {/* ── Zone principale ────────────────────────────────────────────────── */}
+        <div className="flex-1 flex flex-col min-w-0 h-full">
+
+          {/* En-tête */}
+          <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 border-b border-white/10 bg-black/20 backdrop-blur flex-shrink-0">
+            <button
+              onClick={() => isMobile ? setMobileSidebarOpen(true) : setSidebarOpen(!sidebarOpen)}
+              className="text-white/60 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-all flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center"
+            >
+              {isMobile && !mobileSidebarOpen ? (
+                <Menu className="w-5 h-5" />
+              ) : !isMobile && !sidebarOpen ? (
+                <Menu className="w-5 h-5" />
+              ) : (
+                <ChevronLeft className="w-5 h-5 hidden sm:block" />
+              )}
+              {isMobile && <Menu className="w-5 h-5 sm:hidden" />}
+            </button>
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center flex-shrink-0">
+              <span className="text-white text-[10px] sm:text-xs font-bold">G</span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-white font-semibold text-xs sm:text-sm truncate">Gradie</p>
+              <div className="flex items-center gap-1.5">
+                {/* Point vert "en ligne" style iMessage */}
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+                </span>
+                <p className="text-white/40 text-[10px] sm:text-xs">En ligne</p>
+              </div>
+            </div>
+            {activeConversation && (
+              <div className="flex items-center gap-2 min-w-0 ml-auto">
+                <span className="text-white/30 text-[10px] sm:text-xs truncate max-w-[120px] sm:max-w-48">
+                  {activeConversation.title}
+                </span>
+              </div>
             )}
-            {isMobile && <Menu className="w-5 h-5 sm:hidden" />}
-          </button>
-          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-[10px] sm:text-xs font-bold">G</span>
           </div>
-          <div className="min-w-0">
-            <p className="text-white font-semibold text-xs sm:text-sm truncate">Gradie</p>
-            <p className="text-white/40 text-[10px] sm:text-xs hidden sm:block">IA · Axion Labs Technologies</p>
-          </div>
-          {activeConversation && (
-            <div className="ml-auto flex items-center gap-2 min-w-0">
-              <span className="text-white/30 text-[10px] sm:text-xs truncate max-w-[120px] sm:max-w-48">
-                {activeConversation.title}
-              </span>
-            </div>
-          )}
-        </div>
 
-        {/* Messages */}
-        <div 
-          ref={messagesContainerRef}
-          className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
-        >
-          {isLoading && (
-            <div className="flex items-center justify-center h-full">
-              <div className="flex gap-1.5">
-                {[0, 1, 2].map((i) => (
-                  <div key={i} className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {!activeConversation && !isLoading && (
-            <div className="flex flex-col items-center justify-center h-full text-center gap-4 sm:gap-6 px-4">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-2xl shadow-blue-500/30">
-                <span className="text-white text-3xl sm:text-4xl font-bold">G</span>
-              </div>
-              <div>
-                <h2 className="text-white text-lg sm:text-xl font-bold mb-2">
-                  Bonjour{userName ? `, ${userName}` : ''} !
-                </h2>
-                <p className="text-white/50 text-xs sm:text-sm max-w-sm">
-                  Je suis Gradie, votre assistante IA scolaire.<br />
-                  Posez-moi une question ou partagez un document.
-                </p>
-              </div>
-              <button
-                onClick={createNewConversation}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-medium transition-all hover:scale-105 active:scale-95 shadow-lg shadow-blue-500/25 text-sm"
-              >
-                <Plus className="w-4 h-4" />
-                Commencer une conversation
-              </button>
-            </div>
-          )}
-
-          {activeConversation?.messages.map((msg) => (
-            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}>
-              <div className={`max-w-[90%] sm:max-w-[80%] rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 shadow-lg ${
-                msg.role === 'user'
-                  ? 'bg-blue-600 text-white rounded-br-sm'
-                  : 'bg-white/10 backdrop-blur text-white/90 rounded-bl-sm border border-white/10'
-              }`}>
-                {msg.role === 'assistant' && (
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
-                      <span className="text-white text-[7px] sm:text-[8px] font-bold">G</span>
-                    </div>
-                    <span className="text-white/50 text-[10px] sm:text-[11px] font-medium">Gradie</span>
-                  </div>
-                )}
-                <div
-                  className="text-[13px] sm:text-sm leading-relaxed break-words"
-                  dangerouslySetInnerHTML={{ __html: renderMessage(msg.content) }}
-                />
-                <p className={`text-[9px] sm:text-[10px] mt-1.5 ${msg.role === 'user' ? 'text-blue-200/60' : 'text-white/25'} text-right`}>
-                  {formatDate(msg.createdAt)}
-                </p>
-              </div>
-            </div>
-          ))}
-
-          {/* Message en cours de streaming */}
-          {isStreaming && streamingContent && (
-            <div className="flex justify-start animate-fade-in">
-              <div className="max-w-[90%] sm:max-w-[80%] bg-white/10 backdrop-blur text-white/90 rounded-2xl rounded-bl-sm border border-white/10 px-3 sm:px-4 py-2.5 sm:py-3 shadow-lg">
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
-                    <span className="text-white text-[7px] sm:text-[8px] font-bold">G</span>
-                  </div>
-                  <span className="text-white/50 text-[10px] sm:text-[11px] font-medium">Gradie</span>
-                  <span className="text-white/30 text-[9px] sm:text-[10px] animate-pulse ml-1">écrit…</span>
-                </div>
-                <div
-                  className="text-[13px] sm:text-sm leading-relaxed break-words"
-                  dangerouslySetInnerHTML={{ __html: renderMessage(streamingContent) }}
-                />
-                <span className="inline-block w-0.5 h-4 bg-blue-400 animate-pulse ml-0.5 align-middle" />
-              </div>
-            </div>
-          )}
-
-          {/* Indicateur de chargement (sans contenu) */}
-          {isStreaming && !streamingContent && (
-            <div className="flex justify-start">
-              <div className="bg-white/10 backdrop-blur border border-white/10 rounded-2xl rounded-bl-sm px-3 sm:px-4 py-2.5 sm:py-3">
-                <div className="flex gap-1.5 items-center">
+          {/* ── Messages ────────────────────────────────────────────────────── */}
+          <div
+            ref={messagesContainerRef}
+            className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 sm:py-4 space-y-2 scrollbar-gradie"
+          >
+            {/* Chargement */}
+            {isLoading && (
+              <div className="flex items-center justify-center h-full">
+                <div className="flex gap-1.5">
                   {[0, 1, 2].map((i) => (
                     <div key={i} className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
                   ))}
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {error && (
-            <div className="flex justify-center">
-              <div className="flex items-center gap-2 bg-red-500/20 border border-red-500/30 text-red-300 text-xs px-4 py-2 rounded-xl">
-                <X className="w-3 h-3 flex-shrink-0" />
-                <span>{error}</span>
+            {/* Écran d'accueil vide */}
+            {!activeConversation && !isLoading && (
+              <div className="flex flex-col items-center justify-center h-full text-center gap-4 sm:gap-6 px-4">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-2xl shadow-blue-500/30">
+                  <span className="text-white text-3xl sm:text-4xl font-bold">G</span>
+                </div>
+                <div>
+                  <h2 className="text-white text-lg sm:text-xl font-bold mb-2">
+                    Bonjour{userName ? `, ${userName}` : ''} !
+                  </h2>
+                  <p className="text-white/50 text-xs sm:text-sm max-w-sm">
+                    Je suis Gradie, votre assistante IA scolaire.<br />
+                    Posez-moi une question ou partagez un document.
+                  </p>
+                </div>
+                <button
+                  onClick={createNewConversation}
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl font-medium transition-all hover:scale-105 active:scale-95 shadow-lg shadow-blue-500/25 text-sm min-h-[44px]"
+                >
+                  <Plus className="w-4 h-4" />
+                  Commencer une conversation
+                </button>
               </div>
-            </div>
-          )}
+            )}
 
-          <div ref={messagesEndRef} />
-        </div>
+            {/* Messages existants */}
+            {activeConversation?.messages.map((msg, idx) => {
+              const isUser = msg.role === 'user';
+              const showTimestamp = idx === activeConversation.messages.length - 1 ||
+                (new Date(activeConversation.messages[idx + 1]?.createdAt).getTime() -
+                  new Date(msg.createdAt).getTime() > 5 * 60 * 1000);
 
-        {/* Documents de la conversation */}
-        {activeConversation?.documents && activeConversation.documents.length > 0 && (
-          <div className="px-3 sm:px-4 py-2 border-t border-white/5 flex gap-2 overflow-x-auto flex-shrink-0 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
-            {activeConversation.documents.map((doc) => (
-              <div key={doc.id} className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-2.5 sm:px-3 py-1.5 flex-shrink-0">
-                <Paperclip className="w-3 h-3 text-blue-400 flex-shrink-0" />
-                <span className="text-white/70 text-[11px] sm:text-xs truncate max-w-[100px] sm:max-w-32">{doc.name}</span>
-                <span className="text-white/30 text-[9px] sm:text-[10px] flex-shrink-0">{formatSize(doc.size)}</span>
+              return (
+                <div key={msg.id} className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} animate-ios-fade-in`}>
+                  <div className={`flex items-end gap-1.5 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+                    {/* Avatar Gradie (IA seulement) */}
+                    {!isUser && (
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center flex-shrink-0 mb-0.5 self-end">
+                        <span className="text-white text-[9px] font-bold">G</span>
+                      </div>
+                    )}
+
+                    {/* Bulle message style iMessage */}
+                    <div
+                      className={`max-w-[82%] sm:max-w-[75%] px-[14px] py-[9px] shadow-sm ${
+                        isUser
+                          ? 'bg-[#007AFF] text-white imessage-user-bubble'
+                          : 'bg-[#E9E9EB] dark:bg-white/15 text-black dark:text-white/90 imessage-ai-bubble'
+                      }`}
+                    >
+                      {!isUser && (
+                        <p className="text-[10px] font-semibold text-[#007AFF] dark:text-blue-400 mb-1">Gradie</p>
+                      )}
+                      <div
+                        className="text-[14px] sm:text-[15px] leading-[1.4] break-words"
+                        dangerouslySetInnerHTML={{ __html: renderMessage(msg.content) }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Horodatage discret sous la bulle (affiché uniquement sur dernier message ou gap > 5 min) */}
+                  {showTimestamp && (
+                    <p className={`text-[10px] text-white/25 mt-1 ${isUser ? 'mr-2' : 'ml-8'}`}>
+                      {formatDate(msg.createdAt)}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Message en cours de streaming */}
+            {isStreaming && streamingContent && (
+              <div className="flex flex-col items-start animate-ios-fade-in">
+                <div className="flex items-end gap-1.5">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center flex-shrink-0 mb-0.5 self-end">
+                    <span className="text-white text-[9px] font-bold">G</span>
+                  </div>
+                  <div className="max-w-[82%] sm:max-w-[75%] bg-[#E9E9EB] dark:bg-white/15 imessage-ai-bubble px-[14px] py-[9px] shadow-sm">
+                    <p className="text-[10px] font-semibold text-[#007AFF] dark:text-blue-400 mb-1">Gradie</p>
+                    <div
+                      className="text-[14px] sm:text-[15px] leading-[1.4] break-words text-black dark:text-white/90"
+                      dangerouslySetInnerHTML={{ __html: renderMessage(streamingContent) }}
+                    />
+                    {/* Curseur clignotant */}
+                    <span className="inline-block w-[2px] h-[14px] bg-[#007AFF] animate-pulse ml-0.5 align-middle rounded-full" />
+                  </div>
+                </div>
               </div>
-            ))}
+            )}
+
+            {/* Indicateur de frappe 3 points iMessage (avant que le streaming commence) */}
+            {isStreaming && !streamingContent && <TypingIndicator />}
+
+            {/* Erreur */}
+            {error && (
+              <div className="flex justify-center animate-ios-fade-in">
+                <div className="flex items-center gap-2 bg-red-500/20 border border-red-500/30 text-red-300 text-xs px-4 py-2 rounded-xl">
+                  <X className="w-3 h-3 flex-shrink-0" />
+                  <span>{error}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Notification succès upload */}
+            {uploadSuccess && (
+              <div className="flex justify-center animate-ios-fade-in">
+                <div className="flex items-center gap-2 bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs px-4 py-2 rounded-xl">
+                  <CheckCircle2 className="w-3 h-3 flex-shrink-0" />
+                  <span>« {uploadSuccess} » envoyé avec succès</span>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
           </div>
-        )}
 
-        {/* Barre de progression d'upload */}
-        {uploadProgress !== null && (
-          <div className="px-3 sm:px-4 py-2 flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="flex-1 bg-white/10 rounded-full h-1.5">
-                <div
-                  className="bg-blue-500 h-1.5 rounded-full transition-all duration-300"
-                  style={{ width: `${uploadProgress}%` }}
+          {/* Documents de la conversation */}
+          {activeConversation?.documents && activeConversation.documents.length > 0 && (
+            <div className="px-3 sm:px-4 py-2 border-t border-white/5 flex gap-2 overflow-x-auto flex-shrink-0 scrollbar-gradie">
+              {activeConversation.documents.map((doc) => (
+                <div key={doc.id} className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg px-2.5 sm:px-3 py-1.5 flex-shrink-0">
+                  <Paperclip className="w-3 h-3 text-blue-400 flex-shrink-0" />
+                  <span className="text-white/70 text-[11px] sm:text-xs truncate max-w-[100px] sm:max-w-32">{doc.name}</span>
+                  <span className="text-white/30 text-[9px] sm:text-[10px] flex-shrink-0">{formatSize(doc.size)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Barre de progression d'upload */}
+          {uploadProgress !== null && (
+            <div className="px-3 sm:px-4 py-2 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="flex-1 bg-white/10 rounded-full h-1.5">
+                  <div
+                    className="bg-blue-500 h-1.5 rounded-full transition-all duration-300"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+                <span className="text-white/50 text-[10px] sm:text-xs">{uploadProgress}%</span>
+              </div>
+            </div>
+          )}
+
+          {/* ── Zone de saisie style iMessage ────────────────────────────────── */}
+          <div className="px-2.5 sm:px-4 pt-2 pb-3 sm:pb-4 border-t border-white/10 bg-black/20 backdrop-blur flex-shrink-0">
+            <div className="flex items-end gap-2">
+              {/* Bouton joindre → ouvre l'Action Sheet */}
+              <button
+                onClick={() => setShowUploadSheet(true)}
+                disabled={isStreaming}
+                className="text-white/50 hover:text-blue-400 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-blue-500/10 transition-all flex-shrink-0 disabled:opacity-30"
+                title="Joindre un fichier (max 20 Mo)"
+              >
+                <Paperclip className="w-5 h-5" />
+              </button>
+
+              {/* Champ de saisie */}
+              <div className="flex-1 bg-white/5 border border-white/10 rounded-[22px] px-4 py-2.5 focus-within:border-blue-500/50 transition-all">
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Message…"
+                  rows={1}
+                  disabled={isStreaming}
+                  className="w-full bg-transparent text-white placeholder-white/20 text-[15px] resize-none outline-none leading-relaxed max-h-32 overflow-y-auto"
+                  style={{ minHeight: '24px' }}
+                  onInput={(e) => {
+                    const t = e.target as HTMLTextAreaElement;
+                    t.style.height = 'auto';
+                    t.style.height = `${Math.min(t.scrollHeight, 128)}px`;
+                  }}
                 />
               </div>
-              <span className="text-white/50 text-[10px] sm:text-xs">{uploadProgress}%</span>
-            </div>
-          </div>
-        )}
 
-        {/* Zone de saisie */}
-        <div className="p-2.5 sm:p-4 border-t border-white/10 bg-black/20 backdrop-blur flex-shrink-0">
-          <div className="flex items-end gap-2 bg-white/5 border border-white/10 rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 focus-within:border-blue-500/50 transition-all">
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="text-white/40 hover:text-blue-400 p-1 rounded-lg hover:bg-blue-500/10 transition-all flex-shrink-0 self-end"
-              title="Joindre un fichier"
-              disabled={isStreaming}
-            >
-              <Paperclip className="w-4 h-4" />
-            </button>
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Message… (Entrée pour envoyer)"
-              rows={1}
-              disabled={isStreaming}
-              className="flex-1 bg-transparent text-white placeholder-white/20 text-sm resize-none outline-none leading-relaxed max-h-32 overflow-y-auto"
-              style={{ minHeight: '24px' }}
-              onInput={(e) => {
-                const t = e.target as HTMLTextAreaElement;
-                t.style.height = 'auto';
-                t.style.height = `${Math.min(t.scrollHeight, 128)}px`;
-              }}
-            />
-            <button
-              onClick={sendMessage}
-              disabled={!input.trim() || isStreaming}
-              className="bg-blue-600 hover:bg-blue-500 disabled:opacity-30 disabled:cursor-not-allowed text-white p-2 rounded-xl transition-all hover:scale-105 active:scale-95 flex-shrink-0 self-end"
-            >
-              <Send className="w-4 h-4" />
-            </button>
+              {/* Bouton envoyer — style iMessage (bleu quand actif, gris sinon) */}
+              <button
+                onClick={sendMessage}
+                disabled={!input.trim() || isStreaming}
+                className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full transition-all flex-shrink-0 ${
+                  input.trim() && !isStreaming
+                    ? 'bg-[#007AFF] hover:bg-blue-500 active:scale-95 shadow-lg shadow-blue-500/30'
+                    : 'bg-white/10 opacity-40 cursor-not-allowed'
+                }`}
+              >
+                {isStreaming ? (
+                  <div className="flex gap-[3px] items-center">
+                    {[0, 1, 2].map((i) => (
+                      <span
+                        key={i}
+                        className="w-1.5 h-1.5 rounded-full bg-white"
+                        style={{ animation: 'iosTypingDot 1.2s ease-in-out infinite', animationDelay: `${i * 200}ms` }}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <Send className="w-4 h-4 text-white" />
+                )}
+              </button>
+            </div>
+
+            {/* Mention limite + disclaimer — sous la barre */}
+            <p className="text-white/15 text-[10px] text-center mt-2 px-2">
+              Fichiers max <span className="text-white/25 font-medium">{MAX_FILE_SIZE_MB} Mo</span> · Gradie peut faire des erreurs — vérifiez les informations importantes
+            </p>
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.webp"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleFileUpload(file);
-              e.target.value = '';
-            }}
-          />
-          <p className="text-white/15 text-[9px] sm:text-[10px] text-center mt-2">
-            Gradie peut faire des erreurs. Vérifiez les informations importantes. · Axion Labs Technologies
-          </p>
         </div>
       </div>
-
-      {/* Styles pour les scrollbars et animations */}
-      <style jsx>{`
-        .scrollbar-thin::-webkit-scrollbar {
-          width: 4px;
-          height: 4px;
-        }
-        .scrollbar-thin::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .scrollbar-thin::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.1);
-          border-radius: 9999px;
-        }
-        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-          background: rgba(255, 255, 255, 0.2);
-        }
-        
-        @keyframes fade-in {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        
-        .animate-fade-in {
-          animation: fade-in 0.3s ease-out;
-        }
-      `}</style>
-    </div>
+    </>
   );
 }

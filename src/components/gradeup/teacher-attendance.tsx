@@ -1,15 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -71,7 +69,6 @@ export default function TeacherAttendance() {
     } catch { toast.error('Erreur lors du chargement'); } finally { setLoading(false); }
   };
 
-
   const updateStatus = (studentId: string, status: AttendanceStatus) => {
     setAttendance((prev) => prev.map((a) => a.studentId === studentId ? { ...a, status } : a));
   };
@@ -127,19 +124,10 @@ export default function TeacherAttendance() {
 
   const stats = getStats();
 
-  // Calendar heatmap data
-  const getDaysInMonth = () => {
-    const year = parseInt(selectedDate.split('-')[0]);
-    const month = parseInt(selectedDate.split('-')[1]) - 1;
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    return { firstDay, daysInMonth, year, month };
-  };
-
   if (!user) return null;
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in pb-24">
       {/* Page Header */}
       <div className="mb-6 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 p-6">
         <h1 className="text-2xl font-bold">Appel</h1>
@@ -147,52 +135,55 @@ export default function TeacherAttendance() {
       </div>
 
       <Tabs defaultValue="register">
-        <TabsList>
-          <TabsTrigger value="register" className="gap-1.5"><Users className="h-4 w-4" />Appel du jour</TabsTrigger>
-          <TabsTrigger value="history" className="gap-1.5" onClick={fetchHistory}><History className="h-4 w-4" />Historique</TabsTrigger>
+        <TabsList className="w-full justify-start border-b rounded-none bg-transparent h-auto p-0 gap-6">
+          <TabsTrigger value="register" className="data-[state=active]:border-primary border-b-2 border-transparent rounded-none px-1 py-3 text-sm font-semibold gap-1.5"><Users className="h-4 w-4" />Appel du jour</TabsTrigger>
+          <TabsTrigger value="history" className="data-[state=active]:border-primary border-b-2 border-transparent rounded-none px-1 py-3 text-sm font-semibold gap-1.5" onClick={fetchHistory}><History className="h-4 w-4" />Historique</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="register">
+        <TabsContent value="register" className="mt-4">
           {/* Controls */}
-          <Card className="mb-6 shadow-sm">
+          <Card className="mb-6 shadow-sm border border-border bg-card">
             <CardContent className="flex items-center gap-4 flex-wrap py-4">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-44 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" />
-              <Select value={selectedCourseId} onValueChange={setSelectedCourseId}>
-                <SelectTrigger className="w-56 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
-                  <SelectValue placeholder="Sélectionner une classe" />
-                </SelectTrigger>
-                <SelectContent>{courses.map((c) => <SelectItem key={c.id} value={c.id}>{c.name} — {c.class?.name}</SelectItem>)}</SelectContent>
-              </Select>
-              {selectedCourseId && attendance.length > 0 && (
-                <>
-                  <Button variant="outline" size="sm" onClick={markAllPresent} className="hover:scale-[1.02] active:scale-[0.98] transition-all gap-1.5 border-emerald-200 text-emerald-700 hover:bg-emerald-50">
-                    <CheckCircle2 className="h-4 w-4" />Tous présents
-                  </Button>
-                  <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 ml-auto hover:scale-[1.02] active:scale-[0.98] transition-all" onClick={handleSave} disabled={saving}>
-                    <Save className="h-4 w-4 mr-1" />{saving ? 'Enregistrement...' : 'Enregistrer'}
-                  </Button>
-                </>
-              )}
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="w-44 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all rounded-lg" />
+              </div>
+              
+              {/* Native iOS class select spinner */}
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <select
+                  value={selectedCourseId}
+                  onChange={(e) => setSelectedCourseId(e.target.value)}
+                  className="w-56 h-10 border border-input rounded-lg px-3 bg-background text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer font-medium"
+                >
+                  <option value="">Sélectionner une classe</option>
+                  {courses.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} — {c.class?.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </CardContent>
           </Card>
 
           {/* Stats Row */}
           {selectedCourseId && attendance.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-              <div className="p-4 rounded-xl bg-blue-50 text-center border border-blue-100">
+              <div className="p-4 rounded-xl bg-blue-50 text-center border border-blue-100 dark:bg-blue-950/20">
                 <p className="text-2xl font-bold text-blue-600">{stats.total}</p>
                 <p className="text-xs text-blue-600/80 font-medium">Total</p>
               </div>
-              <div className="p-4 rounded-xl bg-emerald-50 text-center border border-emerald-100">
+              <div className="p-4 rounded-xl bg-emerald-50 text-center border border-emerald-100 dark:bg-emerald-950/20">
                 <p className="text-2xl font-bold text-emerald-600">{stats.present}</p>
                 <p className="text-xs text-emerald-600/80 font-medium">Présents</p>
               </div>
-              <div className="p-4 rounded-xl bg-red-50 text-center border border-red-100">
+              <div className="p-4 rounded-xl bg-red-50 text-center border border-red-100 dark:bg-red-950/20">
                 <p className="text-2xl font-bold text-red-600">{stats.absent}</p>
                 <p className="text-xs text-red-600/80 font-medium">Absents</p>
               </div>
-              <div className="p-4 rounded-xl bg-amber-50 text-center border border-amber-100">
+              <div className="p-4 rounded-xl bg-amber-50 text-center border border-amber-100 dark:bg-amber-950/20">
                 <p className="text-2xl font-bold text-amber-600">{stats.late}</p>
                 <p className="text-xs text-amber-600/80 font-medium">En retard</p>
               </div>
@@ -213,44 +204,95 @@ export default function TeacherAttendance() {
               <p className="text-muted-foreground">Aucun élève dans cette classe</p>
             </CardContent></Card>
           ) : (
-            <Card className="shadow-sm">
-              <ScrollArea className="max-h-[500px]">
-                <div className="divide-y">
-                  {attendance.map((record) => (
-                    <div key={record.studentId} className={`flex items-center gap-4 p-4 transition-colors ${record.status === 'absent' ? 'bg-red-50/50' : record.status === 'late' ? 'bg-amber-50/50' : 'hover:bg-muted/30'}`}>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2.5">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm ${record.status === 'present' ? 'bg-emerald-500' : record.status === 'absent' ? 'bg-red-500' : 'bg-amber-500'}`}>
-                            {record.studentName.charAt(0)}
-                          </div>
-                          <p className="font-medium text-sm">{record.studentName}</p>
+            <Card className="shadow-sm border border-border">
+              <div className="divide-y">
+                {attendance.map((record) => (
+                  <div key={record.studentId} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 transition-colors ${record.status === 'absent' ? 'bg-red-50/30' : record.status === 'late' ? 'bg-amber-50/30' : 'hover:bg-muted/10'}`}>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-sm ${record.status === 'present' ? 'bg-emerald-500' : record.status === 'absent' ? 'bg-red-500' : 'bg-amber-500'}`}>
+                          {record.studentName.charAt(0)}
                         </div>
-                        {record.status !== 'present' && (
-                          <Input placeholder="Raison..." className="mt-2 h-8 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" value={record.reason} onChange={(e) => updateReason(record.studentId, e.target.value)} />
-                        )}
+                        <p className="font-semibold text-sm text-foreground">{record.studentName}</p>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Button type="button" size="lg" variant={record.status === 'present' ? 'default' : 'outline'} className={`px-5 py-5 transition-all hover:scale-[1.05] active:scale-[0.95] ${record.status === 'present' ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/25' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`} onClick={() => updateStatus(record.studentId, 'present')}>
-                          <CheckCircle2 className="h-5 w-5" />
-                        </Button>
-                        <Button type="button" size="lg" variant={record.status === 'absent' ? 'default' : 'outline'} className={`px-5 py-5 transition-all hover:scale-[1.05] active:scale-[0.95] ${record.status === 'absent' ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/25' : 'border-red-200 text-red-700 hover:bg-red-50'}`} onClick={() => updateStatus(record.studentId, 'absent')}>
-                          <XCircle className="h-5 w-5" />
-                        </Button>
-                        <Button type="button" size="lg" variant={record.status === 'late' ? 'default' : 'outline'} className={`px-5 py-5 transition-all hover:scale-[1.05] active:scale-[0.95] ${record.status === 'late' ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-500/25' : 'border-amber-200 text-amber-700 hover:bg-amber-50'}`} onClick={() => updateStatus(record.studentId, 'late')}>
-                          <Clock className="h-5 w-5" />
-                        </Button>
-                      </div>
+                      {record.status !== 'present' && (
+                        <Input placeholder="Raison de l'absence ou du retard..." className="mt-2 h-9 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all rounded-lg bg-background" value={record.reason} onChange={(e) => updateReason(record.studentId, e.target.value)} />
+                      )}
                     </div>
-                  ))}
-                </div>
-              </ScrollArea>
+                    
+                    {/* Big Touch-Friendly Buttons (>= 44px height & width) */}
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                      <Button 
+                        type="button" 
+                        size="icon" 
+                        variant={record.status === 'present' ? 'default' : 'outline'} 
+                        className={`h-11 w-11 rounded-xl transition-all hover:scale-[1.05] active:scale-[0.95] ${
+                          record.status === 'present' 
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/25' 
+                            : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'
+                        }`} 
+                        onClick={() => updateStatus(record.studentId, 'present')}
+                      >
+                        <CheckCircle2 className="h-5 w-5" />
+                      </Button>
+                      <Button 
+                        type="button" 
+                        size="icon" 
+                        variant={record.status === 'absent' ? 'default' : 'outline'} 
+                        className={`h-11 w-11 rounded-xl transition-all hover:scale-[1.05] active:scale-[0.95] ${
+                          record.status === 'absent' 
+                            ? 'bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-500/25' 
+                            : 'border-red-200 text-red-700 hover:bg-red-50'
+                        }`} 
+                        onClick={() => updateStatus(record.studentId, 'absent')}
+                      >
+                        <XCircle className="h-5 w-5" />
+                      </Button>
+                      <Button 
+                        type="button" 
+                        size="icon" 
+                        variant={record.status === 'late' ? 'default' : 'outline'} 
+                        className={`h-11 w-11 rounded-xl transition-all hover:scale-[1.05] active:scale-[0.95] ${
+                          record.status === 'late' 
+                            ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-md shadow-amber-500/25' 
+                            : 'border-amber-200 text-amber-700 hover:bg-amber-50'
+                        }`} 
+                        onClick={() => updateStatus(record.studentId, 'late')}
+                      >
+                        <Clock className="h-5 w-5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </Card>
+          )}
+
+          {/* Sticky iOS-style Batch Save Footer */}
+          {selectedCourseId && attendance.length > 0 && (
+            <div className="fixed bottom-16 lg:bottom-4 left-0 lg:left-auto right-0 lg:right-4 z-30 p-4 lg:p-0 bg-background/95 backdrop-blur-md lg:bg-transparent border-t lg:border-none flex justify-center gap-3">
+              <Button 
+                variant="outline" 
+                onClick={markAllPresent} 
+                className="flex-1 lg:flex-none border-emerald-300 text-emerald-700 hover:bg-emerald-50 h-12 lg:h-10 rounded-xl font-medium"
+              >
+                Tous présents
+              </Button>
+              <Button 
+                className="flex-1 lg:flex-none bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 h-12 lg:h-10 rounded-xl text-white font-bold shadow-lg" 
+                onClick={handleSave} 
+                disabled={saving}
+              >
+                <Save className="h-4 w-4 mr-1.5 inline-block" />
+                {saving ? 'Enregistrement...' : 'Enregistrer appel'}
+              </Button>
+            </div>
           )}
         </TabsContent>
 
         {/* History Tab */}
-        <TabsContent value="history">
-          <Card className="shadow-sm">
+        <TabsContent value="history" className="mt-4">
+          <Card className="shadow-sm border border-border bg-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><History className="h-5 w-5 text-blue-500" />Historique de l&apos;appel</CardTitle>
               <CardDescription>Les 50 derniers enregistrements</CardDescription>
@@ -263,8 +305,8 @@ export default function TeacherAttendance() {
                   <p className="text-xs mt-1 text-muted-foreground/60">Cliquez sur l&apos;onglet pour charger l&apos;historique</p>
                 </div>
               ) : (
-                <ScrollArea className="max-h-[500px]">
-                  <Table className="text-sm">
+                <div className="overflow-x-auto">
+                  <Table className="text-sm min-w-[500px]">
                     <TableHeader>
                       <TableRow className="bg-muted/30 hover:bg-muted/30"><TableHead>Date</TableHead><TableHead>Élève</TableHead><TableHead>Statut</TableHead><TableHead className="hidden sm:table-cell">Raison</TableHead></TableRow>
                     </TableHeader>
@@ -279,7 +321,7 @@ export default function TeacherAttendance() {
                       ))}
                     </TableBody>
                   </Table>
-                </ScrollArea>
+                </div>
               )}
             </CardContent>
           </Card>

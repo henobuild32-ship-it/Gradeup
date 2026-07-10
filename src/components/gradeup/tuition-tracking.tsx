@@ -52,7 +52,8 @@ interface ClassOption {
 }
 
 export default function TuitionTracking() {
-  const { schoolId, user } = useAppStore();
+  const user = useAppStore((s) => s.user);
+  const schoolId = user?.schoolId;
   const { toast } = useToast();
   const [students, setStudents] = useState<StudentTuition[]>([]);
   const [classes, setClasses] = useState<ClassOption[]>([]);
@@ -95,7 +96,7 @@ export default function TuitionTracking() {
       const res = await fetch('/api/tuition', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId, action, adminId: userId, ...extra }),
+        body: JSON.stringify({ studentId, action, adminId: user?.id, ...extra }),
       });
       if (!res.ok) throw new Error();
       toast({

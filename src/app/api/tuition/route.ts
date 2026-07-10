@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { studentId, action, adminId } = body;
+    const { studentId, action, adminId, amount } = body;
 
     if (!studentId || !action || !adminId) {
       return NextResponse.json({ error: 'Missing required fields: studentId, action, adminId' }, { status: 400 });
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
     } else if (action === 'restore') {
       await db.user.update({ where: { id: studentId }, data: { active: true } });
     } else if (action === 'mark-paid') {
-      const { amount, month, method } = body;
+      const { month, method } = body;
       if (!amount) {
         return NextResponse.json({ error: 'amount is required for mark-paid' }, { status: 400 });
       }

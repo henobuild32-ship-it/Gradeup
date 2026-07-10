@@ -186,7 +186,7 @@ export default function StudentDashboard() {
 
             <div className="flex-1 text-center sm:text-left">
               <div className="flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-3">
-                <h2 className="text-xl font-bold text-foreground">{user?.fullName}</h2>
+                <h2 className="text-xl font-bold text-foreground">Bonjour, {user?.fullName ? user.fullName.split(' ')[0] : 'Élève'} ! 👋</h2>
                 <Badge className="bg-gradient-to-r from-blue-600 to-blue-500 text-white hover:from-blue-700 hover:to-blue-600 shadow-sm">Élève</Badge>
               </div>
               <p className="text-sm text-muted-foreground mt-1">
@@ -293,83 +293,92 @@ export default function StudentDashboard() {
         </CardContent>
       </Card>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 group">
-          <CardContent className="p-5 flex flex-col gap-2">
+      {/* Stat Cards - Grille tactile 2 colonnes adaptative */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Card 
+          className="overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 group cursor-pointer"
+          onClick={() => setCurrentPage('student-grades')}
+        >
+          <CardContent className="p-4 flex flex-col justify-between h-full min-h-[110px]">
             <div className="flex items-center justify-between">
-              <CardDescription className="text-sm">Moyenne générale</CardDescription>
-              <div className="p-2 rounded-lg bg-blue-50 group-hover:bg-blue-100 transition-colors duration-300">
-                <TrendingUp className="h-4 w-4 text-blue-500" />
-              </div>
+              <span className="text-xs font-semibold text-muted-foreground truncate">Notes</span>
+              <TrendingUp className="h-4 w-4 text-blue-500 shrink-0" />
             </div>
-            <p className="text-3xl font-bold text-blue-600">
+            <p className="text-2xl font-bold text-blue-600 mt-1">
               {grades.length > 0 ? generalAverage20.toFixed(1) : '—'}
             </p>
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">sur 20</p>
-              {grades.length > 0 && (
-                <span className="text-xs font-medium text-emerald-600">↑ 2.3</span>
-              )}
-            </div>
-            {grades.length > 0 && (
-              <div className="h-2 bg-blue-100 rounded-full overflow-hidden mt-1">
-                <div
-                  className={`h-full rounded-full transition-all duration-700 ${
-                    generalAverage >= 80 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' :
-                    generalAverage >= 60 ? 'bg-gradient-to-r from-amber-400 to-amber-500' :
-                    'bg-gradient-to-r from-red-400 to-red-500'
-                  }`}
-                  style={{ width: `${generalAverage}%` }}
-                />
-              </div>
-            )}
+            <p className="text-[10px] text-muted-foreground truncate mt-1">Moyenne générale</p>
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 group">
-          <CardContent className="p-5 flex flex-col gap-2">
+        <Card 
+          className="overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 group cursor-pointer"
+          onClick={() => setCurrentPage('student-attendance')}
+        >
+          <CardContent className="p-4 flex flex-col justify-between h-full min-h-[110px]">
             <div className="flex items-center justify-between">
-              <CardDescription className="text-sm">Mes cours</CardDescription>
-              <div className="p-2 rounded-lg bg-emerald-50 group-hover:bg-emerald-100 transition-colors duration-300">
-                <BookOpen className="h-4 w-4 text-emerald-500" />
-              </div>
+              <span className="text-xs font-semibold text-muted-foreground truncate">Absences</span>
+              <CalendarX className="h-4 w-4 text-red-500 shrink-0" />
             </div>
-            <p className="text-3xl font-bold">{courses.length}</p>
-            <p className="text-xs text-muted-foreground">cours assignés</p>
+            <p className="text-2xl font-bold text-red-600 mt-1">
+              {absenceCount} {absenceCount > 1 ? 'retards' : 'retard'}
+            </p>
+            <p className="text-[10px] text-muted-foreground truncate mt-1">jours d'absence</p>
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 group">
-          <CardContent className="p-5 flex flex-col gap-2">
+        <Card 
+          className="overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 group cursor-pointer"
+          onClick={() => setCurrentPage('student-payments')}
+        >
+          <CardContent className="p-4 flex flex-col justify-between h-full min-h-[110px]">
             <div className="flex items-center justify-between">
-              <CardDescription className="text-sm">Mes absences</CardDescription>
-              <div className="p-2 rounded-lg bg-red-50 group-hover:bg-red-100 transition-colors duration-300">
-                <CalendarX className="h-4 w-4 text-red-500" />
-              </div>
+              <span className="text-xs font-semibold text-muted-foreground truncate">Paiement</span>
+              <CreditCard className="h-4 w-4 text-emerald-500 shrink-0" />
             </div>
-            <p className="text-3xl font-bold text-red-600">{absenceCount}</p>
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">jour(s) absent</p>
-              <span className="text-xs font-medium text-emerald-600">-1 ce mois</span>
-            </div>
+            <p className={`text-lg font-bold mt-1 ${pendingPayments > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+              {pendingPayments > 0 ? 'En attente' : 'À jour'}
+            </p>
+            <p className="text-[10px] text-muted-foreground truncate mt-1">{pendingPayments > 0 ? `${pendingPayments} en attente` : 'Frais de scolarité'}</p>
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 group cursor-pointer" onClick={() => setCurrentPage('student-ai')}>
-          <CardContent className="p-5 flex flex-col gap-2">
+        <Card 
+          className="overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 group cursor-pointer"
+          onClick={() => setCurrentPage('student-courses')}
+        >
+          <CardContent className="p-4 flex flex-col justify-between h-full min-h-[110px]">
             <div className="flex items-center justify-between">
-              <CardDescription className="text-sm">IA Gradie</CardDescription>
-              <div className="p-2 rounded-lg bg-purple-50 group-hover:bg-purple-100 transition-colors duration-300">
-                <Sparkles className="h-4 w-4 text-purple-500" />
-              </div>
+              <span className="text-xs font-semibold text-muted-foreground truncate">Devoirs</span>
+              <FileText className="h-4 w-4 text-purple-500 shrink-0" />
             </div>
-            <p className="text-lg font-bold text-purple-600">Étudier avec Grady</p>
-            <p className="text-xs text-muted-foreground">Posez vos questions, préparez vos examens</p>
+            <p className="text-2xl font-bold text-purple-600 mt-1">2 à faire</p>
+            <p className="text-[10px] text-muted-foreground truncate mt-1">cette semaine</p>
           </CardContent>
         </Card>
-
       </div>
+
+      {/* Prochain Cours & Programme du jour */}
+      <Card className="relative overflow-hidden transition-all duration-300 hover:shadow-lg">
+        <CardContent className="p-5">
+          <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">📚 Prochain cours</h3>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-muted/40 p-4 rounded-xl">
+            <div>
+              <p className="font-bold text-base text-foreground">Mathématiques</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Aujourd'hui · 10:30 (Salle B)</p>
+            </div>
+            <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">En cours de préparation</Badge>
+          </div>
+          <div className="mt-4 pt-3 border-t">
+            <h4 className="text-xs font-semibold text-muted-foreground mb-2">➤ Programme du jour</h4>
+            <ul className="text-xs space-y-1.5 text-muted-foreground">
+              <li className="flex items-center gap-2">🟢 08:30 - Physique-Chimie (Énergie mécanique)</li>
+              <li className="flex items-center gap-2">🔵 10:30 - Mathématiques (Algèbre linéaire)</li>
+              <li className="flex items-center gap-2">🟡 14:00 - Histoire-Géographie (Géopolitique)</li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Bottom Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -497,6 +506,16 @@ export default function StudentDashboard() {
           </div>
         </div>
       </Card>
+
+      {/* Floating Grady Chat CTA for Mobile */}
+      <div className="fixed bottom-20 right-4 z-40 lg:hidden">
+        <Button
+          onClick={() => setCurrentPage('student-ai')}
+          className="rounded-full h-12 w-12 bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-xl shadow-blue-500/30 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform duration-200"
+        >
+          <Sparkles className="h-6 w-6 animate-pulse-soft" />
+        </Button>
+      </div>
     </div>
   );
 }

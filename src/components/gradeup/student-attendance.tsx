@@ -3,16 +3,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '@/lib/store';
 import type { AttendanceInfo } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
 import {
   CalendarCheck, CalendarX, Clock, Calendar, Filter, UserCheck, UserX, AlertTriangle,
 } from 'lucide-react';
@@ -54,11 +51,22 @@ export default function StudentAttendance() {
   const total = attendance.length;
   const presenceRate = total > 0 ? Math.round((totalPresent / total) * 100) : 0;
 
+  // Generate last 30 days
+  const last30Days = useMemo<Date[]>(() => {
+    const days: Date[] = [];
+    for (let i = 0; i < 30; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      days.push(d);
+    }
+    return days;
+  }, []);
+
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'present': return <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">Présent</Badge>;
-      case 'absent': return <Badge className="bg-red-100 text-red-700 border-red-200">Absent</Badge>;
-      case 'late': return <Badge className="bg-amber-100 text-amber-700 border-amber-200">En retard</Badge>;
+      case 'present': return <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200">Présent</Badge>;
+      case 'absent': return <Badge className="bg-red-50 text-red-700 border-red-200">Absent</Badge>;
+      case 'late': return <Badge className="bg-amber-50 text-amber-700 border-amber-200">En retard</Badge>;
       default: return <Badge variant="secondary">{status}</Badge>;
     }
   };
@@ -89,49 +97,86 @@ export default function StudentAttendance() {
         <p className="text-sm text-muted-foreground mt-1">Historique de vos présences et absences</p>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white shadow-sm">
-          <CardContent className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100"><CalendarCheck className="h-6 w-6 text-blue-600" /></div>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white dark:from-blue-950/20 shadow-sm">
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/50"><CalendarCheck className="h-5 w-5 text-blue-600" /></div>
             <div>
-              <p className="text-2xl font-bold text-blue-600">{presenceRate}%</p>
-              <CardDescription>Taux de présence</CardDescription>
+              <p className="text-xl font-bold text-blue-600">{presenceRate}%</p>
+              <CardDescription className="text-[10px]">Présence</CardDescription>
             </div>
           </CardContent>
         </Card>
         <Card className="shadow-sm">
-          <CardContent className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100"><UserCheck className="h-6 w-6 text-emerald-600" /></div>
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/50"><UserCheck className="h-5 w-5 text-emerald-600" /></div>
             <div>
-              <p className="text-2xl font-bold text-emerald-600">{totalPresent}</p>
-              <CardDescription>Présent(s)</CardDescription>
+              <p className="text-xl font-bold text-emerald-600">{totalPresent}</p>
+              <CardDescription className="text-[10px]">Présent(s)</CardDescription>
             </div>
           </CardContent>
         </Card>
         <Card className="shadow-sm">
-          <CardContent className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100"><UserX className="h-6 w-6 text-red-600" /></div>
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/50"><UserX className="h-5 w-5 text-red-600" /></div>
             <div>
-              <p className="text-2xl font-bold text-red-600">{totalAbsent}</p>
-              <CardDescription>Absent(s)</CardDescription>
+              <p className="text-xl font-bold text-red-600">{totalAbsent}</p>
+              <CardDescription className="text-[10px]">Absent(s)</CardDescription>
             </div>
           </CardContent>
         </Card>
         <Card className="shadow-sm">
-          <CardContent className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100"><AlertTriangle className="h-6 w-6 text-amber-600" /></div>
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/50"><AlertTriangle className="h-5 w-5 text-amber-600" /></div>
             <div>
-              <p className="text-2xl font-bold text-amber-600">{totalLate}</p>
-              <CardDescription>En retard</CardDescription>
+              <p className="text-xl font-bold text-amber-600">{totalLate}</p>
+              <CardDescription className="text-[10px]">Retard(s)</CardDescription>
             </div>
           </CardContent>
         </Card>
       </div>
 
+      {/* iOS style scrollable calendar strip */}
+      <div>
+        <h3 className="font-bold text-sm text-muted-foreground uppercase tracking-wider mb-3">📅 Aperçu 30 derniers jours</h3>
+        <div className="flex gap-2 overflow-x-auto pb-4 no-swipe scrollbar-none px-1">
+          {last30Days.map((day, idx) => {
+            const dateStr = day.toISOString().split('T')[0];
+            const record = attendance.find(a => a.date.startsWith(dateStr));
+            const isToday = new Date().toDateString() === day.toDateString();
+            
+            let statusDot = <div className="h-1.5 w-1.5 rounded-full bg-transparent mt-1" />;
+            if (record) {
+              if (record.status === 'present') statusDot = <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 mt-1" />;
+              else if (record.status === 'late') statusDot = <div className="h-1.5 w-1.5 rounded-full bg-amber-500 mt-1" />;
+              else if (record.status === 'absent') statusDot = <div className="h-1.5 w-1.5 rounded-full bg-red-500 mt-1" />;
+            }
+            
+            const dayName = day.toLocaleDateString('fr-FR', { weekday: 'short' }).substring(0, 3);
+            const dayNum = day.getDate();
+            
+            return (
+              <div 
+                key={idx} 
+                className={`flex flex-col items-center justify-center p-3 rounded-2xl min-w-[55px] border transition-all duration-200 ${
+                  isToday 
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/20' 
+                    : 'bg-card border-border'
+                }`}
+              >
+                <span className={`text-[10px] uppercase font-bold ${isToday ? 'text-blue-100' : 'text-muted-foreground'}`}>{dayName}</span>
+                <span className="text-base font-bold mt-1">{dayNum}</span>
+                {statusDot}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Month filter */}
       {months.length > 0 && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 mt-4">
           <Filter className="h-4 w-4 text-muted-foreground" />
           <Select value={selectedMonth} onValueChange={setSelectedMonth}>
             <SelectTrigger className="w-52 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"><SelectValue placeholder="Tous les mois" /></SelectTrigger>
@@ -143,7 +188,7 @@ export default function StudentAttendance() {
         </div>
       )}
 
-      {/* Attendance table */}
+      {/* Attendance details list */}
       {filteredAttendance.length === 0 ? (
         <div className="text-center py-20">
           <div className="mx-auto w-24 h-24 rounded-full bg-muted/50 flex items-center justify-center mb-4"><Calendar className="h-12 w-12 text-muted-foreground/50" /></div>
@@ -151,28 +196,35 @@ export default function StudentAttendance() {
           <p className="text-muted-foreground">Aucune donnée de présence disponible.</p>
         </div>
       ) : (
-        <Card className="shadow-sm">
-          <CardContent className="p-0">
-            <ScrollArea className="max-h-96">
-              <Table className="text-sm">
-                <TableHeader>
-                  <TableRow className="bg-muted/30 hover:bg-muted/30"><TableHead className="pl-6">Date</TableHead><TableHead className="text-center">Statut</TableHead><TableHead className="hidden sm:table-cell">Motif</TableHead></TableRow>
-                </TableHeader>
-                <TableBody className="[&>tr:nth-child(even)]:bg-muted/30">
-                  {filteredAttendance.map((record) => (
-                    <TableRow key={record.id} className="hover:bg-blue-50/50 dark:hover:bg-blue-950/20 transition-colors">
-                      <TableCell className="pl-6">
-                        <div className="flex items-center gap-2"><CalendarCheck className="h-4 w-4 text-muted-foreground" /><span className="font-medium">{formatDate(record.date)}</span></div>
-                      </TableCell>
-                      <TableCell className="text-center">{getStatusBadge(record.status)}</TableCell>
-                      <TableCell className="hidden sm:table-cell text-muted-foreground text-sm max-w-[250px] truncate">{record.reason || '—'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+        <div className="space-y-2.5">
+          {filteredAttendance.map((record) => (
+            <div 
+              key={record.id} 
+              className="flex items-center justify-between p-4 rounded-xl bg-card border shadow-sm transition-all duration-200 hover:shadow-md"
+            >
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${
+                  record.status === 'present' ? 'bg-emerald-50 text-emerald-600' :
+                  record.status === 'late' ? 'bg-amber-50 text-amber-600' : 'bg-red-50 text-red-600'
+                }`}>
+                  {record.status === 'present' ? <UserCheck className="w-5 h-5" /> :
+                   record.status === 'late' ? <Clock className="w-5 h-5" /> : <UserX className="w-5 h-5" />}
+                </div>
+                <div>
+                  <p className="font-semibold text-sm text-foreground">{formatDate(record.date)}</p>
+                  {record.reason ? (
+                    <p className="text-xs text-muted-foreground mt-0.5">Motif : {record.reason}</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground/50 mt-0.5">Aucun motif spécifié</p>
+                  )}
+                </div>
+              </div>
+              <div>
+                {getStatusBadge(record.status)}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

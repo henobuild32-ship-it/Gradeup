@@ -135,10 +135,42 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Tableau de bord', page: 'parent-dashboard', icon: LayoutDashboard, emoji: '📊' },
     { label: 'Suivi scolaire', page: 'parent-grades', icon: BarChart3, emoji: '📊' },
     { label: 'Paiements', page: 'parent-payments', icon: CreditCard, emoji: '💳' },
+    { label: 'IA Gradie', page: 'parent-ai', icon: Bot, emoji: '🤖' },
     { label: 'Notifications', page: 'parent-notifications', icon: Bell, emoji: '🔔' },
     { label: 'Messagerie', page: 'messages', icon: MessageSquare, emoji: '💬' },
     { label: 'Profil', page: 'profile', icon: User, emoji: '👤' },
     { label: 'Aide', page: 'help', icon: Lightbulb, emoji: '💡' },
+  ],
+};
+
+const bottomTabsByRole: Record<UserRole, { label: string; page: PageView; icon: React.ElementType }[]> = {
+  ADMIN: [
+    { label: 'Accueil', page: 'admin-dashboard', icon: LayoutDashboard },
+    { label: 'Classes', page: 'admin-classes', icon: School },
+    { label: 'Grady IA', page: 'admin-ai', icon: Bot },
+    { label: 'Frais', page: 'admin-tuition', icon: DollarSign },
+    { label: 'Profil', page: 'profile', icon: User },
+  ],
+  TEACHER: [
+    { label: 'Accueil', page: 'teacher-dashboard', icon: LayoutDashboard },
+    { label: 'Cours', page: 'teacher-courses', icon: BookOpen },
+    { label: 'Grady IA', page: 'teacher-ai', icon: Bot },
+    { label: 'Rapports', page: 'teacher-reports', icon: ScrollText },
+    { label: 'Profil', page: 'profile', icon: User },
+  ],
+  STUDENT: [
+    { label: 'Accueil', page: 'student-dashboard', icon: LayoutDashboard },
+    { label: 'Cours', page: 'student-courses', icon: BookOpen },
+    { label: 'Grady IA', page: 'student-ai', icon: Bot },
+    { label: 'Notifs', page: 'student-notifications', icon: Bell },
+    { label: 'Profil', page: 'profile', icon: User },
+  ],
+  PARENT: [
+    { label: 'Accueil', page: 'parent-dashboard', icon: LayoutDashboard },
+    { label: 'Suivi', page: 'parent-grades', icon: BarChart3 },
+    { label: 'Grady IA', page: 'parent-ai', icon: Bot },
+    { label: 'Paiements', page: 'parent-payments', icon: CreditCard },
+    { label: 'Profil', page: 'profile', icon: User },
   ],
 };
 
@@ -193,6 +225,7 @@ const pageTitles: Record<PageView, string> = {
   'parent-grades': 'Suivi scolaire',
   'parent-payments': 'Paiements',
   'parent-notifications': 'Notifications',
+  'parent-ai': 'IA Gradie',
   'profile': 'Profil',
   'messages': 'Messagerie',
   'calendar': 'Calendrier',
@@ -412,6 +445,53 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    // Avoid swiping when active inside textareas, inputs, or horizontal sliders
+    const target = e.target as HTMLElement;
+    if (
+      target.closest('input') ||
+      target.closest('textarea') ||
+      target.closest('.no-swipe') ||
+      target.closest('[role="slider"]')
+    ) {
+      return;
+    }
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (touchStart === null) return;
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (touchStart === null || touchEnd === null) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isMobile && (isLeftSwipe || isRightSwipe)) {
+      const tabs = user ? bottomTabsByRole[user.role] : null;
+      if (tabs) {
+        const currentIdx = tabs.findIndex((tab) => tab.page === currentPage);
+        if (currentIdx !== -1) {
+          if (isLeftSwipe && currentIdx < tabs.length - 1) {
+            handleNavigate(tabs[currentIdx + 1].page);
+          } else if (isRightSwipe && currentIdx > 0) {
+            handleNavigate(tabs[currentIdx - 1].page);
+          }
+        }
+      }
+    }
+    setTouchStart(null);
+    setTouchEnd(null);
+  };
 
   // Responsive device orientation and screen resize observer
   useEffect(() => {
@@ -582,166 +662,229 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
       {/* Main Content Container - Flex column pour structure verticale */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
-        {/* Top Header with backdrop blur - shrink-0 pour qu'il ne se réduise pas */}
-        <header className="h-14 border-b bg-card/80 backdrop-blur-xl shrink-0 flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30">
-          <div className="flex items-center gap-3">
-            {/* Mobile hamburger */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden hover:bg-blue-50 hover:text-blue-600 transition-colors"
-              onClick={() => setSidebarOpen(true)}
-            >
-              <Menu className="w-5 h-5" />
-            </Button>
+        <header 
+          className="h-14 border-b bg-card/80 backdrop-blur-xl shrink-0 flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30"
+          style={{ paddingTop: 'env(safe-area-inset-top)' }}
+        >
+          {isMobile ? (
+            <div className="flex items-center justify-between w-full relative h-full">
+              {/* Left Side: Hamburger */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hover:bg-blue-50 hover:text-blue-600 transition-colors shrink-0 z-10"
+                onClick={() => setSidebarOpen(true)}
+              >
+                <Menu className="w-5 h-5" />
+              </Button>
 
-            {/* Desktop collapse toggle */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="hidden lg:flex hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                  onClick={() => setSidebarOpen(!sidebarOpen)}
-                >
-                  <ChevronLeft className={`w-4 h-4 transition-transform duration-300 ${!sidebarOpen ? 'rotate-180' : ''}`} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                {sidebarOpen ? 'Réduire le menu' : 'Ouvrir le menu'}
-              </TooltipContent>
-            </Tooltip>
+              {/* Centered Large-style Title */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <h2 className="text-sm font-semibold text-foreground tracking-tight select-none">
+                  {pageTitles[currentPage] || 'GradeUp'}
+                </h2>
+              </div>
 
-            <div className="flex items-center gap-2">
-              <img src="/logo-gradeup.png" alt="GradeUp" className="w-7 h-7 rounded-md object-contain drop-shadow-sm lg:hidden" />
-              <h2 className="text-base font-semibold text-foreground relative">
-                {pageTitles[currentPage] || 'Tableau de bord'}
-                <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full" />
-              </h2>
-              <kbd className="hidden md:inline-flex items-center gap-1 px-2 py-1 text-[10px] font-mono text-muted-foreground bg-muted rounded-md border border-border">
-                Ctrl K
-              </kbd>
+              {/* Right Side: dropdown menu / profile */}
+              <div className="flex items-center gap-2 z-10">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="flex items-center justify-center h-8 w-8 p-0 rounded-full hover:bg-muted transition-all duration-200">
+                      <Avatar className="h-7 w-7 ring-2 ring-blue-100 transition-all duration-200">
+                        {user.photoUrl && <AvatarImage src={user.photoUrl} alt={user.fullName} />}
+                        <AvatarFallback className="text-[10px] bg-primary text-primary-foreground font-bold">
+                          {initials}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel className="font-normal">
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium">{user.fullName}</p>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${roleBadgeColors[user.role]}`}>
+                            {roleLabels[user.role]}
+                          </Badge>
+                          {user.school && (
+                            <span className="text-[10px] text-muted-foreground truncate">{user.school.name}</span>
+                          )}
+                        </div>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => handleNavigate('profile')} className="cursor-pointer">
+                      <User className="mr-2 h-4 w-4" />
+                      Mon profil
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={handleLogout}
+                      className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/30"
+                    >
+                      <LogOut className="mr-2 h-4 w-4" />
+                      Déconnexion
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-3">
+                {/* Desktop collapse toggle */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="hidden lg:flex hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                      onClick={() => setSidebarOpen(!sidebarOpen)}
+                    >
+                      <ChevronLeft className={`w-4 h-4 transition-transform duration-300 ${!sidebarOpen ? 'rotate-180' : ''}`} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    {sidebarOpen ? 'Réduire le menu' : 'Ouvrir le menu'}
+                  </TooltipContent>
+                </Tooltip>
 
-          <div className="flex items-center gap-2">
-            {/* Notification bell */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="relative hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 hover:brightness-110 active:scale-[0.97]"
-                  onClick={() => {
-                    if (user.role === 'TEACHER') {
-                      toast.info('Pas de volet de notifications pour les professeurs pour le moment.');
-                    } else {
-                      const notifPage = `${user.role.toLowerCase()}-notifications` as PageView;
-                      setCurrentPage(notifPage);
-                    }
-                  }}
-                >
-                  <Bell className="w-4 h-4" />
-                  {/* Real-time notifications count badge */}
-                  {unreadNotificationsCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white px-1 animate-scale-in">
-                      {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
-                    </span>
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Notifications</TooltipContent>
-            </Tooltip>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-semibold text-foreground relative">
+                    {pageTitles[currentPage] || 'Tableau de bord'}
+                    <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full" />
+                  </h2>
+                  <kbd className="hidden md:inline-flex items-center gap-1 px-2 py-1 text-[10px] font-mono text-muted-foreground bg-muted rounded-md border border-border">
+                    Ctrl K
+                  </kbd>
+                </div>
+              </div>
 
-            {/* Messages shortcut with unread badge */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="relative hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition-all duration-200 active:scale-[0.97]"
-                  onClick={() => handleNavigate('messages')}
-                >
-                  <MessageSquare className="w-4 h-4" />
-                  {unreadMessages > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white px-1 animate-scale-in">
-                      {unreadMessages > 99 ? '99+' : unreadMessages}
-                    </span>
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Messagerie{unreadMessages > 0 ? ` (${unreadMessages})` : ''}</TooltipContent>
-            </Tooltip>
-
-            {/* Dark mode toggle */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                {mounted ? (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 dark:hover:text-yellow-400 transition-all duration-200 active:scale-[0.97]"
-                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                  >
-                    {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-                  </Button>
-                ) : (
-                  <div className="w-8 h-8" />
-                )}
-              </TooltipTrigger>
-              <TooltipContent>{theme === 'dark' ? 'Mode clair' : 'Mode sombre'}</TooltipContent>
-            </Tooltip>
-
-            {/* User dropdown menu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center gap-2 h-8 px-2 rounded-full hover:bg-muted transition-all duration-200">
-                  <Avatar className="h-7 w-7 ring-2 ring-blue-100 transition-all duration-200">
-                    {user.photoUrl && <AvatarImage src={user.photoUrl} alt={user.fullName} />}
-                    <AvatarFallback className="text-[10px] bg-primary text-primary-foreground">
-                      {initials}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="hidden sm:inline text-sm font-medium text-foreground max-w-[120px] truncate">
-                    {user.fullName}
-                  </span>
-                  <ChevronDown className="w-3 h-3 text-muted-foreground hidden sm:block" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium">{user.fullName}</p>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${roleBadgeColors[user.role]}`}>
-                        {roleLabels[user.role]}
-                      </Badge>
-                      {user.school && (
-                        <span className="text-[10px] text-muted-foreground truncate">{user.school.name}</span>
+              <div className="flex items-center gap-2">
+                {/* Notification bell */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="relative hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 hover:brightness-110 active:scale-[0.97]"
+                      onClick={() => {
+                        if (user.role === 'TEACHER') {
+                          toast.info('Pas de volet de notifications pour les professeurs pour le moment.');
+                        } else {
+                          const notifPage = `${user.role.toLowerCase()}-notifications` as PageView;
+                          setCurrentPage(notifPage);
+                        }
+                      }}
+                    >
+                      <Bell className="w-4 h-4" />
+                      {/* Real-time notifications count badge */}
+                      {unreadNotificationsCount > 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white px-1 animate-scale-in">
+                          {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
+                        </span>
                       )}
-                    </div>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => handleNavigate('profile')} className="cursor-pointer">
-                  <User className="mr-2 h-4 w-4" />
-                  Mon profil
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleLogout}
-                  className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/30"
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Déconnexion
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Notifications</TooltipContent>
+                </Tooltip>
+
+                {/* Messages shortcut with unread badge */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="relative hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition-all duration-200 active:scale-[0.97]"
+                      onClick={() => handleNavigate('messages')}
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      {unreadMessages > 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white px-1 animate-scale-in">
+                          {unreadMessages > 99 ? '99+' : unreadMessages}
+                        </span>
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Messagerie{unreadMessages > 0 ? ` (${unreadMessages})` : ''}</TooltipContent>
+                </Tooltip>
+
+                {/* Dark mode toggle */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    {mounted ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 dark:hover:text-yellow-400 transition-all duration-200 active:scale-[0.97]"
+                        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                      >
+                        {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                      </Button>
+                    ) : (
+                      <div className="w-8 h-8" />
+                    )}
+                  </TooltipTrigger>
+                  <TooltipContent>{theme === 'dark' ? 'Mode clair' : 'Mode sombre'}</TooltipContent>
+                </Tooltip>
+
+                {/* User dropdown menu */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="flex items-center gap-2 h-8 px-2 rounded-full hover:bg-muted transition-all duration-200">
+                      <Avatar className="h-7 w-7 ring-2 ring-blue-100 transition-all duration-200">
+                        {user.photoUrl && <AvatarImage src={user.photoUrl} alt={user.fullName} />}
+                        <AvatarFallback className="text-[10px] bg-primary text-primary-foreground">
+                          {initials}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="hidden sm:inline text-sm font-medium text-foreground max-w-[120px] truncate">
+                        {user.fullName}
+                      </span>
+                      <ChevronDown className="w-3 h-3 text-muted-foreground hidden sm:block" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel className="font-normal">
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium">{user.fullName}</p>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${roleBadgeColors[user.role]}`}>
+                            {roleLabels[user.role]}
+                          </Badge>
+                          {user.school && (
+                            <span className="text-[10px] text-muted-foreground truncate">{user.school.name}</span>
+                          )}
+                        </div>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => handleNavigate('profile')} className="cursor-pointer">
+                      <User className="mr-2 h-4 w-4" />
+                      Mon profil
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={handleLogout}
+                      className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/30"
+                    >
+                      <LogOut className="mr-2 h-4 w-4" />
+                      Déconnexion
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </>
+          )}
         </header>
 
         {/* ✅ Main content: overflow-y-auto pour le scroll, min-h-0 pour flexibilité */}
-        <main className="flex-1 overflow-y-auto min-h-0">
+        <main 
+          className={`flex-1 overflow-y-auto min-h-0 ${isMobile ? 'pb-20' : ''}`}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
           {/* ✅ Suppression de min-h-full qui cause des espaces vides */}
           <div className="p-4 lg:p-6 animate-fade-in flex flex-col" key={currentPage}>
             {children}
@@ -819,6 +962,48 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Bottom Tab Bar (iOS style) on Mobile */}
+      {isMobile && (
+        <nav 
+          className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-card/90 backdrop-blur-xl border-t flex items-center justify-around px-2 z-40 shadow-lg"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        >
+          {bottomTabsByRole[user.role]?.map((tab) => {
+            const isActive = currentPage === tab.page;
+            const Icon = tab.icon;
+            
+            // Show badge count if it's the notification or message tab
+            const isNotifTab = tab.page.includes('notification');
+            const isMsgTab = tab.page === 'messages';
+            
+            return (
+              <button
+                key={tab.page}
+                onClick={() => handleNavigate(tab.page)}
+                className={`flex flex-col items-center justify-center flex-1 h-full py-1 transition-all duration-200 ${
+                  isActive ? 'text-primary scale-105 font-semibold animate-scale-in' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <div className="relative">
+                  <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5px] text-blue-600 dark:text-blue-400' : 'stroke-[1.8px]'}`} />
+                  {isNotifTab && unreadNotificationsCount > 0 && (
+                    <span className="absolute -top-1 -right-2 min-w-[14px] h-3.5 flex items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white px-0.5 animate-scale-in">
+                      {unreadNotificationsCount}
+                    </span>
+                  )}
+                  {isMsgTab && unreadMessages > 0 && (
+                    <span className="absolute -top-1 -right-2 min-w-[14px] h-3.5 flex items-center justify-center rounded-full bg-blue-500 text-[8px] font-bold text-white px-0.5 animate-scale-in">
+                      {unreadMessages}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] mt-1 tracking-tight truncate max-w-full">{tab.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      )}
     </div>
   );
 }

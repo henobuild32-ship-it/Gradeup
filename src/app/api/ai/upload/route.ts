@@ -37,7 +37,14 @@ async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
       return buffer.toString('utf-8');
     }
 
-    // Pour les images : retour vide (OCR optionnel – nécessite tesseract.js)
+    // Extraction OCR pour les images
+    if (mimeType.startsWith('image/')) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const Tesseract = require('tesseract.js');
+      const result = await Tesseract.recognize(buffer, 'fra');
+      return result.data.text || '';
+    }
+
     return '';
   } catch (error) {
     console.error('Erreur extraction texte:', error);
@@ -45,38 +52,112 @@ async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
   }
 }
 
-async function generateSummary(text: string, fileName: string): Promise<string> {
+async function generateSummary(
+  text: string,
+  fileName: string,
+  mimeType: string,
+  buffer?: Buffer
+): Promise<string> {
   const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
-  if (!DEEPSEEK_API_KEY || !text) return '';
+  const OR_API_KEY = process.env.OR_API_KEY;
+  
+  if (!DEEPSEEK_API_KEY && !OR_API_KEY) {
+    return 'Service IA non configuré pour résumer le document.';
+  }
+
+  const isImage = mimeType.startsWith('image/');
 
   try {
-    const res = await fetch('https://api.deepseek.com/chat/completions', {
+    const key = DEEPSEEK_API_KEY || OR_API_KEY;
+    const isUsingOpenRouter = !DEEPSEEK_API_KEY;
+    
+    const url = isUsingOpenRouter 
+      ? 'https://openrouter.ai/api/v1/chat/completions' 
+      : 'https://api.deepseek.com/chat/completions';
+
+    let model = isUsingOpenRouter
+      ? (process.env.OR_MODEL || 'deepseek/deepseek-chat-v3-0324:free')
+      : 'deepseek-chat';
+
+    // Si c'est une image et qu'on utilise OpenRouter, on utilise un modèle vision gratuit
+    if (isImage && isUsingOpenRouter) {
+      model = 'google/gemini-2.0-flash-exp:free';
+    }
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${key}`,
+    };
+
+    if (isUsingOpenRouter) {
+      headers['HTTP-Referer'] = 'https://gradeup.vercel.app';
+      headers['X-Title'] = 'GradeUp';
+    }
+
+    let messages;
+    if (isImage && buffer && isUsingOpenRouter) {
+      const base64Image = buffer.toString('base64');
+      messages = [
+        {
+          role: 'system',
+          content: 'Tu es Gradie, l\'assistante IA de GradeUp. Analyse cette image et fournis une description détaillée en français, ainsi qu\'un résumé du texte visible. Sois claire, structurée et concise.',
+        },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: `Image : "${fileName}"\nTexte OCR extrait : ${text.slice(0, 1000)}`,
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:${mimeType};base64,${base64Image}`,
+              },
+            },
+          ],
+        },
+      ];
+    } else {
+      const promptSystem = isImage
+        ? 'Tu es Gradie, l\'assistante IA de GradeUp. Décris et explique cette image en français en te basant sur le texte extrait par OCR. Maximum 3 paragraphes.'
+        : 'Tu es Gradie, l\'assistante IA de GradeUp. Résume le document ci-dessous en français de manière claire, concise et utile pour un élève ou un professeur. Maximum 3 paragraphes.';
+
+      messages = [
+        {
+          role: 'system',
+          content: promptSystem,
+        },
+        {
+          role: 'user',
+          content: `Document : "${fileName}"\n\n${text.slice(0, 8000)}`,
+        },
+      ];
+    }
+
+    const res = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
-      },
+      headers,
       body: JSON.stringify({
-        model: 'deepseek-chat',
-        stream: false,
+        model,
+        messages,
         temperature: 0.5,
-        max_tokens: 400,
-        messages: [
-          {
-            role: 'system',
-            content: 'Tu es Gradie, une IA scolaire. Résume le document ci-dessous en français de manière claire, concise et utile pour un élève ou un professeur. Maximum 3 paragraphes.',
-          },
-          {
-            role: 'user',
-            content: `Document : "${fileName}"\n\n${text.slice(0, 6000)}`,
-          },
-        ],
+        max_tokens: 600,
       }),
     });
-    if (!res.ok) return '';
+
+    if (!res.ok) {
+      // En cas d'échec du modèle vision, fallback sur le modèle textuel classique
+      if (isImage && isUsingOpenRouter && model !== (process.env.OR_MODEL || 'deepseek/deepseek-chat-v3-0324:free')) {
+        return generateSummary(text, fileName, mimeType);
+      }
+      return '';
+    }
+
     const data = await res.json();
     return data.choices?.[0]?.message?.content || '';
-  } catch {
+  } catch (error) {
+    console.error('Error generating summary:', error);
     return '';
   }
 }
@@ -98,7 +179,7 @@ export async function POST(request: NextRequest) {
     // Vérification du type MIME
     if (!ALLOWED_TYPES[file.type]) {
       return NextResponse.json(
-        { error: `Type de fichier non supporté : ${file.type}. Acceptés : PDF, DOCX, TXT, JPEG, PNG.` },
+        { error: `Type de fichier non supporté : ${file.type}. Acceptés : PDF, DOCX, TXT, JPEG, PNG, WEBP.` },
         { status: 415 }
       );
     }
@@ -111,7 +192,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Vérification que la conversation appartient bien à l'utilisateur
+    // Vérification de la conversation
     const conversation = await db.aiConversation.findFirst({
       where: { id: conversationId, userId },
     });
@@ -130,11 +211,11 @@ export async function POST(request: NextRequest) {
     await writeFile(filePath, buffer);
     const fileUrl = `/uploads/${fileName}`;
 
-    // Extraction du texte
+    // Extraction du texte / OCR
     const extractedText = await extractText(buffer, file.type);
 
-    // Génération du résumé via l'IA
-    const summary = await generateSummary(extractedText, file.name);
+    // Résumé / Description par l'IA (avec vision si image)
+    const summary = await generateSummary(extractedText, file.name, file.type, buffer);
 
     // Sauvegarde en base
     const document = await db.aiDocument.create({
@@ -144,21 +225,32 @@ export async function POST(request: NextRequest) {
         mimeType: file.type,
         url: fileUrl,
         size: file.size,
-        extractedText: extractedText.slice(0, 50000), // limiter la taille
+        extractedText: extractedText.slice(0, 50000),
         summary,
       },
     });
 
-    // Ajout d'un message système dans la conversation pour signaler le document
+    // Compter les documents dans la conversation pour savoir si on peut les comparer
+    const docCount = await db.aiDocument.count({
+      where: { conversationId },
+    });
+
+    let assistantMessageContent = `📄 **Document reçu : ${file.name}**\n\n${summary || 'Le document a été analysé et est maintenant disponible dans cette conversation.'}`;
+    
+    if (docCount > 1) {
+      assistantMessageContent += `\n\n💡 *Vous avez maintenant ${docCount} documents chargés. Vous pouvez me demander de les comparer ou d'effectuer une synthèse croisée !*`;
+    }
+
+    // Enregistrer le message de notification de l'assistant
     await db.aiMessage.create({
       data: {
         conversationId,
         role: 'assistant',
-        content: `📄 **Document reçu : ${file.name}**\n\n${summary || 'Le document a été analysé et est maintenant disponible dans cette conversation.'}`,
+        content: assistantMessageContent,
       },
     });
 
-    // Mise à jour du titre de la conversation si c'est le premier document
+    // Titrer la conversation si nécessaire
     if (conversation.title === 'Nouvelle conversation') {
       await db.aiConversation.update({
         where: { id: conversationId },

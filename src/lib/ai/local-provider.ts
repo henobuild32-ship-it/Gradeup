@@ -8,7 +8,7 @@ interface LocalProviderInput {
 
 function extractData(context: string) {
   const r: Record<string, string> = {};
-  const g = (re: RegExp) => { const m = context.match(re); return m ? m[1].trim() : null; };
+  const g = (re: RegExp) => { const m = context.match(re); return m ? m[1].trim() : ''; };
 
   r.average = g(/Moyenne\s*:\s*([\d.]+)/);
   const ns = context.match(/Notes?\s*:[\s\S]*?(?=\n(?:Présences|Paiements|Professeur|Administrateur|Documents|Total|$))/i);

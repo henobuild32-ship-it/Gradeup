@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
       });
 
       const students = enrolledStudents.map((enrolled) => {
-        const student = enrolled.student;
+        const student = enrolled.user;
         const grades = allDetailedGrades.filter((g) => g.studentId === student.id);
         const subjectAverages = new Map<string, { total: number; count: number; maxScore: number }>();
         grades.forEach((g) => {
@@ -117,9 +117,9 @@ export async function GET(request: NextRequest) {
       classes.map(async (cls) => {
         const enrollments = await db.enrolledClass.findMany({
           where: { classId: cls.id },
-          include: { student: { select: { id: true } } },
+          include: { user: { select: { id: true } } },
         });
-        const studentIds = enrollments.map((e) => e.student.id);
+        const studentIds = enrollments.map((e) => e.user.id);
 
         const allGrades = await db.detailedGrade.findMany({
           where: { schoolId, studentId: { in: studentIds } },

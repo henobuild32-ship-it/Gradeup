@@ -198,6 +198,7 @@ export type PageView =
   | 'parent-grades'
   | 'parent-payments'
   | 'parent-notifications'
+  | 'parent-ai'
   | 'profile'
   | 'messages'
   | 'calendar'
