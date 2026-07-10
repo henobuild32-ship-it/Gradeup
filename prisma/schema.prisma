@@ -15,6 +15,7 @@ model School {
   password         String
   inviteCode       String             @unique
   currency         String             @default("USD")
+  logoUrl          String             @default("")
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   attendance       Attendance[]

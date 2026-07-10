@@ -15,9 +15,10 @@ import {
   IdCard, Printer, RefreshCw, Phone, Edit, Calendar, User, 
   BookOpen, GraduationCap, Building2, Upload, CreditCard, 
   ExternalLink, Loader2, Mail, MapPin, Hash, Shield, 
-  CheckCircle, School, Users, Eye, EyeOff 
+  CheckCircle, School, Users, Eye, EyeOff, RotateCw, Download 
 } from 'lucide-react';
 import { toast } from 'sonner';
+import IdCard3D from './IdCard3D';
 
 interface EnrolledClassInfo {
   class: { id: string; name: string; level: string };
@@ -50,10 +51,12 @@ interface StudentItem {
 
 export default function AdminCards() {
   const { user } = useAppStore();
-  const [students, setStudents] = useState<StudentItem[]>([]);
+  const [usersList, setUsersList] = useState<StudentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('ALL');
+  const [cardRole, setCardRole] = useState<'STUDENT' | 'TEACHER'>('STUDENT');
+  const [schoolLogo, setSchoolLogo] = useState('');
   const printRef = useRef<HTMLDivElement>(null);
 
   // Edit/Create State
@@ -123,22 +126,38 @@ export default function AdminCards() {
     }
   };
 
-  const fetchStudents = useCallback(async () => {
+  const fetchUsersList = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/users?schoolId=${user?.schoolId}&role=STUDENT`);
+      const res = await fetch(`/api/users?schoolId=${user?.schoolId}&role=${cardRole}`);
       const data = await res.json();
-      setStudents(Array.isArray(data.users) ? data.users : []);
+      setUsersList(Array.isArray(data.users) ? data.users : []);
     } catch {
-      toast.error('Erreur lors du chargement des élèves');
+      toast.error(cardRole === 'STUDENT' ? 'Erreur lors du chargement des élèves' : 'Erreur lors du chargement des enseignants');
     } finally {
       setLoading(false);
+    }
+  }, [user?.schoolId, cardRole]);
+
+  const fetchSchoolLogo = useCallback(async () => {
+    if (!user?.schoolId) return;
+    try {
+      const res = await fetch(`/api/config?schoolId=${user.schoolId}`);
+      const data = await res.json();
+      if (data.config) {
+        setSchoolLogo(data.config.logoUrl || '');
+      }
+    } catch {
+      // silencieux
     }
   }, [user?.schoolId]);
 
   useEffect(() => {
-    if (user?.schoolId) fetchStudents();
-  }, [fetchStudents, user?.schoolId]);
+    if (user?.schoolId) {
+      fetchUsersList();
+      fetchSchoolLogo();
+    }
+  }, [fetchUsersList, fetchSchoolLogo, user?.schoolId]);
 
   const generateCards = async (action: 'generate-all' | 'generate-class' | 'generate-single', classId?: string, studentId?: string) => {
     try {
@@ -157,7 +176,7 @@ export default function AdminCards() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       toast.success(action === 'generate-single' ? 'Carte générée avec succès !' : `${data.generatedCount || 0} carte(s) générée(s) avec succès !`);
-      fetchStudents();
+      fetchUsersList();
     } catch (e: any) {
       toast.error(e.message || 'Erreur lors de la génération');
     } finally {
@@ -253,12 +272,12 @@ export default function AdminCards() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             schoolId: user?.schoolId, 
-            role: 'STUDENT',
+            role: cardRole,
             ...formData 
           }),
         });
         if (!res.ok) throw new Error('Erreur lors de la création');
-        toast.success('Nouvelle carte (élève) créée avec succès');
+        toast.success(cardRole === 'STUDENT' ? 'Nouvelle carte (élève) créée avec succès' : 'Nouvelle carte (enseignant) créée avec succès');
       } else if (editingStudent) {
         const res = await fetch(`/api/users`, {
           method: 'PATCH',
@@ -270,7 +289,7 @@ export default function AdminCards() {
       }
       setIsCreating(false);
       setEditingStudent(null);
-      fetchStudents();
+      fetchUsersList();
     } catch (e: any) {
       toast.error(e.message);
     } finally {
@@ -290,238 +309,57 @@ export default function AdminCards() {
     }
   };
 
-  // Grouping logic
+  // Grouping logic (Only for students. Teachers will be shown in a single list)
   const classesMap = new Map<string, { id: string; name: string; students: StudentItem[] }>();
   classesMap.set('UNASSIGNED', { id: 'unassigned', name: 'Sans Classe', students: [] });
 
-  students.forEach((s) => {
-    if (!s.classEnrollments || s.classEnrollments.length === 0) {
-      classesMap.get('UNASSIGNED')!.students.push(s);
-    } else {
-      s.classEnrollments.forEach((enrollment) => {
-        const cls = enrollment.class;
-        if (!classesMap.has(cls.id)) classesMap.set(cls.id, { id: cls.id, name: cls.name, students: [] });
-        classesMap.get(cls.id)!.students.push(s);
-      });
-    }
-  });
+  if (cardRole === 'STUDENT') {
+    usersList.forEach((s) => {
+      if (!s.classEnrollments || s.classEnrollments.length === 0) {
+        classesMap.get('UNASSIGNED')!.students.push(s);
+      } else {
+        s.classEnrollments.forEach((enrollment) => {
+          const cls = enrollment.class;
+          if (!classesMap.has(cls.id)) classesMap.set(cls.id, { id: cls.id, name: cls.name, students: [] });
+          classesMap.get(cls.id)!.students.push(s);
+        });
+      }
+    });
+  }
 
   if (classesMap.get('UNASSIGNED')!.students.length === 0) classesMap.delete('UNASSIGNED');
   const allClasses = Array.from(classesMap.values()).sort((a, b) => a.name.localeCompare(b.name));
-  const filteredStudents = activeTab === 'ALL' ? students : activeTab === 'UNASSIGNED' ? classesMap.get('UNASSIGNED')?.students || [] : classesMap.get(activeTab)?.students || [];
+  
+  const filteredStudents = cardRole === 'TEACHER' 
+    ? usersList 
+    : (activeTab === 'ALL' ? usersList : activeTab === 'UNASSIGNED' ? classesMap.get('UNASSIGNED')?.students || [] : classesMap.get(activeTab)?.students || []);
 
   const StudentCard = ({ student }: { student: StudentItem }) => {
-    const className = student.classEnrollments?.[0]?.class?.name || 'Sans Classe';
-    const levelName = student.classEnrollments?.[0]?.class?.level || '';
-    const schoolName = user?.school?.name || 'GradeUp School';
-    const cardExpiry = student.cardExpiryDate || new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toLocaleDateString();
-
     return (
-      <div className="break-inside-avoid relative group">
-        <div className="relative w-full max-w-[520px] mx-auto rounded-2xl overflow-hidden shadow-2xl hover:shadow-3xl transition-all duration-300">
-          {/* Carte principale avec design premium */}
-          <div className="relative bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900">
-            {/* Effet de fond */}
-            {/* Decorative background (removed complex inline SVG URL to avoid JSX parsing issues) */}
-            <div className="absolute inset-0 opacity-20" />
-            
-            {/* En-tête avec nom de l'école */}
-            <div className="relative px-6 pt-6 pb-3 border-b border-white/10">
-              <div className="flex justify-between items-start">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 bg-white/10 rounded-lg backdrop-blur-sm">
-                    <School className="w-5 h-5 text-blue-300" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-lg tracking-tight text-white/95 uppercase">{schoolName}</h3>
-                    <p className="text-[10px] text-blue-200/70">Établissement d'Excellence</p>
-                  </div>
-                </div>
-                <div className="text-right bg-white/5 backdrop-blur-sm px-3 py-1.5 rounded-lg">
-                  <p className="text-[8px] uppercase tracking-wider text-blue-200/80 font-semibold">Année Scolaire</p>
-                  <p className="text-xs font-bold text-white">{student.academicYear || '2025-2026'}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Corps de la carte */}
-            <div className="relative px-6 py-4">
-              <div className="flex gap-5">
-                {/* Colonne gauche - Photo et QR Code */}
-                <div className="flex flex-col items-center gap-3 w-[110px] shrink-0">
-                  <div className="relative">
-                    <div className="w-24 h-24 rounded-xl border-2 border-white/30 shadow-lg overflow-hidden bg-gradient-to-br from-slate-700 to-slate-800">
-                      {student.photoUrl ? (
-                        <img src={student.photoUrl} alt={student.fullName} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <User className="w-12 h-12 text-white/40" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-0.5">
-                      <CheckCircle className="w-3 h-3 text-white" />
-                    </div>
-                  </div>
-                  
-                  {/* QR Code */}
-                  <div className="bg-white p-1.5 rounded-xl shadow-lg">
-                    {student.cardId ? (
-                      <QRCodeSVG value={`${student.id}-${student.cardId}`} size={80} level="H" includeMargin={false} />
-                    ) : (
-                      <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center">
-                        <span className="text-[9px] text-gray-400 text-center">Générer QR</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Colonne droite - Informations */}
-                <div className="flex-1 space-y-3">
-                  {/* Nom de l'étudiant */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <h2 className="text-xl font-bold text-white leading-tight">{student.fullName}</h2>
-                      {student.gender && (
-                        <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-[10px]">
-                          {student.gender === 'M' ? 'Masculin' : 'Féminin'}
-                        </Badge>
-                      )}
-                    </div>
-                    {student.postName && (
-                      <p className="text-sm text-blue-200/80">{student.postName}</p>
-                    )}
-                  </div>
-
-                  {/* Informations clés en grille */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-white/5 backdrop-blur-sm rounded-lg p-2">
-                      <div className="flex items-center gap-1 mb-1">
-                        <Hash className="w-3 h-3 text-blue-300" />
-                        <p className="text-[8px] uppercase text-blue-200/70 font-semibold">Matricule</p>
-                      </div>
-                      <p className="text-xs font-mono font-bold text-white">{student.matricule || 'N/A'}</p>
-                    </div>
-                    
-                    <div className="bg-white/5 backdrop-blur-sm rounded-lg p-2">
-                      <div className="flex items-center gap-1 mb-1">
-                        <BookOpen className="w-3 h-3 text-blue-300" />
-                        <p className="text-[8px] uppercase text-blue-200/70 font-semibold">Classe</p>
-                      </div>
-                      <p className="text-xs font-semibold text-white truncate">{className}</p>
-                    </div>
-
-                    {(student.section || levelName) && (
-                      <div className="bg-white/5 backdrop-blur-sm rounded-lg p-2">
-                        <div className="flex items-center gap-1 mb-1">
-                          <GraduationCap className="w-3 h-3 text-blue-300" />
-                          <p className="text-[8px] uppercase text-blue-200/70 font-semibold">Section/Option</p>
-                        </div>
-                        <p className="text-xs font-medium text-white/90 truncate">{student.section || levelName}</p>
-                      </div>
-                    )}
-
-                    {student.birthDate && (
-                      <div className="bg-white/5 backdrop-blur-sm rounded-lg p-2">
-                        <div className="flex items-center gap-1 mb-1">
-                          <Calendar className="w-3 h-3 text-blue-300" />
-                          <p className="text-[8px] uppercase text-blue-200/70 font-semibold">Naissance</p>
-                        </div>
-                        <p className="text-xs text-white/90">{student.birthDate}</p>
-                      </div>
-                    )}
-
-                    {student.bloodType && (
-                      <div className="bg-white/5 backdrop-blur-sm rounded-lg p-2">
-                        <div className="flex items-center gap-1 mb-1">
-                          <Shield className="w-3 h-3 text-red-300" />
-                          <p className="text-[8px] uppercase text-blue-200/70 font-semibold">Groupe Sanguin</p>
-                        </div>
-                        <p className="text-xs font-bold text-white">{student.bloodType}</p>
-                      </div>
-                    )}
-
-                    {student.nationality && (
-                      <div className="bg-white/5 backdrop-blur-sm rounded-lg p-2">
-                        <div className="flex items-center gap-1 mb-1">
-                          <MapPin className="w-3 h-3 text-blue-300" />
-                          <p className="text-[8px] uppercase text-blue-200/70 font-semibold">Nationalité</p>
-                        </div>
-                        <p className="text-xs text-white/90">{student.nationality}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Contacts */}
-                  {(student.phone || student.parentPhone) && (
-                    <div className="bg-white/5 backdrop-blur-sm rounded-lg p-2">
-                      <div className="grid grid-cols-2 gap-2">
-                        {student.phone && (
-                          <div className="flex items-center gap-1">
-                            <Phone className="w-3 h-3 text-green-300" />
-                            <div>
-                              <p className="text-[8px] text-blue-200/70">Élève</p>
-                              <p className="text-[10px] font-medium text-white">{student.phone}</p>
-                            </div>
-                          </div>
-                        )}
-                        {student.parentPhone && (
-                          <div className="flex items-center gap-1">
-                            <Users className="w-3 h-3 text-orange-300" />
-                            <div>
-                              <p className="text-[8px] text-blue-200/70">Parent</p>
-                              <p className="text-[10px] font-medium text-white">{student.parentPhone}</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      {student.parentEmail && (
-                        <div className="flex items-center gap-1 mt-1">
-                          <Mail className="w-3 h-3 text-blue-300" />
-                          <p className="text-[9px] text-white/80 truncate">{student.parentEmail}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {student.address && (
-                    <div className="flex items-center gap-1 text-[9px] text-white/70">
-                      <MapPin className="w-3 h-3" />
-                      <span className="truncate">{student.address}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Pied de carte avec numéro de carte */}
-            <div className="relative px-6 py-3 border-t border-white/10 bg-black/20 backdrop-blur-sm">
-              <div className="flex justify-between items-center text-[9px]">
-                <div className="flex items-center gap-2">
-                  <Shield className="w-3 h-3 text-blue-300" />
-                  <span className="text-white/70">Carte d'Identité Scolaire</span>
-                </div>
-                {student.cardId && (
-                  <div className="font-mono font-bold text-white">
-                    N°: {student.cardId}
-                  </div>
-                )}
-                <div className="text-white/50">
-                  Valable jusqu'au: {cardExpiry}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Bouton d'édition */}
+      <div className="break-inside-avoid relative group border border-border/60 rounded-3xl p-4 bg-muted/10 shadow-sm flex flex-col items-center">
+        {/* Button to edit card details */}
+        <div className="absolute top-2 right-2 z-10 no-print">
           <Button 
             onClick={() => openEditModal(student)}
-            className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-all duration-300 rounded-full shadow-lg h-8 w-8 p-0 bg-white text-blue-600 hover:bg-blue-50 border border-blue-200 no-print"
-            title="Modifier les informations"
+            className="rounded-full shadow-md h-9 w-9 p-0 bg-white hover:bg-slate-100 text-blue-600 border border-slate-200"
+            title="Modifier la carte"
           >
-            <Edit className="w-3.5 h-3.5" />
+            <Edit className="w-4 h-4" />
           </Button>
         </div>
+
+        {/* The 3D double-sided interactive card */}
+        <IdCard3D 
+          user={{
+            ...student,
+            role: cardRole,
+            className: student.classEnrollments?.[0]?.class?.name || student.className,
+            courseName: student.section, // use section as subject for teachers if editing
+          }} 
+          schoolName={user?.school?.name || 'Établissement GradeUp'} 
+          schoolLogo={schoolLogo} 
+          role={cardRole} 
+        />
       </div>
     );
   };
@@ -557,10 +395,10 @@ export default function AdminCards() {
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <IdCard className="w-6 h-6 text-blue-600" /> 
-              Cartes d'Identité Scolaire
+              Cartes d&apos;Identité Scolaires
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Gérez et éditez les cartes d'identification sécurisées avec QR code
+              Gérez et téléchargez les cartes d&apos;identification recto-verso pour les élèves et enseignants
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -568,36 +406,58 @@ export default function AdminCards() {
               <CreditCard className="w-4 h-4 mr-2" />
               Nouvelle Carte (15$)
             </Button>
-            <Button variant="outline" onClick={() => generateCards('generate-all')} disabled={generating || students.length === 0}>
+            <Button variant="outline" onClick={() => generateCards('generate-all')} disabled={generating || usersList.length === 0}>
               <RefreshCw className={`w-4 h-4 mr-2 ${generating ? 'animate-spin' : ''}`} />
               Générer IDs
             </Button>
             <Button onClick={handlePrint} disabled={filteredStudents.length === 0} className="bg-blue-600 hover:bg-blue-700 text-white">
-              <Printer className="h-4 w-4 mr-2" /> Imprimer
+              <Printer className="h-4 w-4 mr-2" /> Imprimer tout
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Onglets de filtrage */}
-      <div className="no-print">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <div className="overflow-x-auto pb-2">
-            <TabsList className="inline-flex w-max">
-              <TabsTrigger value="ALL" className="gap-1.5">
-                Tous 
-                <Badge variant="secondary" className="ml-1 text-xs">{students.length}</Badge>
-              </TabsTrigger>
-              {allClasses.map((c) => (
-                <TabsTrigger key={c.id} value={c.id} className="gap-1.5">
-                  {c.name} 
-                  <Badge variant="secondary" className="ml-1 text-xs">{c.students.length}</Badge>
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
-        </Tabs>
+      {/* Rôle Selector Segmented Control */}
+      <div className="no-print mb-4 bg-muted/40 p-1.5 rounded-xl inline-flex gap-2">
+        <Button 
+          variant={cardRole === 'STUDENT' ? 'default' : 'ghost'} 
+          onClick={() => { setCardRole('STUDENT'); setActiveTab('ALL'); }}
+          className="rounded-lg text-sm gap-2"
+        >
+          <Users className="w-4 h-4" />
+          Élèves
+        </Button>
+        <Button 
+          variant={cardRole === 'TEACHER' ? 'default' : 'ghost'} 
+          onClick={() => { setCardRole('TEACHER'); setActiveTab('ALL'); }}
+          className="rounded-lg text-sm gap-2"
+        >
+          <GraduationCap className="w-4 h-4" />
+          Enseignants
+        </Button>
       </div>
+
+      {/* Onglets de filtrage par classe (Uniquement pour les élèves) */}
+      {cardRole === 'STUDENT' && (
+        <div className="no-print">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <div className="overflow-x-auto pb-2">
+              <TabsList className="inline-flex w-max">
+                <TabsTrigger value="ALL" className="gap-1.5">
+                  Tous 
+                  <Badge variant="secondary" className="ml-1 text-xs">{usersList.length}</Badge>
+                </TabsTrigger>
+                {allClasses.map((c) => (
+                  <TabsTrigger key={c.id} value={c.id} className="gap-1.5">
+                    {c.name} 
+                    <Badge variant="secondary" className="ml-1 text-xs">{c.students.length}</Badge>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
+          </Tabs>
+        </div>
+      )}
 
       {/* Liste des cartes */}
       {loading ? (
@@ -609,9 +469,9 @@ export default function AdminCards() {
       ) : filteredStudents.length === 0 ? (
         <div className="text-center py-16 no-print bg-muted/20 rounded-xl border border-dashed">
           <IdCard className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold">Aucun élève trouvé</h3>
+          <h3 className="text-lg font-semibold">Aucun {cardRole === 'STUDENT' ? 'élève' : 'enseignant'} trouvé</h3>
           <p className="text-sm text-muted-foreground mt-2">
-            Commencez par créer une nouvelle carte d'identité
+            Commencez par créer une nouvelle carte d&apos;identité
           </p>
         </div>
       ) : (

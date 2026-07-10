@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
           email: true,
           currency: true,
           inviteCode: true,
+          logoUrl: true,
           createdAt: true,
         },
       });
@@ -38,6 +39,7 @@ export async function GET(request: NextRequest) {
         email: true,
         currency: true,
         inviteCode: true,
+        logoUrl: true,
         createdAt: true,
       },
     });
@@ -56,7 +58,7 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { schoolId, currency, name, email } = body;
+    const { schoolId, currency, name, email, logoUrl } = body;
 
     if (!schoolId) {
       return NextResponse.json({ error: 'schoolId is required' }, { status: 400 });
@@ -73,12 +75,14 @@ export async function PUT(request: NextRequest) {
         ...(currency !== undefined && { currency }),
         ...(name !== undefined && { name }),
         ...(email !== undefined && { email }),
+        ...(logoUrl !== undefined && { logoUrl }),
       },
       select: {
         id: true,
         name: true,
         email: true,
         currency: true,
+        logoUrl: true,
         createdAt: true,
       },
     });

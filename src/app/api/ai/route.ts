@@ -1,10 +1,6 @@
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
-import { generateLocalResponse } from '@/lib/ai/local-provider';
-import { generateOpenRouterResponse } from '@/lib/ai/openrouter-provider';
-
-const AI_PROVIDER = (process.env.AI_PROVIDER || 'openrouter').toLowerCase();
-const HAS_OPENROUTER_KEY = !!process.env.OR_API_KEY;
+import { generateGLMResponse } from '@/lib/ai/glm-provider';
 
 export const runtime = 'nodejs';
 export const maxDuration = 55; // Vercel Pro : 60s max, on laisse 5s de marge
@@ -125,19 +121,6 @@ Réponds avec rigueur et bienveillance.`;
   return systemPrompt;
 }
 
-function checkRequiresCloud(message: string, hasDocuments: boolean): boolean {
-  if (hasDocuments) return true;
-  if (message.length > 120) return true;
-  const complexKeywords = [
-    'dissert', 'dissertation', 'qcm', 'quiz', 'rattrapage', 'recommandation',
-    'strategique', 'simulation', 'analyse comparative', 'bulletin', 'corrige',
-    'copie', 'cree un cours', 'genere', 'prepare un cours', 'soft skills',
-    'tuteur', 'coaching', 'methode', 'stress', 'explication',
-    'recherche', 'compare', 'synthese', 'difference', 'evolution'
-  ];
-  const lowerMsg = message.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  return complexKeywords.some(k => lowerMsg.includes(k));
-}
 
 // ─── Collecte du contexte scolaire ────────────────────────────────────────────
 
@@ -315,22 +298,7 @@ ${classes.map(c => `  - ${c.name} (${c.level}) : ${c._count.enrollments} élève
 // ─── Route POST principale ────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
-  const useLocal = AI_PROVIDER === 'local';
-  const useOpenRouter = AI_PROVIDER === 'openrouter' || AI_PROVIDER === 'auto';
-
-  if (!useLocal && !useOpenRouter) {
-    return new Response(
-      JSON.stringify({ error: 'Aucun fournisseur IA configuré. Vérifiez AI_PROVIDER.' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } },
-    );
-  }
-
-  if (useOpenRouter && !HAS_OPENROUTER_KEY) {
-    return new Response(
-      JSON.stringify({ error: 'Clé OR_API_KEY manquante. L\'IA ne peut pas fonctionner.' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } },
-    );
-  }
+  // GLM est le seul provider — aucune vérification d'autres clés requise
 
   let body: { message?: string; schoolId?: string; userId?: string; context?: string; conversationId?: string };
   try {
@@ -419,68 +387,11 @@ export async function POST(request: NextRequest) {
   const conversationIdFinal = conversation.id;
   const encoder = new TextEncoder();
 
-  // ─── Routage local vs cloud ──────────────────────────────────────────────────
-  const hasDocuments = conversation.documents.length > 0;
-  const requiresCloud = checkRequiresCloud(message, hasDocuments);
-  let runCloud = useOpenRouter && (requiresCloud || !useLocal);
-
-  if (!runCloud && useLocal) {
-    try {
-      const localReply = await generateLocalResponse({
-        message,
-        schoolContext: fullContext,
-        userName,
-        userRole: role,
-        historyMessages,
-      });
-
-      const isFallback =
-        localReply.includes("Je n'ai pas bien compris") ||
-        localReply.includes('Pouvez-vous reformuler') ||
-        localReply.includes("Désolé, je n'ai pas saisi");
-
-      if (isFallback && useOpenRouter) {
-        runCloud = true;
-      } else {
-        // Détecter et sauvegarder les préférences
-        const prefRegex = /\[PREF:\s*([^=]+)\s*=\s*([^\]]+)\]/gi;
-        let match;
-        const newPrefs = { ...userPreferences };
-        let prefChanged = false;
-        while ((match = prefRegex.exec(localReply)) !== null) {
-          newPrefs[match[1].trim()] = match[2].trim();
-          prefChanged = true;
-        }
-        if (prefChanged) await saveUserPreferences(userId, newPrefs);
-
-        const cleanReply = localReply.replace(/\[PREF:\s*[^\]]+\]/gi, '').trim();
-        await db.aiMessage.create({ data: { conversationId: conversationIdFinal, role: 'assistant', content: cleanReply } });
-        await db.aiConversation.update({ where: { id: conversationIdFinal }, data: { updatedAt: new Date() } });
-
-        const stream = new ReadableStream({
-          start(controller) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ token: cleanReply, conversationId: conversationIdFinal })}\n\n`));
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, conversationId: conversationIdFinal })}\n\n`));
-            controller.close();
-          },
-        });
-        return new Response(stream, {
-          headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' },
-        });
-      }
-    } catch (err) {
-      console.error('[AI] Erreur provider local:', err);
-      if (!useOpenRouter) {
-        return new Response(JSON.stringify({ error: 'Erreur du moteur local.' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
-      }
-      runCloud = true;
-    }
-  }
-
-  // ─── Appel Cloud (OpenRouter avec fallback de modèles) ──────────────────────
+  // ─── Appel GLM (provider unique) ─────────────────────────────────────────────
   let aiResponse: Response;
+
   try {
-    aiResponse = await generateOpenRouterResponse({
+    aiResponse = await generateGLMResponse({
       message,
       schoolContext: fullContext,
       userName,
@@ -489,7 +400,7 @@ export async function POST(request: NextRequest) {
       systemPrompt,
     });
   } catch (err) {
-    console.error('[AI] Tous les modèles OpenRouter ont échoué:', err);
+    console.error('[AI] Échec de l\'appel GLM:', err);
     const errMsg = err instanceof Error ? err.message : 'Erreur inconnue';
     return new Response(
       JSON.stringify({ error: `L'IA est temporairement indisponible. Détails : ${errMsg}` }),
@@ -499,7 +410,7 @@ export async function POST(request: NextRequest) {
 
   if (!aiResponse.ok) {
     const errorText = await aiResponse.text().catch(() => '');
-    console.error('[AI] Réponse erreur OpenRouter:', aiResponse.status, errorText.slice(0, 300));
+    console.error('[AI] Réponse erreur GLM:', aiResponse.status, errorText.slice(0, 300));
     return new Response(
       JSON.stringify({ error: 'Le service IA est temporairement indisponible. Réessayez dans quelques instants.' }),
       { status: 503, headers: { 'Content-Type': 'application/json' } },

@@ -16,6 +16,8 @@ import {
   Save,
   Info,
   Loader2,
+  Upload,
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -24,6 +26,7 @@ interface ConfigData {
   name: string;
   email: string;
   currency: string;
+  logoUrl?: string;
   createdAt: string;
 }
 
@@ -39,6 +42,8 @@ export default function AdminConfig() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState('USD');
+  const [logoUrl, setLogoUrl] = useState('');
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (user?.schoolId) {
@@ -53,6 +58,7 @@ export default function AdminConfig() {
       if (data.config) {
         setConfig(data.config);
         setSelectedCurrency(data.config.currency || 'USD');
+        setLogoUrl(data.config.logoUrl || '');
       }
     } catch {
       toast.error('Erreur lors du chargement de la configuration');
@@ -70,17 +76,47 @@ export default function AdminConfig() {
         body: JSON.stringify({
           schoolId: user?.schoolId,
           currency: selectedCurrency,
+          logoUrl: logoUrl,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erreur');
       toast.success('Configuration mise à jour avec succès');
       setConfig(data.config);
+      setLogoUrl(data.config.logoUrl || '');
+      
+      // Update local store user object if needed to sync immediately
+      if (user && user.school) {
+        user.school.logoUrl = data.config.logoUrl || '';
+      }
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : 'Erreur lors de la mise à jour');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error('L\'image est trop grande (max 2MB)');
+        return;
+      }
+      setUploading(true);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoUrl(reader.result as string);
+        setUploading(false);
+        toast.success('Logo chargé en mémoire. Pensez à enregistrer vos modifications.');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoUrl('');
+    toast.success('Logo retiré. Pensez à enregistrer vos modifications.');
   };
 
   const currentCurrency = currencies.find((c) => c.value === selectedCurrency);
@@ -204,8 +240,8 @@ export default function AdminConfig() {
 
               <Button
                 onClick={handleSave}
-                disabled={saving || selectedCurrency === config?.currency}
-                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-blue-500/20"
+                disabled={saving || (selectedCurrency === config?.currency && logoUrl === (config?.logoUrl || ''))}
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-blue-500/20 animate-scale-in"
               >
                 {saving ? (
                   <>
@@ -215,10 +251,69 @@ export default function AdminConfig() {
                 ) : (
                   <>
                     <Save className="h-4 w-4 mr-2" />
-                    Enregistrer
+                    Enregistrer la configuration
                   </>
                 )}
               </Button>
+            </CardContent>
+          </Card>
+
+          {/* Logo Configuration */}
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Upload className="h-5 w-5 text-blue-600" />
+                Logo de l&apos;école
+              </CardTitle>
+              <CardDescription>
+                Ajoutez le logo de votre établissement pour l&apos;afficher sur toutes les cartes d&apos;identité
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-col items-center gap-4">
+                {logoUrl ? (
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-32 h-32 rounded-xl border border-border bg-white flex items-center justify-center p-2 shadow-sm overflow-hidden">
+                      <img src={logoUrl} alt="Logo de l'école" className="max-w-full max-h-full object-contain" />
+                    </div>
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      onClick={handleRemoveLogo}
+                      className="gap-1.5"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Retirer le logo
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-32 h-32 rounded-xl border-2 border-dashed border-muted-foreground/30 bg-muted/20 flex items-center justify-center">
+                      <School className="w-12 h-12 text-muted-foreground/40" />
+                    </div>
+                    <p className="text-xs text-muted-foreground text-center">Aucun logo configuré (affichage vide sur les cartes)</p>
+                  </div>
+                )}
+
+                <div className="w-full">
+                  <Label htmlFor="school-logo-upload" className="cursor-pointer">
+                    <div className="flex items-center justify-center gap-2 border-2 border-dashed rounded-lg p-3 hover:bg-muted/50 transition-colors">
+                      <Upload className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">
+                        {uploading ? 'Chargement...' : 'Sélectionner un logo (PNG, JPG - max 2MB)'}
+                      </span>
+                    </div>
+                  </Label>
+                  <input
+                    id="school-logo-upload"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleLogoUpload}
+                    disabled={uploading}
+                  />
+                </div>
+              </div>
             </CardContent>
           </Card>
         </>

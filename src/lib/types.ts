@@ -8,6 +8,7 @@ export interface SchoolInfo {
   name: string;
   email: string;
   currency: string;
+  logoUrl?: string;
   inviteCode?: string;
 }
 

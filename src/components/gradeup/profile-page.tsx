@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   User,
   Mail,
@@ -25,7 +26,9 @@ import {
   LogOut,
   MessageCircle,
   Camera,
+  IdCard,
 } from 'lucide-react';
+import IdCard3D from './IdCard3D';
 
 const roleLabels: Record<string, string> = {
   ADMIN: 'Administrateur',
@@ -53,6 +56,8 @@ export default function ProfilePage() {
   const [schoolName, setSchoolName] = useState(user?.school?.name || '');
   const [currency, setCurrency] = useState(user?.school?.currency || '');
   const [savingConfig, setSavingConfig] = useState(false);
+  const [fullUser, setFullUser] = useState<any>(null);
+  const [loadingCard, setLoadingCard] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -64,6 +69,26 @@ export default function ProfilePage() {
       }
     }
   }, [user]);
+
+  useEffect(() => {
+    if (user?.id && (user.role === 'STUDENT' || user.role === 'TEACHER')) {
+      const fetchFullUser = async () => {
+        try {
+          setLoadingCard(true);
+          const res = await fetch(`/api/users/${user.id}`);
+          const data = await res.json();
+          if (data.user) {
+            setFullUser(data.user);
+          }
+        } catch (err) {
+          console.error("Erreur de chargement de la carte d'identité:", err);
+        } finally {
+          setLoadingCard(false);
+        }
+      };
+      fetchFullUser();
+    }
+  }, [user?.id, user?.role]);
 
   if (!user) return null;
 
@@ -223,6 +248,46 @@ export default function ProfilePage() {
           </div>
         </div>
       </Card>
+
+      {/* Ma Carte d'Identité 3D (Élèves & Enseignants uniquement) */}
+      {(user.role === 'STUDENT' || user.role === 'TEACHER') && (
+        <Card className="transition-all duration-300 hover:shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <div className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/30">
+                <IdCard className="h-4 w-4 text-blue-600" />
+              </div>
+              Ma Carte d&apos;Identité Numérique
+            </CardTitle>
+            <CardDescription>
+              Visualisez, retournez en 3D ou téléchargez votre carte d&apos;identité officielle
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="py-6 flex justify-center items-center">
+            {loadingCard ? (
+              <div className="flex flex-col items-center gap-4 w-full max-w-[400px]">
+                <Skeleton className="h-[250px] w-full rounded-2xl" />
+                <Skeleton className="h-9 w-32 rounded-lg" />
+              </div>
+            ) : fullUser ? (
+              <IdCard3D 
+                user={{
+                  ...fullUser,
+                  className: fullUser.classEnrollments?.[0]?.class?.name || fullUser.className,
+                  courseName: fullUser.section, // use section as subject for teachers
+                }}
+                schoolName={fullUser.school?.name || 'Établissement GradeUp'}
+                schoolLogo={fullUser.school?.logoUrl}
+                role={user.role as 'STUDENT' | 'TEACHER'}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground italic text-center py-8">
+                Impossible de charger votre carte d&apos;identité. Veuillez contacter l&apos;administration.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* School Info (all roles can see) */}
       {user.school && (
