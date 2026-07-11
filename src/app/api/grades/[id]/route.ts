@@ -41,7 +41,7 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { score, maxScore, trimester, comment } = body;
+    const { score, maxScore, trimester, comment, modifiedBy, reason } = body;
 
     const existing = await db.grade.findUnique({ where: { id } });
     if (!existing) {
@@ -69,12 +69,27 @@ export async function PUT(
       },
     });
 
+    // Create audit history entry if score actually changed
+    if (score !== undefined && parseFloat(score) !== existing.score && modifiedBy) {
+      await db.gradeHistory.create({
+        data: {
+          gradeId: id,
+          schoolId: existing.schoolId,
+          oldScore: existing.score,
+          newScore: parseFloat(score),
+          modifiedBy,
+          reason: reason || '',
+        },
+      });
+    }
+
     return NextResponse.json({ grade });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
 
 export async function DELETE(
   request: NextRequest,

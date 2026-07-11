@@ -104,11 +104,18 @@ ${preferencesStr}
   }
 
   systemPrompt += `
-DIRECTIVES :
-1. Réponds toujours en français chaleureux, précis et adapté au rôle de l'interlocuteur.
+DIRECTIVES ABSOLUES :
+1. Réponds TOUJOURS en français correct, châtié et professionnel. Zéro faute d'orthographe, de grammaire ou de conjugaison.
 2. Si l'utilisateur exprime de nouvelles préférences (ex: "Appelle-moi Prof. Diop", "Tutoie-moi"), confirme poliment et ajoute en fin de réponse la balise : \`[PREF: clef=valeur]\`
 3. Utilise le contexte scolaire ci-dessous pour fournir des analyses précises. Si une information est manquante, dis-le sans inventer de données.
-4. Reste professionnel et proactif.
+4. Reste professionnel, proactif et bienveillant.
+5. FORMATAGE MATHÉMATIQUE : Pour toutes les formules et expressions mathématiques, utilise UNIQUEMENT des caractères Unicode et du texte courant. N'utilise JAMAIS de syntaxe LaTeX (\\frac, \\sqrt, $...$, etc.) ni de blocs de code. Exemples :
+   - Fraction : « a/b » ou « (numérateur)/(dénominateur) »
+   - Puissance : x² , x³ , xⁿ
+   - Racine : √x, ³√x
+   - Opérateurs : × , ÷ , ± , ≠ , ≤ , ≥ , ∑ , π , θ , ∞
+   - Équation : « 2x + 3 = 7 » (en texte simple)
+6. N'inclus jamais de blocs de code (\`\`\`) pour des explications non-techniques.
 
 TA MISSION POUR LE RÔLE ${userRole} :
 ${guidance}
@@ -241,22 +248,42 @@ ${difficultyRadar.join('\n') || 'Aucun élève en difficulté.'}`;
 
       let childrenContext = '';
       for (const child of children) {
-        const childClass = child.classEnrollments[0]?.class?.name || 'Non assignée';
+        const childClass = child.classEnrollments[0]?.class;
+        const className = childClass?.name || 'Non assignée';
+        const classFees = childClass?.fees || 0;
         const [childGrades, childAttendance, childPayments] = await Promise.all([
-          db.grade.findMany({ where: { studentId: child.id } }),
+          db.grade.findMany({ where: { studentId: child.id }, orderBy: { createdAt: 'desc' } }),
           db.attendance.findMany({ where: { studentId: child.id } }),
-          db.payment.findMany({ where: { studentId: child.id } }),
+          db.payment.findMany({ where: { studentId: child.id }, orderBy: { createdAt: 'desc' } }),
         ]);
-        const avg = childGrades.length > 0 ? (childGrades.reduce((s, g) => s + g.score, 0) / childGrades.length).toFixed(2) : 'N/A';
+        const avg = childGrades.length > 0
+          ? (childGrades.reduce((s, g) => s + (g.score / g.maxScore) * 20, 0) / childGrades.length).toFixed(2)
+          : 'N/A';
         const absences = childAttendance.filter(a => a.status === 'absent').length;
-        const pendingFees = childPayments.filter(p => p.status !== 'paid').reduce((s, p) => s + p.amount, 0);
-        childrenContext += `🧒 ${child.fullName} (${childClass}) — Moyenne: ${avg}/20 — Absences: ${absences} — Frais dus: ${pendingFees}\n`;
-        if (absences > 2) childrenContext += `  ⚠️ ALERTE : ${child.fullName} dépasse le seuil de 2 absences !\n`;
+        const unjustifiedAbsences = childAttendance.filter(a => a.status === 'absent' && (!a.reason || a.reason.length === 0)).length;
+        const paidAmount = childPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
+        const pendingAmount = childPayments.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0);
+        const overdueAmount = childPayments.filter(p => p.status === 'overdue').reduce((s, p) => s + p.amount, 0);
+        const balance = Math.max(0, classFees - paidAmount);
+
+        childrenContext += `🧒 ${child.fullName} (Classe : ${className})\n`;
+        childrenContext += `   Moyenne générale : ${avg}/20\n`;
+        childrenContext += `   Absences : ${absences} total (${unjustifiedAbsences} non justifiées)\n`;
+        childrenContext += `   Frais annuels : ${classFees} FCFA — Payé : ${paidAmount} FCFA — En attente : ${pendingAmount} FCFA — En retard : ${overdueAmount} FCFA — Solde dû : ${balance} FCFA\n`;
+        if (childPayments.length > 0) {
+          childrenContext += `   Derniers paiements :\n`;
+          childPayments.slice(0, 3).forEach(p => {
+            childrenContext += `     - ${p.amount} FCFA (${p.status}) — ${p.month || 'N/A'} — Mode : ${p.method}\n`;
+          });
+        }
+        if (unjustifiedAbsences > 2) childrenContext += `   ⚠️ ALERTE ASSIDUITÉ : ${child.fullName} a ${unjustifiedAbsences} absences non justifiées !\n`;
+        if (overdueAmount > 0) childrenContext += `   ⚠️ ALERTE PAIEMENT : ${overdueAmount} FCFA en retard de paiement !\n`;
+        childrenContext += '\n';
       }
 
-      return `Parent : ${userName}
-Suivi de la fratrie :
-${childrenContext || 'Aucun enfant lié pour le moment.'}`;
+      return `Parent : ${userName}\nSuivi de la fratrie :\n${childrenContext || 'Aucun enfant lié pour le moment.'}`;
+
+
 
     } else if (role === 'ADMIN') {
       const [studentCount, teacherCount, parentCount, classCount, courseCount, paymentStats, pendingPayments, overduePayments] = await Promise.all([

@@ -42,6 +42,9 @@ export default function TeacherGrades() {
   const [formMaxScore, setFormMaxScore] = useState('20');
   const [formTrimester, setFormTrimester] = useState('1');
   const [formComment, setFormComment] = useState('');
+  const [formReason, setFormReason] = useState('');
+  const [gradeHistoryList, setGradeHistoryList] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   const fetchCourses = useCallback(async () => {
     if (!user) return;
@@ -102,13 +105,27 @@ export default function TeacherGrades() {
   useEffect(() => {
     if (!filterCourseId || !user) {
       setGridStudents([]);
+      setGridScores({});
+      setGridComments({});
       return;
     }
+
+    // Immediately clear stale data to avoid showing previous class data
+    setGridStudents([]);
+    setGridScores({});
+    setGridComments({});
+
+    const controller = new AbortController();
+
     const loadGridStudents = async () => {
       try {
         const course = courses.find((c) => c.id === filterCourseId);
         if (!course) return;
-        const res = await fetch(`/api/users?schoolId=${user.schoolId}&role=STUDENT&classId=${course.classId}`);
+        const res = await fetch(
+          `/api/users?schoolId=${user.schoolId}&role=STUDENT&classId=${course.classId}`,
+          { signal: controller.signal }
+        );
+        if (!res.ok) return;
         const data = await res.json();
         const studentsList = Array.isArray(data.users) ? data.users : (Array.isArray(data) ? data : []);
         setGridStudents(studentsList);
@@ -117,16 +134,23 @@ export default function TeacherGrades() {
         const scores: Record<string, string> = {};
         const comments: Record<string, string> = {};
         studentsList.forEach((s: UserInfo) => {
-          const matching = grades.find((g) => g.studentId === s.id && g.courseId === filterCourseId && g.trimester === filterTrimester);
+          const matching = grades.find(
+            (g) => g.studentId === s.id && g.courseId === filterCourseId && g.trimester === filterTrimester
+          );
           scores[s.id] = matching ? String(matching.score) : '';
           comments[s.id] = matching ? matching.comment : '';
         });
         setGridScores(scores);
         setGridComments(comments);
-      } catch { /* silent */ }
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === 'AbortError') return; // requête annulée, pas d'erreur
+      }
     };
+
     loadGridStudents();
+    return () => controller.abort();
   }, [filterCourseId, filterTrimester, courses, grades, user]);
+
 
   const resetForm = () => {
     setFormCourseId('');
@@ -135,6 +159,8 @@ export default function TeacherGrades() {
     setFormMaxScore('20');
     setFormTrimester('1');
     setFormComment('');
+    setFormReason('');
+    setGradeHistoryList([]);
     setEditingGrade(null);
   };
 
@@ -143,7 +169,7 @@ export default function TeacherGrades() {
     setDialogOpen(true);
   };
 
-  const openEditDialog = (grade: GradeInfo) => {
+  const openEditDialog = async (grade: GradeInfo) => {
     setEditingGrade(grade);
     setFormCourseId(grade.courseId);
     setFormStudentId(grade.studentId);
@@ -151,6 +177,22 @@ export default function TeacherGrades() {
     setFormMaxScore(String(grade.maxScore));
     setFormTrimester(grade.trimester);
     setFormComment(grade.comment);
+    setFormReason('');
+    
+    // Fetch grade history
+    setLoadingHistory(true);
+    try {
+      const res = await fetch(`/api/grades/${grade.id}/history`);
+      if (res.ok) {
+        const hData = await res.json();
+        setGradeHistoryList(hData.history || []);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingHistory(false);
+    }
+
     const course = courses.find((c) => c.id === grade.courseId);
     if (course && user) {
       fetch(`/api/users?schoolId=${user.schoolId}&role=STUDENT&classId=${course.classId}`)
@@ -164,6 +206,11 @@ export default function TeacherGrades() {
   const handleSubmit = async () => {
     if (!user || !formCourseId || !formStudentId || !formScore || !formTrimester) {
       toast.error('Veuillez remplir tous les champs obligatoires');
+      return;
+    }
+
+    if (editingGrade && !formReason.trim()) {
+      toast.error('Veuillez renseigner un motif pour la modification de la note');
       return;
     }
 
@@ -185,6 +232,8 @@ export default function TeacherGrades() {
         maxScore,
         trimester: formTrimester,
         comment: formComment.trim(),
+        modifiedBy: user.id,
+        reason: formReason.trim(),
       };
 
       const url = editingGrade ? `/api/grades/${editingGrade.id}` : '/api/grades';
@@ -615,10 +664,47 @@ export default function TeacherGrades() {
                 <option value="3">Trimestre 3</option>
               </select>
             </div>
-            <div className="space-y-2">
+             <div className="space-y-2">
               <Label>Commentaire</Label>
-              <Textarea placeholder="Commentaire sur la performance..." value={formComment} onChange={(e) => setFormComment(e.target.value)} rows={3} className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" />
+              <Textarea placeholder="Commentaire sur la performance..." value={formComment} onChange={(e) => setFormComment(e.target.value)} rows={2} className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-xs" />
             </div>
+
+            {editingGrade && (
+              <div className="space-y-2 border-t pt-3">
+                <Label className="text-red-500">Motif de la modification *</Label>
+                <Textarea
+                  placeholder="Raison du changement de note (obligatoire)..."
+                  value={formReason}
+                  onChange={(e) => setFormReason(e.target.value)}
+                  rows={2}
+                  className="focus:ring-2 focus:ring-red-500/20 focus:border-red-500 border-red-200 transition-all text-xs"
+                />
+              </div>
+            )}
+
+            {editingGrade && gradeHistoryList.length > 0 && (
+              <div className="space-y-2 border-t pt-3">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wider">Historique des modifications</Label>
+                <div className="max-h-32 overflow-y-auto space-y-2 pr-1 text-xs">
+                  {gradeHistoryList.map((h: any) => (
+                    <div key={h.id} className="p-2 rounded bg-muted/50 border text-[11px] leading-relaxed">
+                      <div className="flex justify-between text-muted-foreground">
+                        <span>Par: {h.modifier?.fullName || 'Enseignant'} ({h.modifier?.role})</span>
+                        <span>{new Date(h.createdAt).toLocaleString('fr-FR')}</span>
+                      </div>
+                      <div className="mt-1">
+                        Valeur : <strong className="text-red-600">{h.oldScore}</strong> → <strong className="text-emerald-600">{h.newScore}</strong>
+                      </div>
+                      {h.reason && (
+                        <div className="mt-0.5 text-muted-foreground italic">
+                          Motif : "{h.reason}"
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter>

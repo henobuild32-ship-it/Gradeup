@@ -108,6 +108,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Vérifier le statut d'abonnement de l'école (sauf pour l'admin, qui doit pouvoir se connecter)
+    if (user.role !== 'ADMIN') {
+      const status = school.subscriptionStatus;
+      const expiry = school.subscriptionExpiry;
+      if (status === 'suspended') {
+        return NextResponse.json(
+          { error: 'L\'accès à cet établissement est actuellement suspendu. Contactez votre administrateur.' },
+          { status: 403 }
+        );
+      }
+      if (status === 'expired' || (expiry && new Date(expiry) < new Date())) {
+        return NextResponse.json(
+          { error: 'L\'abonnement de cet établissement a expiré. Contactez votre administrateur.' },
+          { status: 403 }
+        );
+      }
+    }
+
     return NextResponse.json({
       user: {
         id: user.id,
@@ -125,6 +143,8 @@ export async function POST(request: NextRequest) {
           email: school.email,
           currency: school.currency,
           inviteCode: school.inviteCode,
+          subscriptionStatus: school.subscriptionStatus,
+          subscriptionExpiry: school.subscriptionExpiry,
         },
         classEnrollments: user.classEnrollments.map((e) => ({
           id: e.id,

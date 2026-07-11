@@ -7,6 +7,7 @@ export async function GET(request: NextRequest) {
     const schoolId = searchParams.get('schoolId');
     const courseId = searchParams.get('courseId');
     const teacherId = searchParams.get('teacherId');
+    const classId = searchParams.get('classId');
 
     if (!schoolId) {
       return NextResponse.json({ error: 'schoolId is required' }, { status: 400 });
@@ -22,11 +23,20 @@ export async function GET(request: NextRequest) {
       where.teacherId = teacherId;
     }
 
+    // Filter by classId: find all courses in that class, then filter homework by those courses
+    if (classId) {
+      const classCoursesIds = await db.course.findMany({
+        where: { classId, schoolId },
+        select: { id: true },
+      });
+      where.courseId = { in: classCoursesIds.map((c) => c.id) };
+    }
+
     const homework = await db.homework.findMany({
       where,
       include: {
         course: {
-          select: { id: true, name: true },
+          select: { id: true, name: true, class: { select: { id: true, name: true } } },
         },
         teacher: {
           select: { id: true, fullName: true, role: true },
@@ -42,10 +52,11 @@ export async function GET(request: NextRequest) {
   }
 }
 
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { schoolId, courseId, teacherId, title, description, dueDate } = body;
+    const { schoolId, courseId, teacherId, title, description, dueDate, gradingType } = body;
 
     if (!schoolId || !courseId || !teacherId || !title) {
       return NextResponse.json(
@@ -62,6 +73,7 @@ export async function POST(request: NextRequest) {
         title,
         description: description || '',
         dueDate: dueDate || '',
+        gradingType: gradingType || 'manual',
       },
       include: {
         course: {
@@ -79,3 +91,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+

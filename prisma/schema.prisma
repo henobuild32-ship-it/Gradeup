@@ -9,74 +9,86 @@ datasource db {
 }
 
 model School {
-  id               String             @id @default(cuid())
-  name             String
-  email            String             @unique
-  password         String
-  inviteCode       String             @unique
-  currency         String             @default("USD")
-  logoUrl          String             @default("")
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  attendance       Attendance[]
-  courses          Course[]
-  courseWithPoints CourseWithPoints[]
-  detailedGrades   DetailedGrade[]
-  grades           Grade[]
-  homework         Homework[]
-  lessons          Lesson[]
-  messages         Message[]
-  notifications    Notification[]
-  payments         Payment[]
-  reportCards      ReportCard[]
-  classes          SchoolClass[]
-  users            User[]
-  videoConferences VideoConference[]
+  id                   String                 @id @default(cuid())
+  name                 String
+  email                String                 @unique
+  password             String
+  inviteCode           String                 @unique
+  currency             String                 @default("USD")
+  logoUrl              String                 @default("")
+  province             String                 @default("")
+  city                 String                 @default("")
+  commune              String                 @default("")
+  schoolCode           String                 @default("")
+  subscriptionStatus   String                 @default("active")
+  subscriptionExpiry   DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  attendance           Attendance[]
+  courses              Course[]
+  courseWithPoints     CourseWithPoints[]
+  deliberations        DeliberationDecision[]
+  detailedGrades       DetailedGrade[]
+  grades               Grade[]
+  gradeHistories       GradeHistory[]
+  homework             Homework[]
+  lessons              Lesson[]
+  messages             Message[]
+  notifications        Notification[]
+  payments             Payment[]
+  reportCards          ReportCard[]
+  classes              SchoolClass[]
+  schedules            CourseSchedule[]
+  users                User[]
+  videoConferences     VideoConference[]
 }
 
 model User {
-  id                String             @id @default(cuid())
-  schoolId          String
-  fullName          String
-  email             String             @default("")
-  password          String
-  role              String             @default("STUDENT")
-  photoUrl          String             @default("")
-  parentCode        String             @unique
-  active            Boolean            @default(true)
-  parentId          String?
-  phone             String             @default("")
-  parentPhone       String             @default("")
-  parentPhone2      String             @default("")
-  cardId            String?            @unique
-  postName          String             @default("")
-  gender            String             @default("M")
-  birthDate         String             @default("")
-  matricule         String             @default("")
-  academicYear      String             @default("2025-2026")
-  section           String             @default("")
-  aiPreferences     String             @default("{}")
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  conversations     AiConversation[]
-  attendanceStudent Attendance[]       @relation("AttendanceStudent")
-  attendanceTeacher Attendance[]       @relation("AttendanceTeacher")
-  courses           Course[]
-  detailedGrades    DetailedGrade[]
-  classEnrollments  EnrolledClass[]
-  gradesStudent     Grade[]            @relation("GradeStudent")
-  gradesTeacher     Grade[]            @relation("GradeTeacher")
-  homework          Homework[]
-  lessons           Lesson[]
-  receivedMessages  Message[]          @relation("ReceivedMessages")
-  sentMessages      Message[]          @relation("SentMessages")
-  notifications     Notification[]     @relation("UserNotifications")
-  payments          Payment[]
-  pushSubscriptions PushSubscription[]
-  reportCards       ReportCard[]
-  parent            User?              @relation("ParentChild", fields: [parentId], references: [id])
-  children          User[]             @relation("ParentChild")
-  school            School             @relation(fields: [schoolId], references: [id])
+  id                      String                 @id @default(cuid())
+  schoolId                String
+  fullName                String
+  email                   String                 @default("")
+  password                String
+  role                    String                 @default("STUDENT")
+  photoUrl                String                 @default("")
+  parentCode              String                 @unique
+  active                  Boolean                @default(true)
+  parentId                String?
+  phone                   String                 @default("")
+  parentPhone             String                 @default("")
+  parentPhone2            String                 @default("")
+  cardId                  String?                @unique
+  postName                String                 @default("")
+  gender                  String                 @default("M")
+  birthDate               String                 @default("")
+  matricule               String                 @default("")
+  academicYear            String                 @default("2025-2026")
+  section                 String                 @default("")
+  aiPreferences           String                 @default("{}")
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+  conversations           AiConversation[]
+  attendanceStudent       Attendance[]           @relation("AttendanceStudent")
+  attendanceTeacher       Attendance[]           @relation("AttendanceTeacher")
+  courses                 Course[]
+  deliberations           DeliberationDecision[] @relation("DeliberationStudent")
+  deliberationsValidated  DeliberationDecision[] @relation("DeliberationValidator")
+  detailedGrades          DetailedGrade[]
+  classEnrollments        EnrolledClass[]
+  gradesStudent           Grade[]                @relation("GradeStudent")
+  gradesTeacher           Grade[]                @relation("GradeTeacher")
+  gradeHistoriesModified  GradeHistory[]         @relation("GradeHistoryModifier")
+  homework                Homework[]
+  lessons                 Lesson[]
+  receivedMessages        Message[]              @relation("ReceivedMessages")
+  sentMessages            Message[]              @relation("SentMessages")
+  notifications           Notification[]         @relation("UserNotifications")
+  payments                Payment[]
+  pushSubscriptions       PushSubscription[]
+  reportCards             ReportCard[]
+  parent                  User?                  @relation("ParentChild", fields: [parentId], references: [id])
+  children                User[]                 @relation("ParentChild")
+  school                  School                 @relation(fields: [schoolId], references: [id])
 
   @@unique([schoolId, fullName, role])
 }
@@ -108,20 +120,23 @@ model EnrolledClass {
 }
 
 model Course {
-  id          String      @id @default(cuid())
+  id          String           @id @default(cuid())
   schoolId    String
   classId     String
   teacherId   String
   name        String
-  description String      @default("")
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  class       SchoolClass @relation(fields: [classId], references: [id])
-  school      School      @relation(fields: [schoolId], references: [id])
-  teacher     User        @relation(fields: [teacherId], references: [id])
+  maxScore    Float            @default(20)
+  coefficient Int              @default(1)
+  description String           @default("")
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  class       SchoolClass      @relation(fields: [classId], references: [id])
+  school      School           @relation(fields: [schoolId], references: [id])
+  teacher     User             @relation(fields: [teacherId], references: [id])
   grades      Grade[]
   homework    Homework[]
   lessons     Lesson[]
+  schedules   CourseSchedule[]
 }
 
 model Lesson {
@@ -140,21 +155,22 @@ model Lesson {
 }
 
 model Grade {
-  id        String   @id @default(cuid())
+  id        String         @id @default(cuid())
   schoolId  String
   courseId  String
   studentId String
   teacherId String
   score     Float
-  maxScore  Float    @default(20)
-  trimester String   @default("1")
-  comment   String   @default("")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  course    Course   @relation(fields: [courseId], references: [id])
-  school    School   @relation(fields: [schoolId], references: [id])
-  student   User     @relation("GradeStudent", fields: [studentId], references: [id])
-  teacher   User     @relation("GradeTeacher", fields: [teacherId], references: [id])
+  maxScore  Float          @default(20)
+  trimester String         @default("1")
+  comment   String         @default("")
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  course    Course         @relation(fields: [courseId], references: [id])
+  school    School         @relation(fields: [schoolId], references: [id])
+  student   User           @relation("GradeStudent", fields: [studentId], references: [id])
+  teacher   User           @relation("GradeTeacher", fields: [teacherId], references: [id])
+  history   GradeHistory[]
 }
 
 model Homework {
@@ -165,6 +181,7 @@ model Homework {
   title       String
   description String   @default("")
   dueDate     String   @default("")
+  gradingType String   @default("manual") // "manual" | "automatic"
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   course      Course   @relation(fields: [courseId], references: [id])
@@ -333,6 +350,64 @@ model ReportCounter {
   maxLimit     Int      @default(1000000)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+model CourseSchedule {
+  id        String   @id @default(cuid())
+  courseId  String
+  schoolId  String
+  dayOfWeek Int      // 1=Lundi, 2=Mardi, 3=Mercredi, 4=Jeudi, 5=Vendredi, 6=Samedi
+  startTime String   // ex: "08:30"
+  endTime   String   // ex: "10:00"
+  room      String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  school    School   @relation(fields: [schoolId], references: [id])
+}
+
+model GradeHistory {
+  id         String   @id @default(cuid())
+  gradeId    String
+  schoolId   String
+  oldScore   Float
+  newScore   Float
+  modifiedBy String
+  reason     String   @default("")
+  createdAt  DateTime @default(now())
+  grade      Grade    @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  school     School   @relation(fields: [schoolId], references: [id])
+  modifier   User     @relation("GradeHistoryModifier", fields: [modifiedBy], references: [id])
+}
+
+model DeliberationDecision {
+  id           String   @id @default(cuid())
+  schoolId     String
+  studentId    String
+  classId      String
+  academicYear String
+  decision     String   // "passage" | "redoublement" | "en_deliberation" | "admis_apres_deliberation" | "non_admis"
+  validatedBy  String
+  comment      String   @default("")
+  decidedAt    DateTime @default(now())
+  student      User     @relation("DeliberationStudent", fields: [studentId], references: [id])
+  school       School   @relation(fields: [schoolId], references: [id])
+  validator    User     @relation("DeliberationValidator", fields: [validatedBy], references: [id])
+}
+
+model EPSTCurriculum {
+  id          String   @id @default(cuid())
+  section     String   // ex: "Scientifique", "Littéraire", "Commerciale"
+  option      String   @default("") // ex: "Chimie-Bio", "Langue des affaires"
+  level       String   // ex: "5ème", "6ème", "7ème"
+  courseName  String
+  maxScore    Float    @default(20)
+  coefficient Int      @default(1)
+  isOfficial  Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([section, option, level, courseName])
 }
 
 model CourseWithPoints {

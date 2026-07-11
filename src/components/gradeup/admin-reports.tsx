@@ -546,10 +546,15 @@ export default function AdminReports() {
 
   useEffect(() => {
     if (selectedClass) {
+      // Immediately clear stale data to avoid showing previous class data
+      setStudents([]);
+      setCourses([]);
+      setSelectedStudent('');
       fetchStudents();
       fetchCourses();
     }
   }, [selectedClass, fetchStudents, fetchCourses]);
+
 
   // ==========================================
   // DB COURSE ACTIONS (PRESERVED)
@@ -642,6 +647,31 @@ export default function AdminReports() {
         const schoolRes = await fetch(`/api/schools/${user?.schoolId}`);
         const schoolData = schoolRes.ok ? await schoolRes.json() : null;
 
+        // Fetch student's grades from DB
+        let studentGrades: any[] = [];
+        try {
+          const gradesRes = await fetch(`/api/grades?schoolId=${user?.schoolId}&studentId=${selectedStudent}`);
+          if (gradesRes.ok) {
+            const gd = await gradesRes.json();
+            studentGrades = Array.isArray(gd) ? gd : (Array.isArray(gd.grades) ? gd.grades : []);
+          }
+        } catch (e) {
+          console.error("Failed to fetch student grades", e);
+        }
+
+        // Fetch EPST curriculum rules for student's section and class level
+        let epstRules: any[] = [];
+        try {
+          const section = student?.section || "Scientifique";
+          const levelName = classInfo?.name || "6ème";
+          const epstRes = await fetch(`/api/epst/curriculum?section=${section}&level=${levelName}`);
+          if (epstRes.ok) {
+            epstRules = await epstRes.json();
+          }
+        } catch (e) {
+          console.error("Failed to fetch EPST curriculum rules", e);
+        }
+
         // Set student metadata
         setBulletinMetadata((prev) => ({
           ...prev,
@@ -655,30 +685,46 @@ export default function AdminReports() {
           studentBirthDate: student?.birthDate || '',
           studentClass: classInfo?.name || '',
           permanentNumber: student?.cardId || student?.matricule || '8362683380029',
-          academicYear: '2024 - 2025',
+          academicYear: student?.academicYear || '2025-2026',
           trimesterText: selectedTrimester === '1' ? '1er TRIMESTRE' : selectedTrimester === '2' ? '2e TRIMESTRE' : '3e TRIMESTRE',
         }));
 
         // Convert DB courses to bulletin courses
         if (courses.length > 0) {
-          const mappedCourses: InteractiveCourseRow[] = courses.map((c, index) => ({
-            id: c.id,
-            name: c.name,
-            maxTJ1: Math.round(c.maxScore * 0.5),
-            maxTJ2: Math.round(c.maxScore * 0.5),
-            maxExam1: c.maxScore,
-            maxTJ3: Math.round(c.maxScore * 0.5),
-            maxTJ4: Math.round(c.maxScore * 0.5),
-            maxExam2: c.maxScore,
-            tj1: '',
-            tj2: '',
-            exam1: '',
-            tj3: '',
-            tj4: '',
-            exam2: '',
-            repechagePercent: '',
-            repechageSign: '',
-          }));
+          const mappedCourses: InteractiveCourseRow[] = courses.map((c, index) => {
+            // Check if there is an EPST curriculum match
+            const epstMatch = epstRules.find(
+              (item: any) => item.courseName.toLowerCase() === c.name.toLowerCase()
+            );
+
+            // Use EPST maxScore if found, otherwise course.maxScore, otherwise fallback to 20
+            const finalMaxScore = epstMatch ? epstMatch.maxScore : (c.maxScore || 20);
+
+            // Find matching grades for this course
+            const courseGrades = studentGrades.filter((g: any) => g.courseId === c.id);
+            const t1Grade = courseGrades.find((g: any) => g.trimester === '1');
+            const t2Grade = courseGrades.find((g: any) => g.trimester === '2');
+            const t3Grade = courseGrades.find((g: any) => g.trimester === '3');
+
+            return {
+              id: c.id,
+              name: c.name,
+              maxTJ1: Math.round(finalMaxScore * 0.25), // TJ is usually 25% of exam / max score in DRC
+              maxTJ2: Math.round(finalMaxScore * 0.25),
+              maxExam1: finalMaxScore,
+              maxTJ3: Math.round(finalMaxScore * 0.25),
+              maxTJ4: Math.round(finalMaxScore * 0.25),
+              maxExam2: finalMaxScore,
+              tj1: t1Grade ? String(t1Grade.score) : '',
+              tj2: '',
+              exam1: t2Grade ? String(t2Grade.score) : '',
+              tj3: t3Grade ? String(t3Grade.score) : '',
+              tj4: '',
+              exam2: '',
+              repechagePercent: '',
+              repechageSign: '',
+            };
+          });
           setBulletinCourses(mappedCourses);
         } else {
           // Fallback if class has no courses

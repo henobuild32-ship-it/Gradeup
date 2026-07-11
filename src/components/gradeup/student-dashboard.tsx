@@ -39,6 +39,8 @@ export default function StudentDashboard() {
   const [payments, setPayments] = useState<PaymentInfo[]>([]);
   const [lessons, setLessons] = useState<LessonInfo[]>([]);
   const [notifications, setNotifications] = useState<NotificationInfo[]>([]);
+  const [schedules, setSchedules] = useState<any[]>([]);
+  const [homework, setHomework] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [parentCode, setParentCode] = useState(user?.parentCode || '');
   const [generatingCode, setGeneratingCode] = useState(false);
@@ -72,6 +74,27 @@ export default function StudentDashboard() {
         setAttendance(Array.isArray(attendanceRes) ? attendanceRes : []);
         setPayments(Array.isArray(paymentsRes) ? paymentsRes : []);
         setNotifications(Array.isArray(notifsRes) ? notifsRes : (Array.isArray(notifsRes?.notifications) ? notifsRes.notifications : []));
+
+        // Fetch schedules for today
+        const todayJs = new Date().getDay(); // 0=Sunday
+        // Convert JS day (0=Sun) to school day (1=Mon ... 6=Sat)
+        const dayOfWeek = todayJs === 0 ? 0 : todayJs;
+        if (classId && dayOfWeek > 0) {
+          try {
+            const schedRes = await fetch(`/api/schedules?schoolId=${user.schoolId}&classId=${classId}&dayOfWeek=${dayOfWeek}`);
+            const schedData = await schedRes.json();
+            setSchedules(Array.isArray(schedData) ? schedData : []);
+          } catch { setSchedules([]); }
+        }
+
+        // Fetch homework by classId
+        if (classId) {
+          try {
+            const hwRes = await fetch(`/api/homework?schoolId=${user.schoolId}&classId=${classId}`);
+            const hwData = await hwRes.json();
+            setHomework(Array.isArray(hwData?.homework) ? hwData.homework : []);
+          } catch { setHomework([]); }
+        }
       } catch (err) {
         console.error('Erreur chargement dashboard:', err);
       } finally {
@@ -352,31 +375,50 @@ export default function StudentDashboard() {
               <span className="text-xs font-semibold text-muted-foreground truncate">Devoirs</span>
               <FileText className="h-4 w-4 text-purple-500 shrink-0" />
             </div>
-            <p className="text-2xl font-bold text-purple-600 mt-1">2 à faire</p>
-            <p className="text-[10px] text-muted-foreground truncate mt-1">cette semaine</p>
+            <p className="text-2xl font-bold text-purple-600 mt-1">
+              {homework.length > 0 ? `${homework.length} devoir${homework.length > 1 ? 's' : ''}` : 'Aucun devoir'}
+            </p>
+            <p className="text-[10px] text-muted-foreground truncate mt-1">
+              {homework.length > 0 ? 'à compléter' : 'cette semaine'}
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Prochain Cours & Programme du jour */}
+      {/* Programme du jour — dynamique */}
       <Card className="relative overflow-hidden transition-all duration-300 hover:shadow-lg">
         <CardContent className="p-5">
-          <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">📚 Prochain cours</h3>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-muted/40 p-4 rounded-xl">
-            <div>
-              <p className="font-bold text-base text-foreground">Mathématiques</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Aujourd'hui · 10:30 (Salle B)</p>
+          <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">📚 Programme du jour</h3>
+          {schedules.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-6 gap-2 bg-muted/30 rounded-xl">
+              <Clock className="h-8 w-8 text-muted-foreground/40" />
+              <p className="text-sm text-muted-foreground">Aucun cours prévu aujourd'hui.</p>
             </div>
-            <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">En cours de préparation</Badge>
-          </div>
-          <div className="mt-4 pt-3 border-t">
-            <h4 className="text-xs font-semibold text-muted-foreground mb-2">➤ Programme du jour</h4>
-            <ul className="text-xs space-y-1.5 text-muted-foreground">
-              <li className="flex items-center gap-2">🟢 08:30 - Physique-Chimie (Énergie mécanique)</li>
-              <li className="flex items-center gap-2">🔵 10:30 - Mathématiques (Algèbre linéaire)</li>
-              <li className="flex items-center gap-2">🟡 14:00 - Histoire-Géographie (Géopolitique)</li>
+          ) : (
+            <ul className="space-y-2">
+              {schedules.map((sched: any, idx: number) => {
+                const colorScheme = subjectColors[idx % subjectColors.length];
+                return (
+                  <li
+                    key={sched.id}
+                    className={`flex items-center gap-3 p-3 rounded-xl border-l-4 ${colorScheme.border} bg-accent/20`}
+                  >
+                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${colorScheme.bg} ${colorScheme.text}`}>
+                      <Clock className="h-4 w-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate">{sched.course?.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {sched.startTime} – {sched.endTime}
+                        {sched.room ? ` · Salle ${sched.room}` : ''}
+                        {sched.course?.teacher ? ` · ${sched.course.teacher.fullName}` : ''}
+                      </p>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
-          </div>
+          )}
         </CardContent>
       </Card>
 

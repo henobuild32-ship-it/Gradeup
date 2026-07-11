@@ -18,7 +18,13 @@ import {
   Loader2,
   Upload,
   Trash2,
+  ShieldAlert,
+  CheckCircle2,
+  XCircle,
+  Clock,
 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 
 interface ConfigData {
@@ -28,6 +34,8 @@ interface ConfigData {
   currency: string;
   logoUrl?: string;
   createdAt: string;
+  subscriptionStatus?: string;
+  subscriptionExpiry?: string | null;
 }
 
 const currencies = [
@@ -44,6 +52,9 @@ export default function AdminConfig() {
   const [selectedCurrency, setSelectedCurrency] = useState('USD');
   const [logoUrl, setLogoUrl] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState('active');
+  const [subscriptionExpiry, setSubscriptionExpiry] = useState('');
+  const [savingSubscription, setSavingSubscription] = useState(false);
 
   useEffect(() => {
     if (user?.schoolId) {
@@ -59,11 +70,41 @@ export default function AdminConfig() {
         setConfig(data.config);
         setSelectedCurrency(data.config.currency || 'USD');
         setLogoUrl(data.config.logoUrl || '');
+        setSubscriptionStatus(data.config.subscriptionStatus || 'active');
+        setSubscriptionExpiry(
+          data.config.subscriptionExpiry
+            ? new Date(data.config.subscriptionExpiry).toISOString().split('T')[0]
+            : ''
+        );
       }
     } catch {
       toast.error('Erreur lors du chargement de la configuration');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveSubscription = async () => {
+    if (!config?.id) return;
+    setSavingSubscription(true);
+    try {
+      const body: Record<string, unknown> = { subscriptionStatus };
+      if (subscriptionExpiry) body.subscriptionExpiry = new Date(subscriptionExpiry).toISOString();
+      else body.subscriptionExpiry = null;
+
+      const res = await fetch(`/api/schools/${config.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erreur');
+      toast.success('Statut d\'abonnement mis à jour');
+      setConfig((prev) => prev ? { ...prev, subscriptionStatus, subscriptionExpiry: subscriptionExpiry || null } : prev);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Erreur lors de la mise à jour');
+    } finally {
+      setSavingSubscription(false);
     }
   };
 
@@ -314,6 +355,87 @@ export default function AdminConfig() {
                   />
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Subscription Management */}
+          <Card className="shadow-sm border-amber-200">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <ShieldAlert className="h-5 w-5 text-amber-500" />
+                Abonnement et accès
+              </CardTitle>
+              <CardDescription>
+                Gérez le statut d&apos;abonnement de l&apos;établissement
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Status badges */}
+              <div className="flex flex-wrap gap-2">
+                {(['active', 'suspended', 'expired'] as const).map((s) => {
+                  const isSelected = subscriptionStatus === s;
+                  const labels: Record<string, string> = {
+                    active: 'Actif',
+                    suspended: 'Suspendu',
+                    expired: 'Expiré',
+                  };
+                  const icons: Record<string, React.ReactNode> = {
+                    active: <CheckCircle2 className="h-3.5 w-3.5" />,
+                    suspended: <XCircle className="h-3.5 w-3.5" />,
+                    expired: <Clock className="h-3.5 w-3.5" />,
+                  };
+                  const colors: Record<string, string> = {
+                    active: isSelected ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100',
+                    suspended: isSelected ? 'bg-red-600 text-white border-red-600' : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100',
+                    expired: isSelected ? 'bg-amber-500 text-white border-amber-500' : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100',
+                  };
+                  return (
+                    <button
+                      key={s}
+                      onClick={() => setSubscriptionStatus(s)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-all cursor-pointer ${colors[s]}`}
+                    >
+                      {icons[s]}{labels[s]}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Expiry date */}
+              <div className="space-y-2">
+                <Label htmlFor="subscription-expiry">Date d&apos;expiration (optionnel)</Label>
+                <Input
+                  id="subscription-expiry"
+                  type="date"
+                  value={subscriptionExpiry}
+                  onChange={(e) => setSubscriptionExpiry(e.target.value)}
+                  className="focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Laissez vide pour un abonnement sans limite de durée.
+                </p>
+              </div>
+
+              {subscriptionStatus === 'suspended' && (
+                <div className="flex items-start gap-2 p-3.5 rounded-lg bg-red-50 border border-red-200">
+                  <XCircle className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
+                  <p className="text-sm text-red-700">
+                    <strong>Attention :</strong> suspendre un établissement empêche tous ses utilisateurs de se connecter.
+                  </p>
+                </div>
+              )}
+
+              <Button
+                onClick={handleSaveSubscription}
+                disabled={savingSubscription}
+                className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 hover:scale-[1.02] active:scale-[0.98] transition-all text-white shadow-md shadow-amber-500/20"
+              >
+                {savingSubscription ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Enregistrement...</>
+                ) : (
+                  <><Save className="h-4 w-4 mr-2" />Enregistrer le statut</>  
+                )}
+              </Button>
             </CardContent>
           </Card>
         </>

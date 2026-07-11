@@ -38,33 +38,30 @@ export async function GET(request: NextRequest) {
         include: {
           user: {
             include: {
-              gradesStudent: {
-                include: { course: { select: { name: true } } },
-              },
               attendanceStudent: true,
             },
           },
         },
       });
 
-      const allDetailedGrades = await db.detailedGrade.findMany({
+      const allGrades = await db.grade.findMany({
         where: {
           studentId: { in: enrolledStudents.map((e) => e.userId) },
           schoolId,
         },
-        include: { course: { select: { name: true, maxScore: true } } },
+        include: { course: { select: { name: true } } },
       });
 
       const students = enrolledStudents.map((enrolled) => {
         const student = enrolled.user;
-        const grades = allDetailedGrades.filter((g) => g.studentId === student.id);
+        const grades = allGrades.filter((g) => g.studentId === student.id);
         const subjectAverages = new Map<string, { total: number; count: number; maxScore: number }>();
         grades.forEach((g) => {
           const name = g.course.name;
-          const existing = subjectAverages.get(name) || { total: 0, count: 0, maxScore: g.course.maxScore };
-          existing.total += g.total;
+          const existing = subjectAverages.get(name) || { total: 0, count: 0, maxScore: g.maxScore };
+          existing.total += g.score;
           existing.count += 1;
-          if (g.course.maxScore > existing.maxScore) existing.maxScore = g.course.maxScore;
+          if (g.maxScore > existing.maxScore) existing.maxScore = g.maxScore;
           subjectAverages.set(name, existing);
         });
 
@@ -78,7 +75,7 @@ export async function GET(request: NextRequest) {
           subjectResults.push({ name, average: avg, maxScore: val.maxScore });
         });
 
-        const overallAverage = totalMax > 0 ? (totalScore / subjectResults.length) * 20 : 0;
+        const overallAverage = totalMax > 0 ? (totalScore / totalMax) * 20 : 0;
 
         const absences = student.attendanceStudent.filter((a) => a.status === 'absent');
         const justifiedAbsences = absences.filter((a) => a.reason && a.reason.length > 0);
@@ -90,8 +87,9 @@ export async function GET(request: NextRequest) {
         } else if (overallAverage < 9) {
           autoDecision = 'redoublement';
         } else {
-          autoDecision = 'deliberation';
+          autoDecision = 'en_deliberation';
         }
+
 
         return {
           studentId: student.id,
@@ -121,7 +119,7 @@ export async function GET(request: NextRequest) {
         });
         const studentIds = enrollments.map((e) => e.user.id);
 
-        const allGrades = await db.detailedGrade.findMany({
+        const allGrades = await db.grade.findMany({
           where: { schoolId, studentId: { in: studentIds } },
         });
 
@@ -136,8 +134,9 @@ export async function GET(request: NextRequest) {
             enAttente++;
             return;
           }
-          const avg = sg.reduce((s, g) => s + g.total, 0) / sg.length;
-          const avg20 = (avg / 20) * 20;
+          const sumScore = sg.reduce((s, g) => s + g.score, 0);
+          const sumMax = sg.reduce((s, g) => s + g.maxScore, 0);
+          const avg20 = sumMax > 0 ? (sumScore / sumMax) * 20 : 0;
           if (avg20 >= 10) passages++;
           else if (avg20 < 9) redoublements++;
           else enAttente++;
@@ -193,7 +192,25 @@ export async function POST(request: NextRequest) {
       }
 
       for (const decision of decisions) {
-        if (decision.status === 'passage') {
+        const studentId = decision.studentId;
+        const status = decision.status; // 'passage' | 'redoublement' | 'en_deliberation' | 'admis_apres_deliberation' | 'non_admis'
+        const comment = decision.comment || '';
+
+        // 1. Log deliberation decision in the database
+        await db.deliberationDecision.create({
+          data: {
+            schoolId,
+            studentId,
+            classId,
+            academicYear: currentClass.createdAt.getFullYear().toString() + " - " + newAcademicYear,
+            decision: status,
+            validatedBy: adminId,
+            comment,
+          }
+        });
+
+        // 2. Perform enrollment updates based on status
+        if (status === 'passage' || status === 'admis_apres_deliberation') {
           const nextLevel = getNextLevel(currentClass.level, currentClass.name);
           if (nextLevel) {
             let nextClass = await db.schoolClass.findFirst({
@@ -204,24 +221,82 @@ export async function POST(request: NextRequest) {
                 data: { schoolId, name: nextLevel.name, level: nextLevel.level, fees: currentClass.fees },
               });
             }
+
+            // Remove enrollment in the old class
+            await db.enrolledClass.deleteMany({
+              where: { userId: studentId, classId }
+            });
+
+            // Create enrollment in the new class
             const existingEnroll = await db.enrolledClass.findUnique({
-              where: { userId_classId: { userId: decision.studentId, classId: nextClass.id } },
+              where: { userId_classId: { userId: studentId, classId: nextClass.id } },
             });
             if (!existingEnroll) {
               await db.enrolledClass.create({
-                data: { userId: decision.studentId, classId: nextClass.id },
+                data: { userId: studentId, classId: nextClass.id },
               });
             }
-          }
-        } else if (decision.status === 'redoublement') {
-          const existingEnroll = await db.enrolledClass.findUnique({
-            where: { userId_classId: { userId: decision.studentId, classId } },
-          });
-          if (!existingEnroll) {
-            await db.enrolledClass.create({
-              data: { userId: decision.studentId, classId },
+
+            // Update academic year and section on student profile
+            await db.user.update({
+              where: { id: studentId },
+              data: { academicYear: newAcademicYear }
             });
           }
+        } else if (status === 'redoublement' || status === 'non_admis') {
+          // Keep enrollment in the current class but update the student's academic year
+          await db.user.update({
+            where: { id: studentId },
+            data: { academicYear: newAcademicYear }
+          });
+        } else if (status === 'en_deliberation') {
+          // Keep student in deliberation (provisional status), no class change yet
+          await db.user.update({
+            where: { id: studentId },
+            data: { academicYear: newAcademicYear }
+          });
+        }
+
+        // 3. Send notifications to student & parents
+        const labelMap: Record<string, string> = {
+          passage: 'Admis(e) en classe supérieure',
+          admis_apres_deliberation: 'Admis(e) après délibération',
+          redoublement: 'Non admis(e) - redoublement',
+          non_admis: 'Non admis(e)',
+          en_deliberation: 'En délibération (décision provisoire)'
+        };
+        const statusLabel = labelMap[status] || status;
+
+        await db.notification.create({
+          data: {
+            schoolId,
+            userId: studentId,
+            senderId: adminId,
+            title: 'Résultat de fin d\'année',
+            message: `Votre décision de fin d'année pour l'année scolaire suivante (${newAcademicYear}) est : ${statusLabel}. ${comment ? `Note : ${comment}` : ''}`,
+            type: 'academic',
+            priority: 'HIGH'
+          }
+        });
+
+        // Find child's parent if exists
+        const childUser = await db.user.findUnique({
+          where: { id: studentId },
+          select: { parentId: true, fullName: true }
+        });
+
+        if (childUser?.parentId) {
+          await db.notification.create({
+            data: {
+              schoolId,
+              userId: childUser.parentId,
+              senderId: adminId,
+              title: `Résultat de fin d'année : ${childUser.fullName}`,
+              message: `La décision de fin d'année pour votre enfant ${childUser.fullName} est : ${statusLabel}. ${comment ? `Note : ${comment}` : ''}`,
+              type: 'academic',
+              priority: 'HIGH'
+            }
+          });
         }
       }
 

@@ -123,7 +123,13 @@ export default function StudentLessons() {
                         </div>
                         {lesson.fileUrl && (
                           <div className="mt-3">
-                            <a href={lesson.fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 hover:underline">
+                            <a
+                              href={lesson.fileUrl}
+                              download={lesson.fileName || true}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                            >
                               <Download className="h-4 w-4" />{lesson.fileName || 'Télécharger le fichier'}
                             </a>
                           </div>

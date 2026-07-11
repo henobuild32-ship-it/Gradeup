@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppStore } from '@/lib/store';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { BookOpen, Users, FileText, Plus, GraduationCap, Clock, Lightbulb } from 'lucide-react';
+import { BookOpen, Users, FileText, Plus, GraduationCap, Clock, Lightbulb, RefreshCw } from 'lucide-react';
 import type { CourseInfo, LessonInfo, UserInfo } from '@/lib/types';
 
 export default function TeacherDashboard() {
@@ -15,16 +15,14 @@ export default function TeacherDashboard() {
   const [courses, setCourses] = useState<CourseInfo[]>([]);
   const [lessons, setLessons] = useState<LessonInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [totalStudents, setTotalStudents] = useState(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
+  const fetchData = useCallback(async (isManual = false) => {
     if (!user) return;
-    fetchData();
-  }, [user]);
-
-  const fetchData = async () => {
-    if (!user) return;
-    setLoading(true);
+    if (isManual) setRefreshing(true);
+    else setLoading(true);
     try {
       const [coursesRes, lessonsRes] = await Promise.all([
         fetch(`/api/courses?schoolId=${user.schoolId}&teacherId=${user.id}`),
@@ -42,15 +40,26 @@ export default function TeacherDashboard() {
       for (const classId of classIds) {
         const studentsRes = await fetch(`/api/users?schoolId=${user.schoolId}&role=STUDENT&classId=${classId}`);
         const studentsData = await studentsRes.json();
-        total += (Array.isArray(studentsData) ? studentsData : []).length;
+        total += (Array.isArray(studentsData) ? studentsData : [studentsData].filter(Boolean)).length;
       }
       setTotalStudents(total);
     } catch {
       // Silently handle
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    fetchData();
+    // Actualisation automatique toutes les 60 secondes
+    intervalRef.current = setInterval(() => fetchData(), 60_000);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [user, fetchData]);
 
   const today = new Date().toISOString().split('T')[0];
   const todayLessons = Array.isArray(lessons) ? lessons.filter((l) => l.createdAt?.startsWith(today)) : [];
@@ -80,6 +89,13 @@ export default function TeacherDashboard() {
             <h1 className="text-2xl lg:text-3xl font-bold">
               Bonjour, {user.fullName} 👋
             </h1>
+            <button
+              onClick={() => fetchData(true)}
+              title="Actualiser"
+              className="ml-auto p-2 rounded-full bg-white/15 hover:bg-white/25 transition-colors"
+            >
+              <RefreshCw className={`h-4 w-4 text-white ${refreshing ? 'animate-spin' : ''}`} />
+            </button>
           </div>
           <p className="text-blue-100 text-sm lg:text-base max-w-xl">
             Bienvenue sur votre tableau de bord — {todayStr}

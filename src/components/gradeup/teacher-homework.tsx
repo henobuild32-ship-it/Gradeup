@@ -28,6 +28,7 @@ export default function TeacherHomework() {
   const [formTitle, setFormTitle] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formDueDate, setFormDueDate] = useState('');
+  const [formGradingType, setFormGradingType] = useState('manual');
 
   useEffect(() => {
     if (!user) return;
@@ -68,16 +69,18 @@ export default function TeacherHomework() {
     setFormTitle('');
     setFormDescription('');
     setFormDueDate('');
+    setFormGradingType('manual');
     setEditingHomework(null);
   };
 
   const openCreateDialog = () => { resetForm(); setDialogOpen(true); };
-  const openEditDialog = (hw: HomeworkInfo) => {
+  const openEditDialog = (hw: any) => {
     setEditingHomework(hw);
     setFormCourseId(hw.courseId);
     setFormTitle(hw.title);
     setFormDescription(hw.description);
     setFormDueDate(hw.dueDate.split('T')[0]);
+    setFormGradingType(hw.gradingType || 'manual');
     setDialogOpen(true);
   };
 
@@ -88,7 +91,15 @@ export default function TeacherHomework() {
     }
     setSubmitting(true);
     try {
-      const body = { schoolId: user.schoolId, courseId: formCourseId, teacherId: user.id, title: formTitle.trim(), description: formDescription.trim(), dueDate: formDueDate };
+      const body = {
+        schoolId: user.schoolId,
+        courseId: formCourseId,
+        teacherId: user.id,
+        title: formTitle.trim(),
+        description: formDescription.trim(),
+        dueDate: formDueDate,
+        gradingType: formGradingType,
+      };
       const url = editingHomework ? `/api/homework/${editingHomework.id}` : '/api/homework';
       const method = editingHomework ? 'PUT' : 'POST';
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -143,7 +154,7 @@ export default function TeacherHomework() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {sortedHomework.map((hw) => {
+          {sortedHomework.map((hw: any) => {
             const daysRemaining = getDaysRemaining(hw.dueDate);
             const isOverdue = daysRemaining < 0;
             const isClose = daysRemaining >= 0 && daysRemaining <= 3;
@@ -152,7 +163,12 @@ export default function TeacherHomework() {
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
-                      <Badge variant="secondary" className="text-xs mb-2 bg-blue-100 text-blue-700">{getCourseName(hw.courseId)}</Badge>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge variant="secondary" className="text-[10px] bg-blue-100 text-blue-700">{getCourseName(hw.courseId)}</Badge>
+                        <Badge variant="outline" className="text-[10px] border-indigo-200 text-indigo-700 bg-indigo-50/50">
+                          {hw.gradingType === 'automatic' ? 'Correction Auto' : 'Correction Manuelle'}
+                        </Badge>
+                      </div>
                       <CardTitle className="text-base">{hw.title}</CardTitle>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
@@ -209,11 +225,25 @@ export default function TeacherHomework() {
             </div>
             <div className="space-y-2">
               <Label>Description</Label>
-              <Textarea placeholder="Décrivez le devoir à réaliser..." value={formDescription} onChange={(e) => setFormDescription(e.target.value)} rows={4} className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" />
+              <Textarea placeholder="Décrivez le devoir à réaliser..." value={formDescription} onChange={(e) => setFormDescription(e.target.value)} rows={3} className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" />
             </div>
-            <div className="space-y-2">
-              <Label>Date limite *</Label>
-              <Input type="date" value={formDueDate} onChange={(e) => setFormDueDate(e.target.value)} className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Date limite *</Label>
+                <Input type="date" value={formDueDate} onChange={(e) => setFormDueDate(e.target.value)} className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" />
+              </div>
+              <div className="space-y-2">
+                <Label>Type de correction *</Label>
+                <Select value={formGradingType} onValueChange={setFormGradingType}>
+                  <SelectTrigger className="w-full focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
+                    <SelectValue placeholder="Sélectionner..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manual">Correction Manuelle</SelectItem>
+                    <SelectItem value="automatic">Correction Automatique</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
           <DialogFooter>

@@ -19,6 +19,8 @@ export async function GET(request: NextRequest) {
           inviteCode: true,
           logoUrl: true,
           createdAt: true,
+          subscriptionStatus: true,
+          subscriptionExpiry: true,
         },
       });
       if (!school) {
@@ -41,6 +43,8 @@ export async function GET(request: NextRequest) {
         inviteCode: true,
         logoUrl: true,
         createdAt: true,
+        subscriptionStatus: true,
+        subscriptionExpiry: true,
       },
     });
 

@@ -35,6 +35,8 @@ import {
   BarChart3,
   User,
   School,
+  Calendar,
+  Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -52,6 +54,17 @@ export default function AdminCourses() {
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedTeacherId, setSelectedTeacherId] = useState('');
   const [creating, setCreating] = useState(false);
+
+  // Schedule dialog state
+  const [showSchedules, setShowSchedules] = useState(false);
+  const [selectedCourseForSched, setSelectedCourseForSched] = useState<CourseInfo | null>(null);
+  const [courseSchedules, setCourseSchedules] = useState<any[]>([]);
+  const [loadingSchedules, setLoadingSchedules] = useState(false);
+  const [newDayOfWeek, setNewDayOfWeek] = useState('1');
+  const [newStartTime, setNewStartTime] = useState('08:00');
+  const [newEndTime, setNewEndTime] = useState('09:30');
+  const [newRoom, setNewRoom] = useState('');
+  const [savingSchedule, setSavingSchedule] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!user?.schoolId) return;
@@ -78,6 +91,72 @@ export default function AdminCourses() {
   }, [user?.schoolId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleOpenSchedules = async (course: CourseInfo) => {
+    setSelectedCourseForSched(course);
+    setShowSchedules(true);
+    setLoadingSchedules(true);
+    setNewRoom('');
+    try {
+      const res = await fetch(`/api/schedules?schoolId=${user?.schoolId}&courseId=${course.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setCourseSchedules(data);
+      }
+    } catch {
+      toast.error("Erreur lors de la récupération des horaires");
+    } finally {
+      setLoadingSchedules(false);
+    }
+  };
+
+  const handleCreateSchedule = async () => {
+    if (!selectedCourseForSched || !user?.schoolId) return;
+    setSavingSchedule(true);
+    try {
+      const res = await fetch('/api/schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          courseId: selectedCourseForSched.id,
+          schoolId: user.schoolId,
+          dayOfWeek: parseInt(newDayOfWeek),
+          startTime: newStartTime,
+          endTime: newEndTime,
+          room: newRoom.trim(),
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Erreur de sauvegarde");
+      }
+
+      toast.success("Horaire ajouté avec succès");
+      
+      // Reload schedules list
+      const reloadRes = await fetch(`/api/schedules?schoolId=${user.schoolId}&courseId=${selectedCourseForSched.id}`);
+      if (reloadRes.ok) {
+        setCourseSchedules(await reloadRes.json());
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Erreur lors de la création de l'horaire");
+    } finally {
+      setSavingSchedule(false);
+    }
+  };
+
+  const handleDeleteSchedule = async (schedId: string) => {
+    if (!confirm("Voulez-vous supprimer ce créneau horaire ?")) return;
+    try {
+      const res = await fetch(`/api/schedules?id=${schedId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error("Erreur de suppression");
+      toast.success("Créneau supprimé");
+      setCourseSchedules(courseSchedules.filter((s) => s.id !== schedId));
+    } catch {
+      toast.error("Erreur lors de la suppression de l'horaire");
+    }
+  };
 
   const handleCreateCourse = async () => {
     if (!newCourseName.trim() || !selectedClassId || !selectedTeacherId) {
@@ -132,6 +211,11 @@ export default function AdminCourses() {
   const getClassName = (classId: string) => {
     const c = classes.find((c) => c.id === classId);
     return c?.name || 'Inconnue';
+  };
+
+  const getDayName = (dayNum: number) => {
+    const days = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+    return days[dayNum - 1] || "Jour inconnu";
   };
 
   if (!user) return null;
@@ -191,8 +275,8 @@ export default function AdminCourses() {
               <School className="h-5 w-5 text-purple-600" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Classes concernées</p>
-              <p className="text-xl font-bold">{new Set(courses.map(c => c.classId)).size}</p>
+              <p className="text-sm text-muted-foreground">Classes</p>
+              <p className="text-xl font-bold">{classes.length}</p>
             </div>
           </CardContent>
         </Card>
@@ -243,7 +327,7 @@ export default function AdminCourses() {
                       {course.description && (
                         <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{course.description}</p>
                       )}
-                      <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground flex-wrap">
                         <div className="flex items-center gap-1.5">
                           <User className="h-4 w-4 text-emerald-500" />
                           <span className="font-medium text-emerald-700">{getTeacherName(course.teacherId)}</span>
@@ -263,14 +347,25 @@ export default function AdminCourses() {
                       </div>
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDeleteCourse(course.id)}
-                    className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-600 hover:bg-red-50 transition-all shrink-0"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenSchedules(course)}
+                      className="gap-1.5 text-xs font-semibold"
+                    >
+                      <Calendar className="h-3.5 w-3.5 text-blue-500" />
+                      Horaires
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteCourse(course.id)}
+                      className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-600 hover:bg-red-50 transition-all shrink-0"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -365,6 +460,137 @@ export default function AdminCourses() {
               )}
               {creating ? 'Création...' : 'Distribuer le cours'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Schedules Management Dialog */}
+      <Dialog open={showSchedules} onOpenChange={setShowSchedules}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <Calendar className="h-5 w-5 text-blue-600" />
+              Horaires du cours : {selectedCourseForSched?.name}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            {/* Add Schedule Form */}
+            <div className="p-4 rounded-xl bg-muted/30 border space-y-4">
+              <h4 className="font-semibold text-sm flex items-center gap-1.5">
+                <Plus className="h-4 w-4 text-emerald-500" />
+                Ajouter un créneau horaire
+              </h4>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-end">
+                <div className="space-y-1.5 col-span-2 sm:col-span-1">
+                  <Label htmlFor="sched-day">Jour</Label>
+                  <Select value={newDayOfWeek} onValueChange={setNewDayOfWeek}>
+                    <SelectTrigger id="sched-day">
+                      <SelectValue placeholder="Jour..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Lundi</SelectItem>
+                      <SelectItem value="2">Mardi</SelectItem>
+                      <SelectItem value="3">Mercredi</SelectItem>
+                      <SelectItem value="4">Jeudi</SelectItem>
+                      <SelectItem value="5">Vendredi</SelectItem>
+                      <SelectItem value="6">Samedi</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="sched-start">Début</Label>
+                  <Input
+                    id="sched-start"
+                    type="time"
+                    value={newStartTime}
+                    onChange={(e) => setNewStartTime(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="sched-end">Fin</Label>
+                  <Input
+                    id="sched-end"
+                    type="time"
+                    value={newEndTime}
+                    onChange={(e) => setNewEndTime(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="sched-room">Salle</Label>
+                  <Input
+                    id="sched-room"
+                    placeholder="Ex: Salle B"
+                    value={newRoom}
+                    onChange={(e) => setNewRoom(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  onClick={handleCreateSchedule}
+                  disabled={savingSchedule}
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                >
+                  {savingSchedule && <div className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin mr-1.5" />}
+                  Ajouter au programme
+                </Button>
+              </div>
+            </div>
+
+            {/* Schedules List */}
+            <div className="space-y-2">
+              <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">Créneaux enregistrés</h4>
+              {loadingSchedules ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              ) : courseSchedules.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">Aucun horaire enregistré pour ce cours.</p>
+              ) : (
+                <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                  {courseSchedules.map((sched) => (
+                    <div
+                      key={sched.id}
+                      className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/10 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Badge variant="outline" className="bg-blue-50/50 text-blue-700 border-blue-200">
+                          {getDayName(sched.dayOfWeek)}
+                        </Badge>
+                        <span className="text-sm font-semibold flex items-center gap-1">
+                          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                          {sched.startTime} – {sched.endTime}
+                        </span>
+                        {sched.room && (
+                          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                            Salle: {sched.room}
+                          </span>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteSchedule(sched.id)}
+                        className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setShowSchedules(false)}>Fermer</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
