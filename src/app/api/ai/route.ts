@@ -371,6 +371,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  let aiResponse: Response;
+  let conversationIdFinal = '';
+  let encoder: TextEncoder;
+  let userPreferences: Record<string, string> = {};
+
+  try {
   // ─── Charger ou créer la conversation ───────────────────────────────────────
   let conversation;
   if (conversationId) {
@@ -387,10 +393,11 @@ export async function POST(request: NextRequest) {
   }
 
   // ─── Charger l'utilisateur et ses préférences (depuis DB, pas filesystem) ───
-  const [user, userPreferences] = await Promise.all([
+  const [user, prefs] = await Promise.all([
     db.user.findUnique({ where: { id: userId }, select: { fullName: true, role: true } }),
     loadUserPreferences(userId),
   ]);
+  userPreferences = prefs;
 
   const role = user?.role || 'STUDENT';
   const userName = user?.fullName || 'utilisateur';
@@ -447,12 +454,10 @@ Si l'utilisateur partage une information durable et importante à retenir, tu pe
     await db.aiConversation.update({ where: { id: conversation.id }, data: { title } });
   }
 
-  const conversationIdFinal = conversation.id;
-  const encoder = new TextEncoder();
+  conversationIdFinal = conversation.id;
+  encoder = new TextEncoder();
 
   // ─── Appel GLM (provider unique) ─────────────────────────────────────────────
-  let aiResponse: Response;
-
   try {
     aiResponse = await generateGLMResponse({
       message,
@@ -476,6 +481,15 @@ Si l'utilisateur partage une information durable et importante à retenir, tu pe
     console.error('[AI] Réponse erreur GLM:', aiResponse.status, errorText.slice(0, 300));
     return new Response(
       JSON.stringify({ error: 'Le service IA est temporairement indisponible. Réessayez dans quelques instants.' }),
+      { status: 503, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
+
+  } catch (err) {
+    console.error('[AI] Erreur non gérée:', err);
+    const errMsg = err instanceof Error ? err.message : 'Erreur inconnue du serveur';
+    return new Response(
+      JSON.stringify({ error: `L'IA est temporairement indisponible. Détails : ${errMsg}` }),
       { status: 503, headers: { 'Content-Type': 'application/json' } },
     );
   }

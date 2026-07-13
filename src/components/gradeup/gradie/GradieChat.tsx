@@ -539,8 +539,15 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
       });
 
       if (!res.ok || !res.body) {
-        const err = await res.json().catch(() => ({ error: 'Erreur inconnue' }));
-        setError(err.error || 'Erreur du serveur.');
+        let msg = 'Erreur du serveur.';
+        try {
+          const data = await res.json();
+          msg = data.error || msg;
+        } catch {
+          const text = await res.text().catch(() => '');
+          msg = text ? text.slice(0, 240) : 'Erreur inconnue du serveur.';
+        }
+        setError(msg);
         setIsStreaming(false);
         return;
       }
