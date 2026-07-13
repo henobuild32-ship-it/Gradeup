@@ -121,20 +121,31 @@
   }
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar - plus visible */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 10px;
+  height: 10px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: oklch(0.75 0.03 260);
-  border-radius: 3px;
+  background: oklch(0.55 0.15 260 / 0.6);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.60 0.05 260);
+  background: oklch(0.50 0.18 260 / 0.85);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0.55 0.15 260 / 0.6) transparent;
 }
 
 /* ===== Page transition & UI animations ===== */

@@ -76,6 +76,7 @@ import {
   GraduationCap,
   ScrollText,
   Zap,
+  Check,
 } from 'lucide-react';
 
 interface NavItem {
@@ -877,20 +878,48 @@ export default function AppLayout({ children }: AppLayoutProps) {
                       <ChevronDown className="w-3 h-3 text-muted-foreground hidden sm:block" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuContent align="end" className="w-64">
                     <DropdownMenuLabel className="font-normal">
                       <div className="flex flex-col space-y-1">
                         <p className="text-sm font-medium">{user.fullName}</p>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${roleBadgeColors[user.role]}`}>
                             {roleLabels[user.role]}
                           </Badge>
                           {user.school && (
-                            <span className="text-[10px] text-muted-foreground truncate">{user.school.name}</span>
+                            <span className="text-[10px] text-muted-foreground truncate max-w-[180px]">{user.school.name}</span>
                           )}
                         </div>
                       </div>
                     </DropdownMenuLabel>
+                    
+                    {/* Interface Switcher */}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="text-xs font-medium text-muted-foreground px-1">
+                      Changer d'interface
+                    </DropdownMenuLabel>
+                    {Object.entries(roleLabels).map(([roleKey, roleLabel]) => {
+                      const role = roleKey as UserRole;
+                      const isCurrent = user.role === role;
+                      const defaultPage = navItemsByRole[role]?.[0]?.page;
+                      return (
+                        <DropdownMenuItem
+                          key={roleKey}
+                          onClick={() => defaultPage && handleNavigate(defaultPage)}
+                          className={`cursor-pointer flex items-center gap-2 ${isCurrent ? 'bg-primary/10 text-primary' : ''}`}
+                          disabled={isCurrent}
+                        >
+                          {isCurrent && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
+                          <span className="capitalize text-sm">{roleLabel.toLowerCase()}</span>
+                          {!isCurrent && defaultPage && (
+                            <span className="text-[10px] text-muted-foreground ml-auto font-mono">
+                              → {defaultPage}
+                            </span>
+                          )}
+                        </DropdownMenuItem>
+                      );
+                    })}
+                    
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => handleNavigate('profile')} className="cursor-pointer">
                       <User className="mr-2 h-4 w-4" />
@@ -913,13 +942,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
         {/* ✅ Main content: overflow-y-auto pour le scroll, min-h-0 pour flexibilité */}
         <main 
-          className={`flex-1 overflow-y-auto min-h-0 ${isMobile ? 'pb-20' : ''}`}
+          className={`flex-1 overflow-y-auto min-h-0 ${isMobile ? 'pb-24' : ''}`}
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
         >
-          {/* ✅ Suppression de min-h-full qui cause des espaces vides */}
-          <div className="p-4 lg:p-6 animate-fade-in flex flex-col" key={currentPage}>
+          {/* ✅ Conteneur de page: flex-1 min-h-0 pour que les enfants puissent scroller */}
+          <div className="p-4 lg:p-6 animate-fade-in flex flex-col flex-1 min-h-0" key={currentPage}>
             {children}
           </div>
         </main>
