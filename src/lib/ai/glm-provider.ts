@@ -8,7 +8,10 @@ interface GLMInput {
 }
 
 export async function generateGLMResponse(input: GLMInput): Promise<Response> {
-  const GLM_API_KEY = process.env.GLM_API_KEY || '6cddc61765f347118131a75559b014cb.vJkKLHDhWnUFJpWX';
+  const GLM_API_KEY = process.env.GLM_API_KEY;
+  if (!GLM_API_KEY) {
+    throw new Error('GLM_API_KEY n\'est pas configurée. Ajoutez-la dans vos variables d\'environnement.');
+  }
   const MODEL = process.env.GLM_MODEL || 'glm-4.5-flash';
 
   const messages = [

@@ -13,21 +13,19 @@ interface BeforeInstallPromptEvent extends Event {
 export function usePWAInstall() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstallable, setIsInstallable] = useState(false);
-  const [isAppInstalled, setIsAppInstalled] = useState(false);
-  const [isIOS, setIsIOS] = useState(false);
+  const [isAppInstalled, setIsAppInstalled] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+  });
+  const [isIOS] = useState(() => {
+    if (typeof navigator === 'undefined') return false;
+    return (
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    );
+  });
 
   useEffect(() => {
-    // Détection iOS
-    const isIosDevice = 
-      /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    setIsIOS(isIosDevice);
-
-    // Détection si déjà installé (standalone)
-    if (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true) {
-      setIsAppInstalled(true);
-    }
-
     const handleBeforeInstallPrompt = (e: Event) => {
       // Empêche Chrome d'afficher le mini-info-barre automatique
       e.preventDefault();

@@ -5,6 +5,8 @@ import { useAppStore } from '@/lib/store';
 import type { UserInfo, GradeInfo, PaymentInfo, AttendanceInfo, NotificationInfo } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import WeeklyScheduleView from './weekly-schedule-view';
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -567,8 +569,18 @@ export default function ParentDashboard() {
                 </Card>
               </div>
 
+              {/* Emploi du temps de l'enfant */}
+              {user?.schoolId && selectedChild?.classEnrollments?.[0]?.classId && (
+                <WeeklyScheduleView
+                  schoolId={user.schoolId}
+                  classId={selectedChild.classEnrollments[0].classId}
+                  classNameLabel={childClass}
+                />
+              )}
+
               {/* Communication Cards */}
               <Card>
+
                 <CardHeader>
                   <CardTitle className="text-base font-bold">Contacter l'établissement</CardTitle>
                 </CardHeader>

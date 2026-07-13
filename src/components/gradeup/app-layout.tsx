@@ -68,12 +68,14 @@ import {
   Moon,
   Lightbulb,
   Video,
+  Library,
   Smartphone,
   Apple,
   IdCard,
   DollarSign,
   GraduationCap,
   ScrollText,
+  Zap,
 } from 'lucide-react';
 
 interface NavItem {
@@ -92,11 +94,16 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Frais scolaires', page: 'admin-tuition', icon: DollarSign, emoji: '💰' },
     { label: 'Cartes Élèves', page: 'admin-cards', icon: IdCard, emoji: '🆔' },
     { label: 'Configuration', page: 'admin-config', icon: Settings, emoji: '⚙️' },
+    { label: 'Présence', page: 'admin-presence', icon: ClipboardCheck, emoji: '✅' },
     { label: 'Rapports', page: 'admin-reports', icon: BarChart3, emoji: '📈' },
     { label: 'Notifications', page: 'admin-notifications', icon: Bell, emoji: '🔔' },
     { label: 'Cours', page: 'admin-courses', icon: BookOpen, emoji: '📚' },
+    { label: 'Emploi du temps', page: 'admin-schedules', icon: CalendarDays, emoji: '🗓️' },
+    { label: 'Bulletins Sync', page: 'auto-report-sync', icon: Zap, emoji: '⚡' },
+    { label: 'Cahier de Cotation', page: 'cahier-cotation', icon: ClipboardList, emoji: '📖' },
     { label: 'IA Gradie', page: 'admin-ai', icon: Bot, emoji: '🤖' },
-    { label: 'Visioconférences', page: 'admin-conferences', icon: Video, emoji: '🎥' },
+    { label: 'Visioconférences', page: 'meetings', icon: Video, emoji: '🎥' },
+    { label: 'Bibliothèque', page: 'library', icon: Library, emoji: '📚' },
     { label: 'Fin du cursus', page: 'admin-end-of-year', icon: GraduationCap, emoji: '🎓' },
     { label: 'Messagerie', page: 'messages', icon: MessageSquare, emoji: '💬' },
     { label: 'Calendrier', page: 'calendar', icon: CalendarDays, emoji: '📆' },
@@ -111,7 +118,11 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Devoirs', page: 'teacher-homework', icon: ClipboardCheck, emoji: '📋' },
     { label: 'Absences', page: 'teacher-attendance', icon: Calendar, emoji: '📅' },
     { label: 'IA Gradie', page: 'teacher-ai', icon: Bot, emoji: '🤖' },
+    { label: 'Visioconférences', page: 'meetings', icon: Video, emoji: '🎥' },
+    { label: 'Bibliothèque', page: 'library', icon: Library, emoji: '📚' },
     { label: 'Rapports', page: 'teacher-reports', icon: ScrollText, emoji: '📄' },
+    { label: 'Bulletins Sync', page: 'auto-report-sync', icon: Zap, emoji: '⚡' },
+    { label: 'Cahier de Cotation', page: 'cahier-cotation', icon: ClipboardList, emoji: '📖' },
     { label: 'Fin du cursus', page: 'teacher-end-of-year', icon: GraduationCap, emoji: '🎓' },
     { label: 'Messagerie', page: 'messages', icon: MessageSquare, emoji: '💬' },
     { label: 'Calendrier', page: 'calendar', icon: CalendarDays, emoji: '📆' },
@@ -125,6 +136,8 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Notes', page: 'student-grades', icon: ClipboardList, emoji: '📝' },
     { label: 'Absences', page: 'student-attendance', icon: Calendar, emoji: '📅' },
     { label: 'Étudier avec Grady', page: 'student-ai', icon: Bot, emoji: '🤖' },
+    { label: 'Visioconférences', page: 'meetings', icon: Video, emoji: '🎥' },
+    { label: 'Bibliothèque', page: 'library', icon: Library, emoji: '📚' },
     { label: 'Notifications', page: 'student-notifications', icon: Bell, emoji: '🔔' },
     { label: 'Messagerie', page: 'messages', icon: MessageSquare, emoji: '💬' },
     { label: 'Calendrier', page: 'calendar', icon: CalendarDays, emoji: '📆' },
@@ -136,6 +149,8 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Suivi scolaire', page: 'parent-grades', icon: BarChart3, emoji: '📊' },
     { label: 'Paiements', page: 'parent-payments', icon: CreditCard, emoji: '💳' },
     { label: 'IA Gradie', page: 'parent-ai', icon: Bot, emoji: '🤖' },
+    { label: 'Visioconférences', page: 'meetings', icon: Video, emoji: '🎥' },
+    { label: 'Bibliothèque', page: 'library', icon: Library, emoji: '📚' },
     { label: 'Notifications', page: 'parent-notifications', icon: Bell, emoji: '🔔' },
     { label: 'Messagerie', page: 'messages', icon: MessageSquare, emoji: '💬' },
     { label: 'Profil', page: 'profile', icon: User, emoji: '👤' },
@@ -199,10 +214,17 @@ const pageTitles: Record<PageView, string> = {
   'admin-reports': 'Rapports',
   'admin-notifications': 'Notifications',
   'admin-conferences': 'Visioconférences',
+  'meetings': 'Visioconférences Grada Vio',
+  'meeting-room': 'Réunion en cours',
+  'library': 'Bibliothèque Numérique',
   'admin-cards': 'Cartes d\'identité',
   'admin-courses': 'Cours',
   'admin-ai': 'IA Gradie',
   'admin-tuition': 'Frais scolaires',
+  'admin-presence': 'Module de Présence',
+  'admin-schedules': 'Gestion des Emplois du Temps',
+  'auto-report-sync': 'Bulletins Synchronisés',
+  'cahier-cotation': 'Cahier de Cotation RDC',
   'admin-end-of-year': 'Fin du cursus',
   'teacher-dashboard': 'Tableau de bord',
   'teacher-courses': 'Cours',
@@ -244,12 +266,15 @@ function SidebarContent({
   onLogout,
 }: {
   collapsed?: boolean;
-  user: { fullName: string; role: UserRole; photoUrl?: string };
+  user: { fullName: string; role: UserRole; photoUrl?: string; isTitulaire?: boolean };
   currentPage: PageView;
   onNavigate: (page: PageView) => void;
   onLogout: () => void;
 }) {
-  const navItems = navItemsByRole[user.role];
+  let navItems = navItemsByRole[user.role] || [];
+  if (user.role === 'TEACHER' && !user.isTitulaire) {
+    navItems = navItems.filter(item => item.page !== 'teacher-reports' && item.page !== 'auto-report-sync');
+  }
   const initials = user.fullName
     .split(' ')
     .map((n) => n[0])
@@ -437,7 +462,7 @@ function SidebarContent({
 }
 
 export default function AppLayout({ children }: AppLayoutProps) {
-  const { user, currentPage, setCurrentPage, sidebarOpen, setSidebarOpen, setUser } = useAppStore();
+  const { user, currentPage, setCurrentPage, sidebarOpen, setSidebarOpen, setUser, logout } = useAppStore();
   const { isInstallable, isAppInstalled, installPWA } = usePWAInstall();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -477,8 +502,16 @@ export default function AppLayout({ children }: AppLayoutProps) {
     const isRightSwipe = distance < -minSwipeDistance;
 
     if (isMobile && (isLeftSwipe || isRightSwipe)) {
-      const tabs = user ? bottomTabsByRole[user.role] : null;
-      if (tabs) {
+      const getFilteredBottomTabs = (u: any) => {
+        if (!u) return [];
+        let tabs = bottomTabsByRole[u.role as UserRole] || [];
+        if (u.role === 'TEACHER' && !u.isTitulaire) {
+          tabs = tabs.filter(t => t.page !== 'teacher-reports');
+        }
+        return tabs;
+      };
+      const tabs = getFilteredBottomTabs(user);
+      if (tabs.length > 0) {
         const currentIdx = tabs.findIndex((tab) => tab.page === currentPage);
         if (currentIdx !== -1) {
           if (isLeftSwipe && currentIdx < tabs.length - 1) {
@@ -525,6 +558,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
     if (!user) return;
 
     // Fetch initial count
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchUnreadNotifications();
 
     // Register background PWA Web Push notifications (only on HTTPS)
@@ -605,9 +639,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
   };
 
   const confirmLogout = () => {
-    setUser(null);
-    setCurrentPage('auth');
     setShowLogoutDialog(false);
+    logout();
   };
 
   const handleNavigate = (page: PageView) => {
@@ -969,7 +1002,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
           className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-card/90 backdrop-blur-xl border-t flex items-center justify-around px-2 z-40 shadow-lg"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
-          {bottomTabsByRole[user.role]?.map((tab) => {
+          {(() => {
+            if (!user) return null;
+            let tabs = bottomTabsByRole[user.role] || [];
+            if (user.role === 'TEACHER' && !user.isTitulaire) {
+              tabs = tabs.filter(t => t.page !== 'teacher-reports');
+            }
+            return tabs;
+          })()?.map((tab) => {
             const isActive = currentPage === tab.page;
             const Icon = tab.icon;
             

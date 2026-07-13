@@ -31,6 +31,31 @@ async function saveUserPreferences(userId: string, prefs: Record<string, string>
   }
 }
 
+// ─── Mémoire long terme ────────────────────────────────────────────────────────
+
+async function loadMemories(userId: string): Promise<string[]> {
+  try {
+    const memories = await db.aiMemory.findMany({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
+      take: 15,
+    });
+    return memories.map((m) => `- ${m.content}`);
+  } catch {
+    return [];
+  }
+}
+
+async function saveMemory(userId: string, schoolId: string, content: string): Promise<void> {
+  try {
+    await db.aiMemory.create({
+      data: { userId, schoolId, content: content.trim(), category: 'fact' },
+    });
+  } catch (err) {
+    console.error('[AI] Erreur sauvegarde mémoire:', err);
+  }
+}
+
 // ─── System prompt ────────────────────────────────────────────────────────────
 
 function buildSystemPrompt(
@@ -392,7 +417,18 @@ export async function POST(request: NextRequest) {
   }));
 
   const isFirstMessage = !conversation.salutationDone;
-  const systemPrompt = buildSystemPrompt(userName, role, fullContext, isFirstMessage, preferencesStr);
+  let systemPrompt = buildSystemPrompt(userName, role, fullContext, isFirstMessage, preferencesStr);
+
+  // ─── Mémoire long terme de l'utilisateur ─────────────────────────────────────
+  const memories = await loadMemories(userId);
+  if (memories.length > 0) {
+    systemPrompt += `
+
+MÉMOIRE À LONG TERME (informtions clés à garder en mémoire sur l'utilisateur et son contexte) :
+${memories.join('\n')}
+
+Si l'utilisateur partage une information durable et importante à retenir, tu peux la sauvegarder en finissant ta réponse par la balise : \`[MEM: texte à mémoriser]\`.`;
+  }
 
   // ─── Enregistrer le message utilisateur ─────────────────────────────────────
   await db.aiMessage.create({
@@ -496,7 +532,21 @@ export async function POST(request: NextRequest) {
           }
           if (prefChanged) await saveUserPreferences(userId, newPrefs);
 
-          const cleanReply = fullReply.replace(/\[PREF:\s*[^\]]+\]/gi, '').trim();
+          // Détecter et sauvegarder les souvenirs long terme
+          const memRegex = /\[MEM:\s*([^\]]+)\]/gi;
+          let memMatch;
+          const memsToSave: string[] = [];
+          while ((memMatch = memRegex.exec(fullReply)) !== null) {
+            memsToSave.push(memMatch[1].trim());
+          }
+          for (const mem of memsToSave) {
+            await saveMemory(userId, schoolId, mem);
+          }
+
+          const cleanReply = fullReply
+            .replace(/\[PREF:\s*[^\]]+\]/gi, '')
+            .replace(/\[MEM:\s*[^\]]+\]/gi, '')
+            .trim();
           await db.aiMessage.create({ data: { conversationId: conversationIdFinal, role: 'assistant', content: cleanReply } });
           await db.aiConversation.update({ where: { id: conversationIdFinal }, data: { updatedAt: new Date() } });
         }

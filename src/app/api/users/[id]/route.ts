@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { notifyUser } from '@/services/notifications/notificationEngine';
+import { hashPassword, verifyPassword } from '@/lib/password';
 
 export async function GET(
   request: NextRequest,
@@ -39,7 +40,7 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { fullName, email, password, newPassword, oldPassword, role, photoUrl, parentId } = body;
+    const { fullName, email, password, newPassword, oldPassword, role, photoUrl, parentId, isTitulaire, titulaireClassIds } = body;
 
     const existing = await db.user.findUnique({ where: { id } });
     if (!existing) {
@@ -54,7 +55,7 @@ export async function PUT(
           { status: 400 }
         );
       }
-      if (oldPassword !== existing.password) {
+      if (!(await verifyPassword(oldPassword, existing.password))) {
         return NextResponse.json(
           { error: 'L\'ancien mot de passe est incorrect.' },
           { status: 401 }
@@ -73,11 +74,13 @@ export async function PUT(
       data: {
         ...(fullName !== undefined && { fullName }),
         ...(email !== undefined && { email }),
-        ...(newPassword !== undefined && { password: newPassword }),
-        ...(password !== undefined && newPassword === undefined && { password }),
+        ...(newPassword !== undefined && { password: await hashPassword(newPassword) }),
+        ...(password !== undefined && newPassword === undefined && { password: await hashPassword(password) }),
         ...(role !== undefined && { role }),
         ...(photoUrl !== undefined && { photoUrl }),
         ...(parentId !== undefined && { parentId: parentId || null }),
+        ...(isTitulaire !== undefined && { isTitulaire }),
+        ...(titulaireClassIds !== undefined && { titulaireClassIds: Array.isArray(titulaireClassIds) ? titulaireClassIds : [] }),
       },
       include: {
         school: true,

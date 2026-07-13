@@ -18,6 +18,11 @@ export async function GET(request: NextRequest) {
           currency: true,
           inviteCode: true,
           logoUrl: true,
+          province: true,
+          city: true,
+          commune: true,
+          latitude: true,
+          longitude: true,
           createdAt: true,
           subscriptionStatus: true,
           subscriptionExpiry: true,
@@ -42,6 +47,11 @@ export async function GET(request: NextRequest) {
         currency: true,
         inviteCode: true,
         logoUrl: true,
+        province: true,
+        city: true,
+        commune: true,
+        latitude: true,
+        longitude: true,
         createdAt: true,
         subscriptionStatus: true,
         subscriptionExpiry: true,
@@ -62,7 +72,7 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { schoolId, currency, name, email, logoUrl } = body;
+    const { schoolId, currency, name, email, logoUrl, latitude, longitude } = body;
 
     if (!schoolId) {
       return NextResponse.json({ error: 'schoolId is required' }, { status: 400 });
@@ -80,6 +90,8 @@ export async function PUT(request: NextRequest) {
         ...(name !== undefined && { name }),
         ...(email !== undefined && { email }),
         ...(logoUrl !== undefined && { logoUrl }),
+        ...(latitude !== undefined && { latitude: latitude === '' ? null : parseFloat(latitude) }),
+        ...(longitude !== undefined && { longitude: longitude === '' ? null : parseFloat(longitude) }),
       },
       select: {
         id: true,
@@ -87,6 +99,8 @@ export async function PUT(request: NextRequest) {
         email: true,
         currency: true,
         logoUrl: true,
+        latitude: true,
+        longitude: true,
         createdAt: true,
       },
     });

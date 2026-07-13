@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { notifyUser } from '@/services/notifications/notificationEngine';
+import { hashPassword } from '@/lib/password';
 
 function generateParentCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -71,7 +72,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { schoolId, fullName, email, password, role, photoUrl, parentId, classId, className } = body;
+    const { schoolId, fullName, email, password, role, photoUrl, parentId, classId, className, isTitulaire, titulaireClassIds } = body;
 
     if (!schoolId || !fullName || !password || !role) {
       return NextResponse.json(
@@ -101,11 +102,13 @@ export async function POST(request: NextRequest) {
         schoolId,
         fullName,
         email: email || '',
-        password,
+        password: await hashPassword(password),
         role,
         photoUrl: photoUrl || '',
         parentId: parentId || null,
         parentCode: parentCodeVal,
+        isTitulaire: !!isTitulaire,
+        titulaireClassIds: Array.isArray(titulaireClassIds) ? titulaireClassIds : [],
       },
       include: {
         school: true,
@@ -169,7 +172,8 @@ export async function PATCH(request: NextRequest) {
     const { 
       userId, active, fullName, email,
       postName, gender, birthDate, matricule, 
-      phone, parentPhone, parentPhone2, academicYear, section, photoUrl
+      phone, parentPhone, parentPhone2, academicYear, section, photoUrl,
+      isTitulaire, titulaireClassIds
     } = body;
 
     if (!userId) {
@@ -190,6 +194,8 @@ export async function PATCH(request: NextRequest) {
     if (academicYear !== undefined) updateData.academicYear = academicYear;
     if (section !== undefined) updateData.section = section;
     if (photoUrl !== undefined) updateData.photoUrl = photoUrl;
+    if (isTitulaire !== undefined) updateData.isTitulaire = isTitulaire;
+    if (titulaireClassIds !== undefined) updateData.titulaireClassIds = Array.isArray(titulaireClassIds) ? titulaireClassIds : [];
 
     const user = await db.user.update({
       where: { id: userId },

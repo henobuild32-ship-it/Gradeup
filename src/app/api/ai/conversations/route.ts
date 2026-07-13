@@ -7,17 +7,36 @@ import { db } from '@/lib/db';
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get('userId');
+  const search = searchParams.get('search')?.trim();
+  const favorite = searchParams.get('favorite');
+  const pinned = searchParams.get('pinned');
 
   if (!userId) {
     return NextResponse.json({ error: 'userId requis' }, { status: 400 });
   }
 
+  const where: any = { userId };
+  if (favorite === '1') where.favorite = true;
+  if (pinned === '1') where.pinned = true;
+  if (search) {
+    where.OR = [
+      { title: { contains: search, mode: 'insensitive' } },
+      { tags: { contains: search, mode: 'insensitive' } },
+    ];
+  }
+
+  let orderBy: any = [{ pinned: 'desc' }, { pinnedAt: 'desc' }, { updatedAt: 'desc' }];
+  if (pinned === '1') orderBy = [{ pinnedAt: 'desc' }];
+
   const conversations = await db.aiConversation.findMany({
-    where: { userId },
-    orderBy: { updatedAt: 'desc' },
+    where,
+    orderBy,
     select: {
       id: true,
       title: true,
+      tags: true,
+      favorite: true,
+      pinned: true,
       createdAt: true,
       updatedAt: true,
       messages: {

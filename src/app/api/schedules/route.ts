@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { courseId, schoolId, dayOfWeek, startTime, endTime, room } = body;
+    const { courseId, schoolId, dayOfWeek, startTime, endTime, room, periodStart, periodEnd, exceptions } = body;
 
     if (!courseId || !schoolId || !dayOfWeek || !startTime || !endTime) {
       return NextResponse.json(
@@ -73,6 +73,9 @@ export async function POST(request: NextRequest) {
         startTime,
         endTime,
         room: room || '',
+        periodStart: periodStart ? new Date(periodStart) : null,
+        periodEnd: periodEnd ? new Date(periodEnd) : null,
+        exceptions: exceptions || '[]',
       },
       include: {
         course: {
@@ -86,6 +89,44 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(schedule, { status: 201 });
   } catch (error) {
     console.error('[POST /api/schedules]', error);
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
+  }
+}
+
+// PUT /api/schedules
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { id, courseId, dayOfWeek, startTime, endTime, room, periodStart, periodEnd, exceptions } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: 'id requis' }, { status: 400 });
+    }
+
+    const updated = await db.courseSchedule.update({
+      where: { id },
+      data: {
+        ...(courseId !== undefined && { courseId }),
+        ...(dayOfWeek !== undefined && { dayOfWeek: parseInt(String(dayOfWeek)) }),
+        ...(startTime !== undefined && { startTime }),
+        ...(endTime !== undefined && { endTime }),
+        ...(room !== undefined && { room: room || '' }),
+        ...(periodStart !== undefined && { periodStart: periodStart ? new Date(periodStart) : null }),
+        ...(periodEnd !== undefined && { periodEnd: periodEnd ? new Date(periodEnd) : null }),
+        ...(exceptions !== undefined && { exceptions: exceptions || '[]' }),
+      },
+      include: {
+        course: {
+          include: {
+            teacher: { select: { id: true, fullName: true } },
+          },
+        },
+      },
+    });
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error('[PUT /api/schedules]', error);
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }
 }

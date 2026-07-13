@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { setAuthCookies, serializeUser } from '@/lib/auth/session';
+import { verifyPassword } from '@/lib/password';
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,7 +30,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Vérifier le mot de passe de l'école
-      if (school.password !== password) {
+      if (!(await verifyPassword(password, school.password))) {
         return NextResponse.json(
           { error: 'Mot de passe incorrect.' },
           { status: 401 }
@@ -73,11 +75,10 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Trouver l'utilisateur : nom et mot de passe (insensible à la casse pour le nom)
+      // Trouver l'utilisateur : nom (insensible à la casse) puis vérifier le mot de passe haché
       const allUsers = await db.user.findMany({
         where: {
           schoolId: school.id,
-          password,
         },
         include: {
           school: true,
@@ -88,9 +89,17 @@ export async function POST(request: NextRequest) {
 
       // Comparer le nom complet de façon insensible à la casse (trim + lowercase)
       const normalizedInput = fullName.trim().toLowerCase();
-      user = allUsers.find(
+      const candidates = allUsers.filter(
         (u) => u.fullName.trim().toLowerCase() === normalizedInput
-      ) || null;
+      );
+
+      // Vérifier le mot de passe (scrypt) sur les candidats de même nom
+      for (const candidate of candidates) {
+        if (await verifyPassword(password, candidate.password)) {
+          user = candidate;
+          break;
+        }
+      }
 
       if (!user) {
         return NextResponse.json(
@@ -126,39 +135,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
-      user: {
-        id: user.id,
-        schoolId: user.schoolId,
-        fullName: user.fullName,
-        email: user.email,
-        role: user.role,
-        photoUrl: user.photoUrl,
-        parentId: user.parentId,
-        parentCode: user.parentCode,
-        active: user.active,
-        school: {
-          id: school.id,
-          name: school.name,
-          email: school.email,
-          currency: school.currency,
-          inviteCode: school.inviteCode,
-          subscriptionStatus: school.subscriptionStatus,
-          subscriptionExpiry: school.subscriptionExpiry,
-        },
-        classEnrollments: user.classEnrollments.map((e) => ({
-          id: e.id,
-          userId: e.userId,
-          classId: e.classId,
-          class: e.class,
-        })),
-        children: user.children.map((c) => ({
-          id: c.id,
-          fullName: c.fullName,
-          role: c.role,
-        })),
-      },
+    const response = NextResponse.json({
+      user: serializeUser(user, user.school || school),
     });
+    setAuthCookies(response, user, user.school || school);
+    return response;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Erreur interne du serveur.';
     return NextResponse.json({ error: message }, { status: 500 });

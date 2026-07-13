@@ -10,6 +10,8 @@ export interface SchoolInfo {
   currency: string;
   logoUrl?: string;
   inviteCode?: string;
+  subscriptionStatus?: string;
+  subscriptionExpiry?: string | null;
 }
 
 export interface UserInfo {
@@ -32,6 +34,8 @@ export interface UserInfo {
   academicYear?: string;
   section?: string;
   active?: boolean;
+  isTitulaire?: boolean;
+  titulaireClassIds?: string[];
   school?: SchoolInfo;
   classEnrollments?: EnrolledClassInfo[];
   children?: UserInfo[];
@@ -63,6 +67,7 @@ export interface CourseInfo {
   teacherId: string;
   name: string;
   description: string;
+  status?: string;
   class?: ClassInfo;
   teacher?: UserInfo;
   _count?: {
@@ -159,6 +164,66 @@ export interface VideoConferenceInfo {
   roomUrl: string;
   targetRole: string;
   targetClassId: string;
+  type: string;
+  status: string;
+  isLocked: boolean;
+  creatorId: string;
+  startedAt?: string | null;
+  endedAt?: string | null;
+  createdAt: string;
+  participants?: ParticipantInfo[];
+  recordings?: RecordingInfo[];
+}
+
+export interface ParticipantInfo {
+  id: string;
+  meetingId: string;
+  schoolId: string;
+  userId: string;
+  fullName: string;
+  role: string; // HOST | COHOST | PARTICIPANT
+  status: string; // pending | approved | rejected | removed
+  isCoHost: boolean;
+  joinedAt?: string | null;
+  leftAt?: string | null;
+  createdAt: string;
+}
+
+export interface RecordingInfo {
+  id: string;
+  meetingId: string;
+  schoolId: string;
+  createdById: string;
+  url: string;
+  note: string;
+  durationSeconds: number;
+  createdAt: string;
+}
+
+export interface RessourceInfo {
+  id: string;
+  schoolId: string;
+  title: string;
+  description: string;
+  category: string;
+  matiere: string;
+  niveau: string;
+  author: string;
+  url: string;
+  fileUrl: string;
+  type: string; // LIEN | PDF | VIDEO | FICHIER
+  visibility: string; // PUBLIC | ROLE | CLASS
+  targetRole: string;
+  targetClassId: string;
+  createdById: string;
+  createdAt: string;
+  isFavorite?: boolean;
+}
+
+export interface FavoriteInfo {
+  id: string;
+  userId: string;
+  ressourceId: string;
   createdAt: string;
 }
 
@@ -173,6 +238,9 @@ export type PageView =
   | 'admin-reports'
   | 'admin-notifications'
   | 'admin-conferences'
+  | 'meetings'
+  | 'meeting-room'
+  | 'library'
   | 'admin-cards'
   | 'admin-courses'
   | 'admin-ai'
@@ -200,6 +268,10 @@ export type PageView =
   | 'parent-payments'
   | 'parent-notifications'
   | 'parent-ai'
+  | 'admin-presence'
+  | 'admin-schedules'
+  | 'auto-report-sync'
+  | 'cahier-cotation'
   | 'profile'
   | 'messages'
   | 'calendar'

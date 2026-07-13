@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { notifyUser } from '@/services/notifications/notificationEngine';
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,6 +8,7 @@ export async function GET(request: NextRequest) {
     const schoolId = searchParams.get('schoolId');
     const classId = searchParams.get('classId');
     const teacherId = searchParams.get('teacherId');
+    const scope = searchParams.get('scope'); // 'global' pour le récapitulatif consolidé
 
     if (!schoolId) {
       return NextResponse.json({ error: 'schoolId is required' }, { status: 400 });
@@ -20,6 +22,7 @@ export async function GET(request: NextRequest) {
       orderBy: { name: 'asc' },
     });
 
+    // Analyse détaillée d'une classe précise
     if (classId) {
       const whereEnroll: Record<string, unknown> = { classId };
       if (teacherId) {
@@ -35,20 +38,11 @@ export async function GET(request: NextRequest) {
 
       const enrolledStudents = await db.enrolledClass.findMany({
         where: { classId },
-        include: {
-          user: {
-            include: {
-              attendanceStudent: true,
-            },
-          },
-        },
+        include: { user: { include: { attendanceStudent: true } } },
       });
 
       const allGrades = await db.grade.findMany({
-        where: {
-          studentId: { in: enrolledStudents.map((e) => e.userId) },
-          schoolId,
-        },
+        where: { studentId: { in: enrolledStudents.map((e) => e.userId) }, schoolId },
         include: { course: { select: { name: true } } },
       });
 
@@ -81,15 +75,7 @@ export async function GET(request: NextRequest) {
         const justifiedAbsences = absences.filter((a) => a.reason && a.reason.length > 0);
         const unjustifiedAbsences = absences.filter((a) => !a.reason || a.reason.length === 0);
 
-        let autoDecision: string;
-        if (overallAverage >= 10 && unjustifiedAbsences.length <= 10) {
-          autoDecision = 'passage';
-        } else if (overallAverage < 9) {
-          autoDecision = 'redoublement';
-        } else {
-          autoDecision = 'en_deliberation';
-        }
-
+        const autoDecision = computeAutoDecision(overallAverage, unjustifiedAbsences.length);
 
         return {
           studentId: student.id,
@@ -101,16 +87,15 @@ export async function GET(request: NextRequest) {
           justifiedAbsences: justifiedAbsences.length,
           unjustifiedAbsences: unjustifiedAbsences.length,
           autoDecision,
+          hasGrades: grades.length > 0,
           hasReportCard: false,
         };
       });
 
-      return NextResponse.json({
-        analysis: { classId, studentCount: students.length },
-        students,
-      });
+      return NextResponse.json({ analysis: { classId, studentCount: students.length }, students });
     }
 
+    // Analyse par classe
     const classAnalysis = await Promise.all(
       classes.map(async (cls) => {
         const enrollments = await db.enrolledClass.findMany({
@@ -127,10 +112,12 @@ export async function GET(request: NextRequest) {
         let redoublements = 0;
         let finsCursus = 0;
         let enAttente = 0;
+        let sansNotes = 0;
 
         studentIds.forEach((sid) => {
           const sg = allGrades.filter((g) => g.studentId === sid);
           if (sg.length === 0) {
+            sansNotes++;
             enAttente++;
             return;
           }
@@ -150,17 +137,173 @@ export async function GET(request: NextRequest) {
           redoublements,
           finsCursus,
           enAttente,
+          sansNotes,
         };
       })
     );
 
-    return NextResponse.json({
-      classes: classAnalysis,
-    });
+    // Récapitulatif consolidé + diagnostics + transitions planifiées (scope global)
+    if (scope === 'global') {
+      const recap = await buildSchoolWideRecap(schoolId);
+      const diagnostics = await buildDiagnostics(schoolId);
+      return NextResponse.json({ classes: classAnalysis, recap, diagnostics });
+    }
+
+    return NextResponse.json({ classes: classAnalysis });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+async function buildSchoolWideRecap(schoolId: string) {
+  const classes = await db.schoolClass.findMany({
+    where: { schoolId },
+    include: { enrollments: { include: { user: { select: { id: true, fullName: true } } } } },
+  });
+
+  const studentIds = classes.flatMap((c) => c.enrollments.map((e) => e.userId));
+  const allGrades = await db.grade.findMany({
+    where: { schoolId, studentId: { in: studentIds } },
+  });
+  const existingDecisions = await db.deliberationDecision.findMany({
+    where: { schoolId, academicYear: getCurrentAcademicYear() },
+  });
+
+  const byClass: Record<string, { className: string; total: number; promoted: number; redoubling: number; leaving: number }> = {};
+  const plannedTransitions: {
+    studentId: string; fullName: string; currentClass: string;
+    decision: string; targetClass: string | null;
+  }[] = [];
+
+  let total = 0;
+  let promoted = 0;
+  let redoubling = 0;
+  let leaving = 0;
+
+  for (const cls of classes) {
+    byClass[cls.id] = { className: cls.name, total: 0, promoted: 0, redoubling: 0, leaving: 0 };
+    for (const enroll of cls.enrollments) {
+      const sid = enroll.userId;
+      total++;
+      byClass[cls.id].total++;
+
+      const decision = resolveDecision(existingDecisions, sid, cls.id, allGrades, sid);
+      const norm = normalizeDecision(decision);
+
+      if (norm === 'promoted') {
+        promoted++;
+        byClass[cls.id].promoted++;
+        const next = getNextLevel(cls.level, cls.name);
+        plannedTransitions.push({
+          studentId: sid,
+          fullName: enroll.user.fullName,
+          currentClass: cls.name,
+          decision,
+          targetClass: next ? next.name : null,
+        });
+      } else if (norm === 'redoubling') {
+        redoubling++;
+        byClass[cls.id].redoubling++;
+        plannedTransitions.push({
+          studentId: sid, fullName: enroll.user.fullName, currentClass: cls.name,
+          decision, targetClass: cls.name,
+        });
+      } else if (norm === 'leaving') {
+        leaving++;
+        byClass[cls.id].leaving++;
+        plannedTransitions.push({
+          studentId: sid, fullName: enroll.user.fullName, currentClass: cls.name,
+          decision, targetClass: null,
+        });
+      } else {
+        // en_deliberation / provisoire -> maintien en attendant délibération
+        byClass[cls.id].redoubling++;
+        redoubling++;
+        plannedTransitions.push({
+          studentId: sid, fullName: enroll.user.fullName, currentClass: cls.name,
+          decision, targetClass: cls.name,
+        });
+      }
+    }
+  }
+
+  return { total, promoted, redoubling, leaving, byClass };
+}
+
+async function buildDiagnostics(schoolId: string) {
+  const classes = await db.schoolClass.findMany({
+    where: { schoolId },
+    include: { enrollments: { include: { user: { select: { id: true } } } } },
+  });
+  const studentIds = classes.flatMap((c) => c.enrollments.map((e) => e.userId));
+  const grades = await db.grade.findMany({ where: { schoolId, studentId: { in: studentIds } } });
+  const reportCards = await db.reportCard.findMany({ where: { schoolId } });
+
+  const studentsWithoutGrades = studentIds.filter(
+    (sid) => !grades.some((g) => g.studentId === sid)
+  ).length;
+
+  const unvalidatedBulletins = reportCards.filter((rc) => rc.status !== 'validated').length;
+
+  const classesIncomplete: string[] = [];
+  for (const cls of classes) {
+    const sids = cls.enrollments.map((e) => e.userId);
+    const withGrades = sids.filter((sid) => grades.some((g) => g.studentId === sid)).length;
+    if (sids.length > 0 && withGrades < sids.length) classesIncomplete.push(cls.name);
+  }
+
+  const anomalies: string[] = [];
+  if (studentsWithoutGrades > 0)
+    anomalies.push(`${studentsWithoutGrades} élève(s) sans aucune note enregistrée.`);
+  if (unvalidatedBulletins > 0)
+    anomalies.push(`${unvalidatedBulletins} bulletin(s) non validé(s).`);
+  if (classesIncomplete.length > 0)
+    anomalies.push(`Classes avec évaluations incomplètes : ${classesIncomplete.join(', ')}.`);
+
+  return {
+    studentsWithoutGrades,
+    unvalidatedBulletins,
+    classesIncomplete,
+    anomalies,
+    canClose: anomalies.length === 0,
+  };
+}
+
+function getCurrentAcademicYear(): string {
+  const y = new Date().getFullYear();
+  return `${y}-${y + 1}`;
+}
+
+function computeAutoDecision(overallAverage: number, unjustifiedAbsences: number): string {
+  if (overallAverage >= 10 && unjustifiedAbsences <= 10) return 'passage';
+  if (overallAverage < 9) return 'redoublement';
+  return 'en_deliberation';
+}
+
+// Résout la décision réelle : délibération enregistrée en priorité, sinon auto.
+function resolveDecision(
+  decisions: { studentId: string; classId: string; decision: string }[],
+  studentId: string,
+  classId: string,
+  grades: { studentId: string; score: number; maxScore: number }[],
+  _sid: string
+): string {
+  const recorded = decisions.find((d) => d.studentId === studentId && d.classId === classId);
+  if (recorded) return recorded.decision;
+  const sg = grades.filter((g) => g.studentId === studentId);
+  if (sg.length === 0) return 'en_deliberation';
+  const sumScore = sg.reduce((s, g) => s + g.score, 0);
+  const sumMax = sg.reduce((s, g) => s + g.maxScore, 0);
+  const avg20 = sumMax > 0 ? (sumScore / sumMax) * 20 : 0;
+  return computeAutoDecision(avg20, 0);
+}
+
+function normalizeDecision(decision: string): 'promoted' | 'redoubling' | 'leaving' | 'pending' {
+  if (decision === 'passage' || decision === 'admis_apres_deliberation') return 'promoted';
+  if (decision === 'redoublement' || decision === 'non_admis') return 'redoubling';
+  if (decision === 'transfert' || decision === 'abandon' || decision === 'fin_cursus') return 'leaving';
+  return 'pending';
 }
 
 export async function POST(request: NextRequest) {
@@ -178,7 +321,7 @@ export async function POST(request: NextRequest) {
           schoolId,
           title: 'Année scolaire verrouillée',
           message: `L'année scolaire a été verrouillée par l'administration.`,
-          type: 'academic',
+          type: 'SYSTEM',
           senderId: adminId,
         },
       });
@@ -193,111 +336,22 @@ export async function POST(request: NextRequest) {
 
       for (const decision of decisions) {
         const studentId = decision.studentId;
-        const status = decision.status; // 'passage' | 'redoublement' | 'en_deliberation' | 'admis_apres_deliberation' | 'non_admis'
+        const status = decision.status;
         const comment = decision.comment || '';
 
-        // 1. Log deliberation decision in the database
         await db.deliberationDecision.create({
           data: {
             schoolId,
             studentId,
             classId,
-            academicYear: currentClass.createdAt.getFullYear().toString() + " - " + newAcademicYear,
+            academicYear: currentClass.createdAt.getFullYear().toString() + ' - ' + newAcademicYear,
             decision: status,
             validatedBy: adminId,
             comment,
-          }
+          },
         });
 
-        // 2. Perform enrollment updates based on status
-        if (status === 'passage' || status === 'admis_apres_deliberation') {
-          const nextLevel = getNextLevel(currentClass.level, currentClass.name);
-          if (nextLevel) {
-            let nextClass = await db.schoolClass.findFirst({
-              where: { schoolId, name: nextLevel.name, level: nextLevel.level },
-            });
-            if (!nextClass) {
-              nextClass = await db.schoolClass.create({
-                data: { schoolId, name: nextLevel.name, level: nextLevel.level, fees: currentClass.fees },
-              });
-            }
-
-            // Remove enrollment in the old class
-            await db.enrolledClass.deleteMany({
-              where: { userId: studentId, classId }
-            });
-
-            // Create enrollment in the new class
-            const existingEnroll = await db.enrolledClass.findUnique({
-              where: { userId_classId: { userId: studentId, classId: nextClass.id } },
-            });
-            if (!existingEnroll) {
-              await db.enrolledClass.create({
-                data: { userId: studentId, classId: nextClass.id },
-              });
-            }
-
-            // Update academic year and section on student profile
-            await db.user.update({
-              where: { id: studentId },
-              data: { academicYear: newAcademicYear }
-            });
-          }
-        } else if (status === 'redoublement' || status === 'non_admis') {
-          // Keep enrollment in the current class but update the student's academic year
-          await db.user.update({
-            where: { id: studentId },
-            data: { academicYear: newAcademicYear }
-          });
-        } else if (status === 'en_deliberation') {
-          // Keep student in deliberation (provisional status), no class change yet
-          await db.user.update({
-            where: { id: studentId },
-            data: { academicYear: newAcademicYear }
-          });
-        }
-
-        // 3. Send notifications to student & parents
-        const labelMap: Record<string, string> = {
-          passage: 'Admis(e) en classe supérieure',
-          admis_apres_deliberation: 'Admis(e) après délibération',
-          redoublement: 'Non admis(e) - redoublement',
-          non_admis: 'Non admis(e)',
-          en_deliberation: 'En délibération (décision provisoire)'
-        };
-        const statusLabel = labelMap[status] || status;
-
-        await db.notification.create({
-          data: {
-            schoolId,
-            userId: studentId,
-            senderId: adminId,
-            title: 'Résultat de fin d\'année',
-            message: `Votre décision de fin d'année pour l'année scolaire suivante (${newAcademicYear}) est : ${statusLabel}. ${comment ? `Note : ${comment}` : ''}`,
-            type: 'academic',
-            priority: 'HIGH'
-          }
-        });
-
-        // Find child's parent if exists
-        const childUser = await db.user.findUnique({
-          where: { id: studentId },
-          select: { parentId: true, fullName: true }
-        });
-
-        if (childUser?.parentId) {
-          await db.notification.create({
-            data: {
-              schoolId,
-              userId: childUser.parentId,
-              senderId: adminId,
-              title: `Résultat de fin d'année : ${childUser.fullName}`,
-              message: `La décision de fin d'année pour votre enfant ${childUser.fullName} est : ${statusLabel}. ${comment ? `Note : ${comment}` : ''}`,
-              type: 'academic',
-              priority: 'HIGH'
-            }
-          });
-        }
+        await applyTransition(schoolId, adminId, studentId, classId, currentClass, status, newAcademicYear, comment);
       }
 
       await db.notification.create({
@@ -305,7 +359,7 @@ export async function POST(request: NextRequest) {
           schoolId,
           title: 'Classes générées pour la nouvelle année',
           message: `Les classes pour l'année ${newAcademicYear} ont été créées.`,
-          type: 'academic',
+          type: 'SYSTEM',
           senderId: adminId,
         },
       });
@@ -313,10 +367,190 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, message: 'Classes générées avec succès' });
     }
 
+    // Clôture + transition SCHOOL-WIDE (atomique)
+    if (action === 'close-year') {
+      const targetYear = newAcademicYear || getNextAcademicYear();
+      const result = await executeSchoolWideTransition(schoolId, adminId, targetYear);
+      return NextResponse.json({ success: true, ...result });
+    }
+
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+async function executeSchoolWideTransition(schoolId: string, adminId: string, newYear: string) {
+  const classes = await db.schoolClass.findMany({
+    where: { schoolId },
+    include: { enrollments: { include: { user: { select: { id: true, fullName: true, parentId: true } } } } },
+  });
+
+  const studentIds = classes.flatMap((c) => c.enrollments.map((e) => e.userId));
+  const allGrades = await db.grade.findMany({ where: { schoolId, studentId: { in: studentIds } } });
+  const existingDecisions = await db.deliberationDecision.findMany({
+    where: { schoolId, academicYear: getCurrentAcademicYear() },
+  });
+
+  const tx: any[] = [];
+  let promoted = 0;
+  let redoubling = 0;
+  let leaving = 0;
+  const notified: { userId: string; parentId?: string | null; fullName: string; label: string }[] = [];
+
+  for (const cls of classes) {
+    for (const enroll of cls.enrollments) {
+      const sid = enroll.userId;
+      const decision = resolveDecision(existingDecisions, sid, cls.id, allGrades, sid);
+      const norm = normalizeDecision(decision);
+
+      if (norm === 'promoted') {
+        const next = getNextLevel(cls.level, cls.name);
+        if (!next) {
+          // Fin de cursus -> sortie
+          tx.push(db.user.update({ where: { id: sid }, data: { academicYear: newYear, active: false } }));
+          leaving++;
+          notified.push({ userId: sid, parentId: enroll.user.parentId, fullName: enroll.user.fullName, label: 'Fin de cursus (diplômé)' });
+          continue;
+        }
+        let nextClass = await db.schoolClass.findFirst({ where: { schoolId, name: next.name, level: next.level } });
+        if (!nextClass) {
+          nextClass = await db.schoolClass.create({ data: { schoolId, name: next.name, level: next.level, fees: cls.fees } });
+        }
+        tx.push(db.enrolledClass.deleteMany({ where: { userId: sid, classId: cls.id } }));
+        tx.push(db.enrolledClass.upsert({
+          where: { userId_classId: { userId: sid, classId: nextClass.id } },
+          create: { userId: sid, classId: nextClass.id },
+          update: {},
+        }));
+        tx.push(db.user.update({ where: { id: sid }, data: { academicYear: newYear } }));
+        promoted++;
+        notified.push({ userId: sid, parentId: enroll.user.parentId, fullName: enroll.user.fullName, label: `Admis(e) en ${next.name}` });
+      } else if (norm === 'redoubling') {
+        tx.push(db.user.update({ where: { id: sid }, data: { academicYear: newYear } }));
+        redoubling++;
+        notified.push({ userId: sid, parentId: enroll.user.parentId, fullName: enroll.user.fullName, label: 'Non admis(e) - redoublement' });
+      } else if (norm === 'leaving') {
+        tx.push(db.user.update({ where: { id: sid }, data: { academicYear: newYear, active: false } }));
+        leaving++;
+        notified.push({ userId: sid, parentId: enroll.user.parentId, fullName: enroll.user.fullName, label: 'Sortie de l\'établissement' });
+      } else {
+        // en délibération -> maintien en attendant décision définitive
+        tx.push(db.user.update({ where: { id: sid }, data: { academicYear: newYear } }));
+        redoubling++;
+        notified.push({ userId: sid, parentId: enroll.user.parentId, fullName: enroll.user.fullName, label: 'Maintien (délibération en attente)' });
+      }
+    }
+  }
+
+  // Historise la clôture + ouvre la nouvelle année
+  tx.push(db.schoolYear.upsert({
+    where: { schoolId_year: { schoolId, year: getCurrentAcademicYear() } },
+    create: { schoolId, year: getCurrentAcademicYear(), status: 'CLOSED', closedById: adminId, closedAt: new Date(), transitionData: { newYear, promoted, redoubling, leaving } },
+    update: { status: 'CLOSED', closedById: adminId, closedAt: new Date(), transitionData: { newYear, promoted, redoubling, leaving } },
+  }));
+  tx.push(db.schoolYear.upsert({
+    where: { schoolId_year: { schoolId, year: newYear } },
+    create: { schoolId, year: newYear, status: 'OPEN' },
+    update: { status: 'OPEN' },
+  }));
+
+  await db.$transaction(tx);
+
+  // Notifications temps réel (déjà diffusées via Supabase Realtime)
+  for (const n of notified) {
+    await notifyUser({
+      schoolId,
+      userId: n.userId,
+      title: 'Résultat de fin d\'année',
+      message: `Votre situation pour ${newYear} : ${n.label}.`,
+      type: 'SYSTEM',
+      priority: 'HIGH',
+    });
+    if (n.parentId) {
+      await notifyUser({
+        schoolId,
+        userId: n.parentId,
+        title: `Résultat : ${n.fullName}`,
+        message: `Situation de fin d'année de ${n.fullName} (${newYear}) : ${n.label}.`,
+        type: 'SYSTEM',
+        priority: 'HIGH',
+      });
+    }
+  }
+
+  return { newYear, promoted, redoubling, leaving };
+}
+
+async function applyTransition(
+  schoolId: string,
+  adminId: string,
+  studentId: string,
+  classId: string,
+  currentClass: { level: string; name: string; fees: number },
+  status: string,
+  newAcademicYear: string,
+  comment: string
+) {
+  const norm = normalizeDecision(status);
+  if (norm === 'promoted') {
+    const next = getNextLevel(currentClass.level, currentClass.name);
+    if (next) {
+      let nextClass = await db.schoolClass.findFirst({ where: { schoolId, name: next.name, level: next.level } });
+      if (!nextClass) nextClass = await db.schoolClass.create({ data: { schoolId, name: next.name, level: next.level, fees: currentClass.fees } });
+      await db.enrolledClass.deleteMany({ where: { userId: studentId, classId } });
+      await db.enrolledClass.upsert({
+        where: { userId_classId: { userId: studentId, classId: nextClass.id } },
+        create: { userId: studentId, classId: nextClass.id },
+        update: {},
+      });
+    }
+    await db.user.update({ where: { id: studentId }, data: { academicYear: newAcademicYear } });
+  } else if (norm === 'leaving') {
+    await db.user.update({ where: { id: studentId }, data: { academicYear: newAcademicYear, active: false } });
+  } else {
+    // redoubling / pending -> maintien
+    await db.user.update({ where: { id: studentId }, data: { academicYear: newAcademicYear } });
+  }
+
+  const labelMap: Record<string, string> = {
+    passage: 'Admis(e) en classe supérieure',
+    admis_apres_deliberation: 'Admis(e) après délibération',
+    redoublement: 'Non admis(e) - redoublement',
+    non_admis: 'Non admis(e)',
+    en_deliberation: 'En délibération (décision provisoire)',
+    transfert: 'Transfert vers un autre établissement',
+    abandon: 'Abandon scolaire',
+    fin_cursus: 'Fin de cursus',
+  };
+  const statusLabel = labelMap[status] || status;
+
+  await db.notification.create({
+    data: {
+      schoolId,
+      userId: studentId,
+      senderId: adminId,
+      title: 'Résultat de fin d\'année',
+      message: `Votre décision pour ${newAcademicYear} est : ${statusLabel}. ${comment ? `Note : ${comment}` : ''}`,
+      type: 'SYSTEM',
+      priority: 'HIGH',
+    },
+  });
+
+  const childUser = await db.user.findUnique({ where: { id: studentId }, select: { parentId: true, fullName: true } });
+  if (childUser?.parentId) {
+    await db.notification.create({
+      data: {
+        schoolId,
+        userId: childUser.parentId,
+        senderId: adminId,
+        title: `Résultat de fin d'année : ${childUser.fullName}`,
+        message: `La décision pour votre enfant ${childUser.fullName} est : ${statusLabel}. ${comment ? `Note : ${comment}` : ''}`,
+        type: 'SYSTEM',
+        priority: 'HIGH',
+      },
+    });
   }
 }
 
@@ -338,4 +572,9 @@ function getNextLevel(level: string, name: string): { name: string; level: strin
     return { name: names[nextNum] || `${nextNum}ème`, level: 'Secondaire' };
   }
   return { name: '1ère', level: 'Primaire' };
+}
+
+function getNextAcademicYear(): string {
+  const y = new Date().getFullYear();
+  return `${y + 1}-${y + 2}`;
 }

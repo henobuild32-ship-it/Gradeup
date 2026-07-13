@@ -66,6 +66,8 @@ interface UserItem {
   role: string;
   active?: boolean;
   classEnrollments?: Array<{ class: { id: string; name: string } }>;
+  isTitulaire?: boolean;
+  titulaireClassIds?: string[];
 }
 
 interface ClassItem {
@@ -123,6 +125,8 @@ export default function AdminUsers() {
   const [formRole, setFormRole] = useState('STUDENT');
   const [formClassName, setFormClassName] = useState('');
   const [formParentId, setFormParentId] = useState('');
+  const [formIsTitulaire, setFormIsTitulaire] = useState(false);
+  const [formTitulaireClassIds, setFormTitulaireClassIds] = useState<string[]>([]);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -186,6 +190,8 @@ export default function AdminUsers() {
     setFormRole('STUDENT');
     setFormClassName('');
     setFormParentId('');
+    setFormIsTitulaire(false);
+    setFormTitulaireClassIds([]);
     setEditingUser(null);
   };
 
@@ -202,6 +208,8 @@ export default function AdminUsers() {
     setFormRole(u.role);
     setFormClassName(u.classEnrollments?.[0]?.class?.name || '');
     setFormParentId('');
+    setFormIsTitulaire(u.isTitulaire || false);
+    setFormTitulaireClassIds(u.titulaireClassIds || []);
     setDialogOpen(true);
   };
 
@@ -223,6 +231,8 @@ export default function AdminUsers() {
           fullName: formName,
           email: formEmail,
           role: formRole,
+          isTitulaire: formIsTitulaire,
+          titulaireClassIds: formIsTitulaire ? formTitulaireClassIds : [],
         };
         if (formPassword) body.password = formPassword;
 
@@ -241,6 +251,8 @@ export default function AdminUsers() {
           email: formEmail,
           password: formPassword,
           role: formRole,
+          isTitulaire: formIsTitulaire,
+          titulaireClassIds: formIsTitulaire ? formTitulaireClassIds : [],
         };
         if (formRole === 'STUDENT' && formClassName) body.className = formClassName;
         if (formRole === 'STUDENT' && formParentId) body.parentId = formParentId;
@@ -416,11 +428,14 @@ export default function AdminUsers() {
                       <TableCell>
                         <Badge variant="outline" className={roleColors[u.role] || ''}>
                           {roleLabels[u.role] || u.role}
+                          {u.role === 'TEACHER' && u.isTitulaire && ' (Titulaire)'}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         {u.classEnrollments && u.classEnrollments.length > 0
                           ? u.classEnrollments.map((e) => e.class.name).join(', ')
+                          : u.isTitulaire && u.titulaireClassIds && u.titulaireClassIds.length > 0
+                          ? `Titulaire: ${u.titulaireClassIds.map(cid => classes.find(c => c.id === cid)?.name).filter(Boolean).join(', ')}`
                           : '—'}
                       </TableCell>
                       <TableCell>
@@ -529,6 +544,53 @@ export default function AdminUsers() {
                 </SelectContent>
               </Select>
             </div>
+            {formRole === 'TEACHER' && (
+              <div className="space-y-3 p-3 border rounded-lg bg-slate-50/50 dark:bg-slate-900/20">
+                <div className="flex items-center gap-2">
+                  <input
+                    id="form-is-titulaire"
+                    type="checkbox"
+                    checked={formIsTitulaire}
+                    onChange={(e) => setFormIsTitulaire(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <Label htmlFor="form-is-titulaire" className="font-semibold cursor-pointer">Professeur titulaire</Label>
+                </div>
+                {formIsTitulaire && (
+                  <div className="space-y-2 mt-2 pt-2 border-t border-dashed">
+                    <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      Classes dont il est titulaire ({formTitulaireClassIds.length})
+                    </Label>
+                    <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-1 bg-white dark:bg-black/20 rounded border">
+                      {classes.length === 0 ? (
+                        <p className="text-xs text-muted-foreground col-span-2 p-2 text-center">Aucune classe disponible</p>
+                      ) : (
+                        classes.map((c) => {
+                          const isChecked = formTitulaireClassIds.includes(c.id);
+                          return (
+                            <label key={c.id} className="flex items-center gap-2 text-xs cursor-pointer p-1 hover:bg-muted/50 rounded transition-colors">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {
+                                  if (isChecked) {
+                                    setFormTitulaireClassIds(formTitulaireClassIds.filter(id => id !== c.id));
+                                  } else {
+                                    setFormTitulaireClassIds([...formTitulaireClassIds, c.id]);
+                                  }
+                                }}
+                                className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="truncate">{c.name}</span>
+                            </label>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             {formRole === 'STUDENT' && (
               <>
                 <div className="space-y-2">

@@ -38,7 +38,7 @@ const roleLabels: Record<string, string> = {
 };
 
 export default function ProfilePage() {
-  const { user, setUser, setCurrentPage } = useAppStore();
+  const { user, setUser, setCurrentPage, logout } = useAppStore();
   const { toast } = useToast();
 
   const [name, setName] = useState(user?.fullName || '');
@@ -100,8 +100,7 @@ export default function ProfilePage() {
     .slice(0, 2);
 
   const handleLogout = () => {
-    setUser(null);
-    setCurrentPage('auth');
+    logout();
     toast({ title: 'Déconnexion', description: 'Vous avez été déconnecté.' });
   };
 

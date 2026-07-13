@@ -94,3 +94,45 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { id, name, description, teacherId, status, maxScore, coefficient } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: 'Missing required field: id' }, { status: 400 });
+    }
+
+    const course = await db.course.update({
+      where: { id },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(description !== undefined && { description }),
+        ...(teacherId !== undefined && { teacherId }),
+        ...(status !== undefined && { status }),
+        ...(maxScore !== undefined && { maxScore: parseFloat(maxScore) }),
+        ...(coefficient !== undefined && { coefficient: parseInt(coefficient, 10) }),
+      },
+      include: {
+        class: true,
+        teacher: {
+          select: { id: true, fullName: true, role: true },
+        },
+        _count: {
+          select: {
+            lessons: true,
+            grades: true,
+            homework: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json({ course });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+

@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { BookOpen, Users, FileText, Plus, GraduationCap, Clock, Lightbulb, RefreshCw } from 'lucide-react';
 import type { CourseInfo, LessonInfo, UserInfo } from '@/lib/types';
+import PresenceWidget from './presence-widget';
 
 export default function TeacherDashboard() {
   const { user } = useAppStore();
@@ -105,6 +106,9 @@ export default function TeacherDashboard() {
           <BookOpen className="h-24 w-24 text-white/10" />
         </div>
       </div>
+
+      {/* Pointage de présence */}
+      <PresenceWidget compact />
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

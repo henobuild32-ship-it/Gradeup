@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { syncStudentReport } from '@/lib/grade-sync';
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,6 +9,7 @@ export async function GET(request: NextRequest) {
     const studentId = searchParams.get('studentId');
     const courseId = searchParams.get('courseId');
     const trimester = searchParams.get('trimester');
+    const teacherId = searchParams.get('teacherId');
 
     if (!schoolId) {
       return NextResponse.json({ error: 'schoolId is required' }, { status: 400 });
@@ -15,17 +17,10 @@ export async function GET(request: NextRequest) {
 
     const where: Record<string, unknown> = { schoolId };
 
-    if (studentId) {
-      where.studentId = studentId;
-    }
-
-    if (courseId) {
-      where.courseId = courseId;
-    }
-
-    if (trimester) {
-      where.trimester = trimester;
-    }
+    if (studentId) where.studentId = studentId;
+    if (courseId) where.courseId = courseId;
+    if (trimester) where.trimester = trimester;
+    if (teacherId) where.teacherId = teacherId;
 
     const grades = await db.grade.findMany({
       where,
@@ -84,6 +79,12 @@ export async function POST(request: NextRequest) {
           select: { id: true, fullName: true, role: true },
         },
       },
+    });
+
+    // ── Auto-sync: update/create the student's report card ──────────────────
+    // Fire-and-forget: we don't block the response on the sync.
+    syncStudentReport(schoolId, studentId, trimester || '1').catch((err) => {
+      console.error('[grade-sync] background sync error after POST /api/grades:', err);
     });
 
     return NextResponse.json({ grade }, { status: 201 });

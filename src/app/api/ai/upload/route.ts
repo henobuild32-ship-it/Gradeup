@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
 import { randomUUID } from 'crypto';
+import { uploadFile } from '@/lib/storage';
+import { generateGLMCompletion } from '@/lib/ai/glm-completion';
 
 export const runtime = 'nodejs';
 
@@ -55,111 +55,28 @@ async function extractText(buffer: Buffer, mimeType: string): Promise<string> {
 async function generateSummary(
   text: string,
   fileName: string,
-  mimeType: string,
-  buffer?: Buffer
+  mimeType: string
 ): Promise<string> {
-  const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
-  const OR_API_KEY = process.env.OR_API_KEY;
-  
-  if (!DEEPSEEK_API_KEY && !OR_API_KEY) {
-    return 'Service IA non configuré pour résumer le document.';
-  }
-
   const isImage = mimeType.startsWith('image/');
 
-  try {
-    const key = DEEPSEEK_API_KEY || OR_API_KEY;
-    const isUsingOpenRouter = !DEEPSEEK_API_KEY;
-    
-    const url = isUsingOpenRouter 
-      ? 'https://openrouter.ai/api/v1/chat/completions' 
-      : 'https://api.deepseek.com/chat/completions';
+  const promptSystem = isImage
+    ? "Tu es Gradie, l'assistante IA de GradeUp. Décris et explique cette image en français en te basant sur le texte extrait par OCR. Maximum 3 paragraphes."
+    : "Tu es Gradie, l'assistante IA de GradeUp. Résume le document ci-dessous en français de manière claire, concise et utile pour un élève ou un professeur. Maximum 3 paragraphes.";
 
-    let model = isUsingOpenRouter
-      ? (process.env.OR_MODEL || 'deepseek/deepseek-chat-v3-0324:free')
-      : 'deepseek-chat';
+  const userContent = isImage
+    ? `Image : "${fileName}"\nTexte OCR extrait : ${text.slice(0, 4000)}`
+    : `Document : "${fileName}"\n\n${text.slice(0, 8000)}`;
 
-    // Si c'est une image et qu'on utilise OpenRouter, on utilise un modèle vision gratuit
-    if (isImage && isUsingOpenRouter) {
-      model = 'google/gemini-2.0-flash-exp:free';
-    }
+  const summary = await generateGLMCompletion(promptSystem, userContent, {
+    temperature: 0.5,
+    maxTokens: 600,
+  });
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${key}`,
-    };
-
-    if (isUsingOpenRouter) {
-      headers['HTTP-Referer'] = 'https://gradeup.vercel.app';
-      headers['X-Title'] = 'GradeUp';
-    }
-
-    let messages;
-    if (isImage && buffer && isUsingOpenRouter) {
-      const base64Image = buffer.toString('base64');
-      messages = [
-        {
-          role: 'system',
-          content: 'Tu es Gradie, l\'assistante IA de GradeUp. Analyse cette image et fournis une description détaillée en français, ainsi qu\'un résumé du texte visible. Sois claire, structurée et concise.',
-        },
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `Image : "${fileName}"\nTexte OCR extrait : ${text.slice(0, 1000)}`,
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:${mimeType};base64,${base64Image}`,
-              },
-            },
-          ],
-        },
-      ];
-    } else {
-      const promptSystem = isImage
-        ? 'Tu es Gradie, l\'assistante IA de GradeUp. Décris et explique cette image en français en te basant sur le texte extrait par OCR. Maximum 3 paragraphes.'
-        : 'Tu es Gradie, l\'assistante IA de GradeUp. Résume le document ci-dessous en français de manière claire, concise et utile pour un élève ou un professeur. Maximum 3 paragraphes.';
-
-      messages = [
-        {
-          role: 'system',
-          content: promptSystem,
-        },
-        {
-          role: 'user',
-          content: `Document : "${fileName}"\n\n${text.slice(0, 8000)}`,
-        },
-      ];
-    }
-
-    const res = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: 0.5,
-        max_tokens: 600,
-      }),
-    });
-
-    if (!res.ok) {
-      // En cas d'échec du modèle vision, fallback sur le modèle textuel classique
-      if (isImage && isUsingOpenRouter && model !== (process.env.OR_MODEL || 'deepseek/deepseek-chat-v3-0324:free')) {
-        return generateSummary(text, fileName, mimeType);
-      }
-      return '';
-    }
-
-    const data = await res.json();
-    return data.choices?.[0]?.message?.content || '';
-  } catch (error) {
-    console.error('Error generating summary:', error);
-    return '';
+  if (!summary) {
+    return 'Le document a été analysé mais le service IA n\'a pas pu générer de résumé.';
   }
+
+  return summary;
 }
 
 export async function POST(request: NextRequest) {
@@ -200,22 +117,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Conversation introuvable.' }, { status: 404 });
     }
 
-    // Sauvegarde du fichier
+    // Sauvegarde du fichier (cloud storage si configuré, sinon FS local)
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     const ext = ALLOWED_TYPES[file.type];
-    const fileName = `${randomUUID()}${ext}`;
-    const uploadsDir = join(process.cwd(), 'public', 'uploads');
-    await mkdir(uploadsDir, { recursive: true });
-    const filePath = join(uploadsDir, fileName);
-    await writeFile(filePath, buffer);
-    const fileUrl = `/uploads/${fileName}`;
+    const storedName = `${randomUUID()}${ext}`;
+    const { url: fileUrl } = await uploadFile(buffer, storedName, file.type);
 
     // Extraction du texte / OCR
     const extractedText = await extractText(buffer, file.type);
 
-    // Résumé / Description par l'IA (avec vision si image)
-    const summary = await generateSummary(extractedText, file.name, file.type, buffer);
+    // Résumé / Description par l'IA (GLM)
+    const summary = await generateSummary(extractedText, file.name, file.type);
 
     // Sauvegarde en base
     const document = await db.aiDocument.create({

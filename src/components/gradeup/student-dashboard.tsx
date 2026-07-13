@@ -10,6 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { TrendingUp, BookOpen, CalendarX, CreditCard, User, Bell, FileText, Clock, Sparkles, Target, Award, Key, Copy, Check, RefreshCw, Users } from 'lucide-react';
 import { AttendanceTrendChart } from './charts-widget';
+import PresenceWidget from './presence-widget';
+import WeeklyScheduleView from './weekly-schedule-view';
 
 const subjectColors = [
   { border: 'border-l-blue-400', bg: 'bg-blue-50', text: 'text-blue-600' },
@@ -253,6 +255,14 @@ export default function StudentDashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Pointage de présence */}
+      <PresenceWidget />
+
+      {/* Emploi du temps hebdomadaire */}
+      {user?.schoolId && classId && (
+        <WeeklyScheduleView schoolId={user.schoolId} classId={classId} classNameLabel={className} />
+      )}
 
       {/* Parent Code Card */}
       <Card className="relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">

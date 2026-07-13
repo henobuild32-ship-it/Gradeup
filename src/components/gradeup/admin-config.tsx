@@ -111,25 +111,20 @@ export default function AdminConfig() {
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Logo is now saved immediately on upload via /api/ecole/logo
+      // This endpoint only saves currency
       const res = await fetch('/api/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           schoolId: user?.schoolId,
           currency: selectedCurrency,
-          logoUrl: logoUrl,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erreur');
       toast.success('Configuration mise à jour avec succès');
-      setConfig(data.config);
-      setLogoUrl(data.config.logoUrl || '');
-      
-      // Update local store user object if needed to sync immediately
-      if (user && user.school) {
-        user.school.logoUrl = data.config.logoUrl || '';
-      }
+      setConfig((prev) => prev ? { ...prev, ...data.config } : data.config);
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : 'Erreur lors de la mise à jour');
     } finally {
@@ -137,27 +132,61 @@ export default function AdminConfig() {
     }
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        toast.error('L\'image est trop grande (max 2MB)');
-        return;
-      }
-      setUploading(true);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setLogoUrl(reader.result as string);
-        setUploading(false);
-        toast.success('Logo chargé en mémoire. Pensez à enregistrer vos modifications.');
-      };
-      reader.readAsDataURL(file);
+    if (!file || !user?.schoolId) return;
+
+    const MAX_MB = 48;
+    if (file.size > MAX_MB * 1024 * 1024) {
+      toast.error(`L'image est trop grande (max ${MAX_MB} MB).`);
+      return;
+    }
+
+    const ALLOWED = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'];
+    if (!ALLOWED.includes(file.type)) {
+      toast.error('Format invalide. Acceptés : JPG, PNG, WEBP, GIF, SVG.');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('schoolId', user.schoolId);
+
+      const res = await fetch('/api/ecole/logo', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erreur upload');
+
+      setLogoUrl(data.logoUrl);
+      setConfig((prev) => prev ? { ...prev, logoUrl: data.logoUrl } : prev);
+      if (user?.school) user.school.logoUrl = data.logoUrl;
+      toast.success('✅ Logo uploadé et sauvegardé dans Supabase !');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Erreur lors de l\'upload du logo.');
+    } finally {
+      setUploading(false);
+      // Reset input so same file can be re-selected
+      e.target.value = '';
     }
   };
 
-  const handleRemoveLogo = () => {
-    setLogoUrl('');
-    toast.success('Logo retiré. Pensez à enregistrer vos modifications.');
+  const handleRemoveLogo = async () => {
+    if (!user?.schoolId) return;
+    try {
+      const res = await fetch('/api/ecole/logo', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schoolId: user.schoolId }),
+      });
+      if (!res.ok) throw new Error('Erreur suppression logo');
+      setLogoUrl('');
+      setConfig((prev) => prev ? { ...prev, logoUrl: '' } : prev);
+      if (user?.school) user.school.logoUrl = '';
+      toast.success('Logo supprimé.');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Erreur lors de la suppression.');
+    }
   };
 
   const currentCurrency = currencies.find((c) => c.value === selectedCurrency);
@@ -281,7 +310,7 @@ export default function AdminConfig() {
 
               <Button
                 onClick={handleSave}
-                disabled={saving || (selectedCurrency === config?.currency && logoUrl === (config?.logoUrl || ''))}
+                disabled={saving || selectedCurrency === config?.currency}
                 className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-blue-500/20 animate-scale-in"
               >
                 {saving ? (
@@ -292,7 +321,7 @@ export default function AdminConfig() {
                 ) : (
                   <>
                     <Save className="h-4 w-4 mr-2" />
-                    Enregistrer la configuration
+                    Enregistrer la devise
                   </>
                 )}
               </Button>
@@ -337,22 +366,34 @@ export default function AdminConfig() {
                 )}
 
                 <div className="w-full">
-                  <Label htmlFor="school-logo-upload" className="cursor-pointer">
+                  <Label htmlFor="school-logo-upload" className={uploading ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}>
                     <div className="flex items-center justify-center gap-2 border-2 border-dashed rounded-lg p-3 hover:bg-muted/50 transition-colors">
-                      <Upload className="w-4 h-4 text-muted-foreground" />
+                      {uploading ? (
+                        <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+                      ) : (
+                        <Upload className="w-4 h-4 text-muted-foreground" />
+                      )}
                       <span className="text-sm text-muted-foreground">
-                        {uploading ? 'Chargement...' : 'Sélectionner un logo (PNG, JPG - max 2MB)'}
+                        {uploading
+                          ? 'Upload en cours vers Supabase...'
+                          : 'Sélectionner un logo (JPG, PNG, WEBP, GIF, SVG — max 48 MB)'}
                       </span>
                     </div>
                   </Label>
                   <input
                     id="school-logo-upload"
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
                     className="hidden"
                     onChange={handleLogoUpload}
                     disabled={uploading}
                   />
+                  {logoUrl && (
+                    <p className="text-[11px] text-emerald-600 mt-1.5 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Logo sauvegardé — utilisé automatiquement sur les cartes d&apos;identité
+                    </p>
+                  )}
                 </div>
               </div>
             </CardContent>

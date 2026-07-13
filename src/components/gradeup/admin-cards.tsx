@@ -27,6 +27,7 @@ interface EnrolledClassInfo {
 interface StudentItem {
   id: string;
   fullName: string;
+  email?: string;
   postName?: string;
   gender?: string;
   birthDate?: string;
@@ -57,6 +58,8 @@ export default function AdminCards() {
   const [activeTab, setActiveTab] = useState<string>('ALL');
   const [cardRole, setCardRole] = useState<'STUDENT' | 'TEACHER'>('STUDENT');
   const [schoolLogo, setSchoolLogo] = useState('');
+  const [schoolEmail, setSchoolEmail] = useState('');
+  const [schoolAddress, setSchoolAddress] = useState('');
   const printRef = useRef<HTMLDivElement>(null);
 
   // Edit/Create State
@@ -146,6 +149,10 @@ export default function AdminCards() {
       const data = await res.json();
       if (data.config) {
         setSchoolLogo(data.config.logoUrl || '');
+        setSchoolEmail(data.config.email || '');
+        // Build address from commune + city + province
+        const parts = [data.config.commune, data.config.city, data.config.province].filter(Boolean);
+        setSchoolAddress(parts.join(', '));
       }
     } catch {
       // silencieux
@@ -189,6 +196,7 @@ export default function AdminCards() {
     setIsCreating(false);
     setFormData({
       fullName: student.fullName,
+      email: student.email || '',
       postName: student.postName || '',
       gender: student.gender || 'M',
       birthDate: student.birthDate || '',
@@ -212,6 +220,7 @@ export default function AdminCards() {
     setIsCreating(true);
     setFormData({
       fullName: '',
+      email: '',
       postName: '',
       gender: 'M',
       birthDate: '',
@@ -357,7 +366,9 @@ export default function AdminCards() {
             courseName: student.section, // use section as subject for teachers if editing
           }} 
           schoolName={user?.school?.name || 'Établissement GradeUp'} 
-          schoolLogo={schoolLogo} 
+          schoolLogo={schoolLogo}
+          schoolEmail={schoolEmail}
+          schoolAddress={schoolAddress}
           role={cardRole} 
         />
       </div>
@@ -573,6 +584,16 @@ export default function AdminCards() {
                 value={formData.postName || ''} 
                 onChange={(e) => setFormData({...formData, postName: e.target.value})} 
                 placeholder="Nom du père"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Email (Prof / Élève)</Label>
+              <Input 
+                type="email"
+                value={formData.email || ''} 
+                onChange={(e) => setFormData({...formData, email: e.target.value})} 
+                placeholder="Ex: prof@ecole.com"
               />
             </div>
             

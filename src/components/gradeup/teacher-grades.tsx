@@ -14,7 +14,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Edit, Trash2, GraduationCap, Filter, Calculator, Sparkles, Check } from 'lucide-react';
+import { Plus, Edit, Trash2, GraduationCap, Filter, Calculator, Sparkles, Check, Zap, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import type { CourseInfo, GradeInfo, UserInfo } from '@/lib/types';
 
@@ -45,6 +45,19 @@ export default function TeacherGrades() {
   const [formReason, setFormReason] = useState('');
   const [gradeHistoryList, setGradeHistoryList] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // Sync state: tracks the last auto-sync event for the banner
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+  const [lastSyncInfo, setLastSyncInfo] = useState<{ student: string; trimester: string; average: number } | null>(null);
+  const [syncVisible, setSyncVisible] = useState(false);
+
+  const showSyncBanner = (studentName: string, trimester: string, average: number) => {
+    setLastSyncedAt(new Date());
+    setLastSyncInfo({ student: studentName, trimester, average });
+    setSyncVisible(true);
+    // Auto-hide after 5 seconds
+    setTimeout(() => setSyncVisible(false), 5000);
+  };
 
   const fetchCourses = useCallback(async () => {
     if (!user) return;
@@ -250,10 +263,14 @@ export default function TeacherGrades() {
         return;
       }
 
+      const studentName = students.find(s => s.id === formStudentId)?.fullName || 'Élève';
       toast.success(editingGrade ? 'Note modifiée avec succès' : 'Note ajoutée avec succès');
       setDialogOpen(false);
       resetForm();
       fetchGrades();
+
+      // Show sync banner
+      showSyncBanner(studentName, formTrimester, parseFloat(formScore) / parseFloat(formMaxScore) * 20);
     } catch {
       toast.error('Erreur lors de l\'enregistrement');
     } finally {
@@ -292,11 +309,20 @@ export default function TeacherGrades() {
       });
 
       if (res.ok) {
-        toast.success(`Note de ${gridStudents.find(s => s.id === studentId)?.fullName} enregistrée`);
+        const studentName = gridStudents.find(s => s.id === studentId)?.fullName || 'Élève';
+        toast.success(`Note de ${studentName} enregistrée`);
         // Refresh local grades query
         const gradesRes = await fetch(`/api/grades?schoolId=${user.schoolId}&teacherId=${user.id}&courseId=${filterCourseId}&trimester=${filterTrimester}`);
         const data = await gradesRes.json();
-        setGrades(Array.isArray(data.grades) ? data.grades : []);
+        const freshGrades = Array.isArray(data.grades) ? data.grades : [];
+        setGrades(freshGrades);
+
+        // Compute local average for sync banner
+        const studentGrades = freshGrades.filter((g: any) => g.studentId === studentId);
+        const avg = studentGrades.length > 0
+          ? studentGrades.reduce((s: number, g: any) => s + (g.score / g.maxScore) * 20, 0) / studentGrades.length
+          : 0;
+        showSyncBanner(studentName, filterTrimester, Math.round(avg * 100) / 100);
       }
     } catch {
       toast.error('Erreur lors de l\'enregistrement automatique');
@@ -346,6 +372,29 @@ export default function TeacherGrades() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+
+      {/* ── Auto-sync confirmation banner ── */}
+      {syncVisible && lastSyncInfo && (
+        <div className="fixed bottom-24 right-6 z-50 animate-fade-in">
+          <div className="flex items-center gap-3 bg-emerald-600 text-white rounded-2xl px-5 py-3.5 shadow-2xl shadow-emerald-500/30 border border-emerald-500">
+            <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+              <Zap className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-sm font-bold leading-tight">Bulletin mis à jour automatiquement</p>
+              <p className="text-xs text-emerald-100 mt-0.5">
+                {lastSyncInfo.student} · T{lastSyncInfo.trimester} · Moy. {lastSyncInfo.average.toFixed(1)}/20
+              </p>
+            </div>
+            <button
+              onClick={() => setSyncVisible(false)}
+              className="ml-2 text-emerald-200 hover:text-white transition-colors text-lg leading-none"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
       {/* Page Header */}
       <div className="mb-6 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 p-6">
         <div className="flex items-start justify-between gap-4 flex-wrap">

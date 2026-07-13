@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { hashPassword } from '@/lib/password';
 
 function generateCode(prefix: string, length: number = 6): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
         data: {
           name: schoolName,
           email,
-          password,
+          password: await hashPassword(password),
           inviteCode: code,
         },
       });
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
           schoolId: school.id,
           fullName,
           email,
-          password,
+          password: await hashPassword(password),
           role: 'ADMIN',
           parentCode: parentCodeVal,
         },
@@ -135,7 +136,7 @@ export async function POST(request: NextRequest) {
       const userData: Record<string, unknown> = {
         schoolId: school.id,
         fullName: cleanFullName,
-        password,
+        password: await hashPassword(password),
         role,
         parentCode: parentCodeVal,
         email: email || '',

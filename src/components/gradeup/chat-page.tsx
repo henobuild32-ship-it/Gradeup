@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Send, Search, MessageCircle, ArrowLeft, Users } from 'lucide-react';
+import { subscribeToTable, isRealtimeEnabled } from '@/lib/realtime';
 
 const roleLabels: Record<string, string> = {
   ADMIN: 'Admin',
@@ -194,16 +195,40 @@ export default function ChatPage() {
     init();
   }, [fetchContacts, fetchConversations]);
 
-  // Polling every 3 seconds
+  // Real-time messages via Supabase Realtime (WebSockets), no custom server needed.
+  // Falls back to a polling loop when Supabase is not configured.
   useEffect(() => {
-    const interval = setInterval(() => {
+    const handleChange = (payload: any) => {
+      const row = payload.eventType === 'DELETE' ? payload.old : payload.new;
+      if (!row || row.schoolId !== schoolId) return;
+      const involvesMe = row.senderId === userId || row.recipientId === userId;
+      if (!involvesMe) return;
+      // Refresh the open conversation (also marks received messages as read)
+      // and the conversation list (unread badges / last message).
       fetchConversations();
-      if (selectedContact) {
+      if (selectedContact && (row.senderId === selectedContact.id || row.recipientId === selectedContact.id)) {
         fetchMessages(selectedContact.id);
       }
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [fetchConversations, fetchMessages, selectedContact]);
+    };
+
+    const unsubscribe = subscribeToTable({
+      table: 'Message',
+      channelName: `realtime-messages-${schoolId}-${userId}`,
+      onEvent: handleChange,
+    });
+
+    // Fallback / safety net polling (slower cadence when realtime is active).
+    const pollMs = isRealtimeEnabled() ? 20000 : 4000;
+    const interval = setInterval(() => {
+      fetchConversations();
+      if (selectedContact) fetchMessages(selectedContact.id);
+    }, pollMs);
+
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
+  }, [fetchConversations, fetchMessages, selectedContact, schoolId, userId]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {

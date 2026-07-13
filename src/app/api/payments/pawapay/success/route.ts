@@ -34,8 +34,7 @@ export async function GET(request: NextRequest) {
   if (schoolId && action) {
     try {
       if (action === 'generate-all' || (action === 'generate-class' && classId)) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const whereClause: any = {
+        const whereClause: Record<string, any> = {
           schoolId,
           role: 'STUDENT',
           cardId: null, // generate only for those who don't have it

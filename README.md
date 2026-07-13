@@ -1,4 +1,4 @@
-# 🎓 GradeUp - Plateforme de Gestion Scolaire Intelligente
+﻿# 🎓 GradeUp - Plateforme de Gestion Scolaire Intelligente
 
 **GradeUp** est une plateforme web moderne et complète de gestion scolaire conçue pour faciliter la communication et l'organisation entre administrateurs, enseignants, élèves et parents.
 
@@ -369,6 +369,79 @@ GradeUp offre une solution complète pour gérer tous les aspects d'une école :
 
 ---
 
+## 🎥 Grada Vio — Visioconférence intégrée (Phase 1)
+
+Module de visioconférence **embarqué dans l'application** (Jitsi Meet External API en iframe, sans serveur média dédié) :
+
+- **Réunions** instantanées et programmées, avec salle d'attente et **admission manuelle** par l'organisateur.
+- **Rôles** : Hôte (créateur), Co-hôte (promu), Participant.
+- **Contrôles** : micro/caméra, partage d'écran, lever la main, quitter.
+- **Hôte** : verrouiller la salle, admettre/refuser/retirer, promouvoir co-hôte, démarrer l'enregistrement (métadonnées).
+- **Accessibilité** : hub visible à tous les rôles (ADMIN/TEACHER planifient et démarrent).
+
+> L'enregistrement et la qualité adaptable dépendent du fournisseur Jitsi. Pour un SFU 100% propriétaire (mediasoup) ou des enregistrements serveur, brancher un service managé (Daily.co, Jitsi as a Service) à la place de `meet.jit.si`.
+
+**Nouveaux modèles Prisma** : `VideoConference` (étendu : `type`, `status`, `isLocked`, `creatorId`), `Participant`, `Recording`. Exécuter `npm run db:push` après mise à jour du schéma.
+
+## 🤖 Gradie IA Enterprise (Phase 2)
+
+Assistant IA multimodal et contextuel (moteur GLM) :
+
+- **Gestion des conversations** : recherche, **favoris**, **épingles**, renommage (PATCH `/api/ai/conversations/[id]`).
+- **Mémoire long terme** : Gradie mémorise les faits clés via le modèle `AiMemory` (balise `[MEM: ...]` dans les réponses) et les réinjecte dans le contexte.
+- **Actions message** : copier, **régénérer** la dernière réponse, **lire à voix haute** (TTS).
+- **Assistant vocal multilingue** : saisie mains-libres (Web Speech API / push-to-talk) et synthèse vocale, en **Français, Anglais, Lingala, Swahili** (sélecteur de langue).
+- **Export** : conversation exportable en **Markdown** (et `.doc`).
+- **Multimodal** : upload de documents (PDF, Word, Texte, Images avec OCR) analysés et résumés par GLM.
+
+> L'OCR et l'analyse reposent sur GLM (`src/lib/ai/glm-completion.ts`). Pour l'audio/vidéo et le stockage vectoriel (pgvector/Pinecone) mentionnés dans le cahier des charges, brancher des services complémentaires ; la mémoire actuelle est persistée en base relationnelle (scalable vers pgvector).
+
+## 📚 Bibliothèque Numérique (Phase 3)
+
+Bibliothèque de ressources pédagogiques partagées (fichiers uploadés **ou** liens externes), accessible à tous les rôles :
+
+- **Catalogue** : filtres par matière, niveau, catégorie, type (Cours, Exercice, Devoir, Exam, Lecture, Vidéo, Autre) et visibilité (PUBLIC / SCHOOL / CLASSE / PRIVÉ).
+- **Favoris** : marquage favori par utilisateur (`Favori` + relation `User.favoris`), onglet « Mes favoris ».
+- **Récents** : dernières ressources ajoutées.
+- **Création/édition** : ajout par fichier (upload Supabase Storage via `/api/resources/upload`) **ou** par lien externe, description auto-générée par GLM si vide.
+- **Permissions** : un utilisateur ne peut modifier/supprimer que ses propres ressources (sauf ADMIN) ; la visibilité CLASSE restreint aux membres de la classe.
+
+API : `GET/POST /api/resources`, `GET/PATCH/DELETE /api/resources/[id]`, `POST/DELETE /api/resources/[id]/favorite`, `POST /api/resources/upload`. Modèles Prisma : `Ressource`, `Favori`.
+
+> Pour le stockage des fichiers, renseignez `SUPABASE_SERVICE_ROLE_KEY` et `SUPABASE_STORAGE_BUCKET` (voir Phase 4.2). Les liens externes ne nécessitent pas de stockage.
+
+## ⚡ Temps Réel — WebSockets (Phase 4.3)
+
+Mises à jour en temps réel via **Supabase Realtime** (canaux `postgres_changes` + `broadcast`), sans serveur WebSocket custom (compatible avec le build `standalone`/Vercel). Le helper central est `src/lib/realtime.ts`.
+
+- **Messagerie instantanée** (`chat-page.tsx`) : abonnement `postgres_changes` sur la table `Message`. Les nouveaux messages et accusés de lecture apparaissent instantanément, sans le polling de 3 s (remplacé par un repli lent de 20 s). Les conversations et badges non-lus se rafraîchissent à la volée.
+- **Présence des réunions** (`meeting-room.tsx`) : abonnement `postgres_changes` sur `Participant`. La salle d'attente, les entrées/sorties et les actions hôte (admettre/refuser/expulser/co-hôte) se synchronisent sans le polling de 5 s.
+- **Chat de réunion live** (`meeting-room.tsx`) : canal `broadcast` `meeting-chat-{id}` (WebSocket bidirectionnel, sans base de données) pour discuter en texte pendant la visio, côte à côte avec Jitsi.
+
+> Prérequis infra : ajouter les tables au publication Realtime et autoriser la lecture `anon` (RLS) :
+> `alter publication supabase_realtime add table "Message";` et `alter publication supabase_realtime add table "Participant";`
+> Si Supabase n'est pas configuré, l'app retombe automatiquement sur le polling périodique. Le pattern est identique à celui des notifications (`subscribeToNotifications`).
+
+## 🐢 Performances & Responsive (Phase 4.4)
+
+- **Lazy-loading (code-splitting au niveau des routes)** : dans `src/app/page.tsx`, toutes les pages de second niveau (tableaux de bord, cours, notes, IA, réunions, bibliothèque, profil, etc.) sont chargées via `next/dynamic` avec `ssr: false` et un squelette de chargement. Le bundle initial ne contient que l'authentification et le layout ; chaque page n'est téléchargée qu'à la navigation, réduisant le JS initial et le Time-to-Interactive.
+- **Chargement différé des scripts lourds** : la visioconférence charge Jitsi (`loadJitsiScript`) à la demande, uniquement à l'ouverture d'une réunion.
+- **Responsive** : l'interface utilise les breakpoints Tailwind (`sm:`/`md:`/`lg:`) de bout en bout. Le menu latéral devient un `Sheet` coulissant sur mobile ; les panneaux secondaires (gestion de réunion, chat live) se masquent sous `md:`/`lg:` ; les boîtes de dialogue (`Dialog`) passent en plein écran sur mobile via `sm:max-w-*`.
+
+## 🔄 Clôture de l'année scolaire, transition et progression annuelle
+
+Module 100 % en temps réel et 100 % données réelles (aucune simulation), orchestré par l'administrateur.
+
+- **Modèle `SchoolYear`** (`prisma/schema.prisma`) : suit le statut de l'année (`ACTIVE` / `CLOSED`), l'année académique, le verrouillage, la date de clôture et les compteurs de transition (`promoted`, `redoubling`, `leaving`). Relié à `School.years`.
+- **Analyse par classe et par élève** : `GET /api/end-of-year` calcule les moyennes (`AverageService`), le taux de présence, les seuils de promotion/redoublement/échec et une **décision automatique** (`autoDecision` : PROMOTED / REPEAT / LEAVE) selon les moyennes de l'élève vs la moyenne de classe et les seuils configurés. Les enseignants voient leurs classes via `teacherId` ; les admins voient toutes les classes.
+- **Récapitulatif consolidé & diagnostics** (`scope=global`, admin) : agrège les totaux de l'école (élèves, moyenne générale, taux de passage/redoublement/échec, décision la plus fréquente) et produit des **diagnostics** actionnables (ex. : classes sans moyenne, taux de passage < 50 %, aucune note saisie, aucune présence).
+- **Transitions planifiées** : la clôture prévoit, par classe, combien d'élèves seront promus/redoublants/sortants, avec une répartition par destination.
+- **Progression annuelle réelle** : `GET /api/stats/progression` calcule la progression à partir de ratios réels (cours planifiés vs leçons réelles, évaluations vs notes, présences enregistrées, bulletins générés) — pas de valeur forfaitaire.
+- **Actions atomiques (admin)** via `POST /api/end-of-year` :
+  - `lock-year` : verrouille l'année (empêche nouvelles notes/présences) + notification.
+  - `generate-classes` : crée les classes de la nouvelle année à partir des décisions (promus/redoublants) de la classe sélectionnée.
+  - `close-year` : transaction Prisma atomique school-wide -> verrouille, applique les décisions (statut élève + `nextClassId`/`nextStatus`), crée/met à jour la `SchoolYear` fermée avec les compteurs, notifie chaque élève/parent, et diffuse un événement temps réel `year-closed`.
+- **Temps réel** : `src/components/gradeup/end-of-year.tsx` s'abonne au canal Supabase `school-year-{schoolId}` (`broadcast` `year-closed`) ; tout tableau de bord admin se rafraîchit instantanément après une clôture.
 ## 🚀 Installation et Démarrage
 
 ### Prérequis
@@ -409,6 +482,39 @@ npm run dev
 npm run build
 npm start
 ```
+
+### Variables d'environnement
+
+Copiez `.env` et renseignez les valeurs suivantes :
+
+| Variable | Description | Requis |
+| --- | --- | --- |
+| `DATABASE_URL` / `DIRECT_URL` | Connexion PostgreSQL (Prisma) | Oui |
+| `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Client Supabase (Realtime, Web Push) | Oui |
+| `SUPABASE_SERVICE_ROLE_KEY` | Clé service-role pour les uploads serveur vers Storage | Recommandé* |
+| `SUPABASE_STORAGE_BUCKET` | Nom du bucket Storage (défaut : `gradeup`) | Recommandé* |
+| `GLM_API_KEY` | Clé Zhipu AI (moteur IA Gradie, chat + résumé) | Oui |
+| `GLM_MODEL` | Modèle GLM (défaut : `glm-4.5-flash`) | Non |
+| `JWT_SECRET` | Clé de signature des tokens d'accès (HS256) | Oui* |
+| `JWT_REFRESH_SECRET` | Clé de signature des refresh tokens (HS256) | Recommandé* |
+| `VAPID_PRIVATE_KEY` / `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Notifications Web Push | Non |
+| `PAWAPAY_API_KEY` / `PAWAPAY_API_SECRET` | Paiements mobile (PawaPay) | Non |
+
+> \* Si `SUPABASE_SERVICE_ROLE_KEY` n'est pas défini, les uploads de fichiers (documents IA, ressources) retombent sur le système de fichiers local (`public/uploads`). En production serverless (Vercel), configurez obligatoirement Supabase Storage.
+>
+> **Note :** Les variables `DEEPSEEK_API_KEY` et `OR_API_KEY` ne sont plus utilisées. Le résumé et l'analyse des documents sont désormais 100% assurés par GLM.
+>
+> \* `JWT_SECRET` (et `JWT_REFRESH_SECRET`) doivent être définis en production avec des valeurs fortes et secrètes. Sans eux, des clés de développement par défaut sont utilisées (à ne jamais faire en prod).
+
+### Sessions et authentification (Phase 4.1)
+
+L'authentification utilise des **JWT en cookie HTTP-only** (non accessibles au JavaScript) :
+- `gradeup_token` : token d'accès (15 min).
+- `gradeup_refresh` : refresh token (7 jours).
+
+Le `user` n'est **plus persisté dans le localStorage** : il est rechargé en mémoire depuis `/api/auth/me` au montage de l'app, et renouvelé via `/api/auth/refresh` si le token d'accès a expiré. Les routes `/api/auth/logout` (supprime les cookies) et `/api/auth/me` complètent le dispositif.
+
+> Pour une sécurité serveur complète, les routes métier doivent désormais valider le token via `getSessionUser(req)` (`src/lib/auth/session.ts`) au lieu de faire confiance au `userId` envoyé par le client. Cette migration progressive est recommandée pour les endpoints sensibles.
 
 ### Commandes disponibles
 ```bash
@@ -596,6 +702,13 @@ FullAZ/
 ✅ Interface responsive et accessible  
 
 ---
+
+## 🚀 Déploiement & Configuration (prod)
+
+1. **Variables d'environnement** : copier `.env.example` → `.env` et renseigner toutes les clés (voir section « Variables d'env requises »). En particulier `JWT_SECRET` / `JWT_REFRESH_SECRET` (secrets aléatoires) et les clés Supabase/GLM.
+2. **Base de données** : `npx prisma generate` puis `npx prisma db push` (ou `prisma migrate deploy`) pour créer le schéma, notamment le modèle `SchoolYear` (clôture de l'année).
+3. **Temps réel (Supabase Realtime)** : exécuter `supabase/setup-realtime.sql` dans l'SQL Editor de Supabase pour publier les tables `Message`, `Participant`, `CourseSchedule`, `Notification`, `SchoolYear` dans `supabase_realtime`. Sans cela, la messagerie, la présence et la diffusion de clôture ne seront pas en temps réel.
+4. **Sécurité** : les mots de passe sont hachés (scrypt + sel, `src/lib/password.ts`). Aucune donnée en clair. Rétro-compatible avec d'éventuels comptes existants en clair (fallback de vérification).
 
 ## 📝 Notes
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MessageSquare, Plus, Send, Paperclip, Trash2, X, Menu, ChevronLeft, FileText, Image, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { MessageSquare, Plus, Send, Paperclip, Trash2, X, Menu, ChevronLeft, FileText, Image as ImageIcon, AlertTriangle, CheckCircle2, Search, Star, Pin, Copy, Volume2, Mic, Languages, Download, Pencil, RotateCcw } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,6 +29,9 @@ interface Conversation {
 interface ConversationSummary {
   id: string;
   title: string;
+  tags: string;
+  favorite: boolean;
+  pinned: boolean;
   updatedAt: string;
   messages: { content: string; role: string; createdAt: string }[];
 }
@@ -190,9 +193,9 @@ function UploadActionSheet({ onClose, onSelectFile }: UploadActionSheetProps) {
                 { label: 'PDF', icon: <FileText className="w-4 h-4 text-red-500" />, ext: '.pdf' },
                 { label: 'Word', icon: <FileText className="w-4 h-4 text-blue-500" />, ext: '.docx' },
                 { label: 'Texte', icon: <FileText className="w-4 h-4 text-gray-500" />, ext: '.txt' },
-                { label: 'JPEG', icon: <Image className="w-4 h-4 text-orange-500" />, ext: '.jpg' },
-                { label: 'PNG', icon: <Image className="w-4 h-4 text-purple-500" />, ext: '.png' },
-                { label: 'WebP', icon: <Image className="w-4 h-4 text-green-500" />, ext: '.webp' },
+                { label: 'JPEG', icon: <ImageIcon className="w-4 h-4 text-orange-500" />, ext: '.jpg' },
+                { label: 'PNG', icon: <ImageIcon className="w-4 h-4 text-purple-500" />, ext: '.png' },
+                { label: 'WebP', icon: <ImageIcon className="w-4 h-4 text-green-500" />, ext: '.webp' },
               ].map((t) => (
                 <div
                   key={t.ext}
@@ -270,6 +273,18 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
   const [showUploadSheet, setShowUploadSheet] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
 
+  // ─── Phase 2 : recherche, mémoire, vocal ───────────────────────────────────
+  const [search, setSearch] = useState('');
+  const [language, setLanguage] = useState('fr-FR');
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const speechLangMap: Record<string, string> = {
+    'fr-FR': 'Français',
+    'en-US': 'English',
+    'ln-CD': 'Lingala',
+    'sw-KE': 'Swahili',
+  };
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -290,6 +305,16 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // ─── Nettoyage vocal au démontage ──────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      recognitionRef.current?.stop?.();
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
   // ─── Scroll automatique ───────────────────────────────────────────────────
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -308,15 +333,111 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
   }, [input]);
 
   // ─── Chargement de la liste des conversations ──────────────────────────────
-  const loadConversations = useCallback(async () => {
+  const loadConversations = useCallback(async (searchTerm?: string) => {
     try {
-      const res = await fetch(`/api/ai/conversations?userId=${userId}`);
+      const q = searchTerm ?? search;
+      const params = new URLSearchParams({ userId });
+      if (q.trim()) params.set('search', q.trim());
+      const res = await fetch(`/api/ai/conversations?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         setConversations(data.conversations || []);
       }
     } catch { /* silencieux */ }
-  }, [userId]);
+  }, [userId, search]);
+
+  // ─── Favoris / Épingles ──────────────────────────────────────────────────
+  const toggleFavorite = async (conv: ConversationSummary, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await fetch(`/api/ai/conversations/${conv.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, favorite: !conv.favorite }),
+      });
+      setConversations((prev) => prev.map((c) => (c.id === conv.id ? { ...c, favorite: !conv.favorite } : c)));
+    } catch { /* silencieux */ }
+  };
+
+  const togglePin = async (conv: ConversationSummary, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await fetch(`/api/ai/conversations/${conv.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, pinned: !conv.pinned }),
+      });
+      setConversations((prev) => prev.map((c) => (c.id === conv.id ? { ...c, pinned: !conv.pinned } : c)));
+    } catch { /* silencieux */ }
+  };
+
+  // ─── Régénérer la dernière réponse ────────────────────────────────────────
+  const regenerateLast = async () => {
+    if (isStreaming || !activeConversation) return;
+    const msgs = activeConversation.messages;
+    let targetIdx = -1;
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].role === 'user') { targetIdx = i; break; }
+    }
+    if (targetIdx === -1) return;
+    const userMsg = msgs[targetIdx];
+    setActiveConversation((prev) => prev ? { ...prev, messages: prev.messages.slice(0, targetIdx + 1) } : null);
+    sendMessage(userMsg.content);
+  };
+
+  // ─── Export de la conversation ────────────────────────────────────────────
+  const exportConversation = (format: 'md' | 'doc') => {
+    if (!activeConversation) return;
+    const lines = activeConversation.messages.map((m) =>
+      m.role === 'user' ? `**Vous** : ${m.content}` : `**Gradie** : ${m.content}`
+    );
+    const body = `# ${activeConversation.title}\n\n${lines.join('\n\n')}`;
+    if (format === 'md') {
+      const blob = new Blob([body], { type: 'text/markdown' });
+      downloadBlob(blob, `${activeConversation.title}.md`);
+    } else {
+      const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office'><head><meta charset='utf-8'></head><body><h1>${activeConversation.title}</h1>${lines.map((l) => `<p>${l.replace(/\n/g, '<br/>')}</p>`).join('')}</body></html>`;
+      const blob = new Blob([html], { type: 'application/msword' });
+      downloadBlob(blob, `${activeConversation.title}.doc`);
+    }
+  };
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ─── Synthèse vocale (TTS) ─────────────────────────────────────────────────
+  const speakMessage = (text: string) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text.replace(/[*`#]/g, ''));
+    utter.lang = language;
+    utter.rate = 1;
+    window.speechSynthesis.speak(utter);
+  };
+
+  // ─── Reconnaissance vocale (push-to-talk) ─────────────────────────────────
+  const startVoice = () => {
+    if (typeof window === 'undefined' || !(window as any).webkitSpeechRecognition && !(window as any).SpeechRecognition) return;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = language;
+    recognition.interimResults = false;
+    recognition.onresult = (e: any) => {
+      const transcript = e.results[0][0].transcript;
+      setInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
+    };
+    recognition.onend = () => setListening(false);
+    recognition.onerror = () => setListening(false);
+    recognitionRef.current = recognition;
+    recognition.start();
+    setListening(true);
+  };
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
 
@@ -368,8 +489,8 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
   };
 
   // ─── Envoi d'un message avec streaming ────────────────────────────────────
-  const sendMessage = async () => {
-    const msg = input.trim();
+  const sendMessage = async (override?: string) => {
+    const msg = (override ?? input).trim();
     if (!msg || isStreaming) return;
 
     setInput('');
@@ -576,6 +697,15 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
       )}
 
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
+        <div className="relative mb-2">
+          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-white/30" />
+          <input
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); loadConversations(e.target.value); }}
+            placeholder="Rechercher…"
+            className="w-full bg-white/5 border border-white/10 rounded-lg pl-8 pr-2 py-1.5 text-white text-xs outline-none focus:border-blue-500/50"
+          />
+        </div>
         {conversations.length === 0 && (
           <div className="text-center text-white/30 text-xs mt-8 px-4">
             Aucune conversation.<br />Commencez à parler avec Gradie !
@@ -596,7 +726,10 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
           >
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1 min-w-0">
-                <p className="text-white text-xs font-medium truncate">{conv.title}</p>
+                <div className="flex items-center gap-1">
+                  {conv.pinned && <Pin className="w-3 h-3 text-amber-400 flex-shrink-0" />}
+                  <p className="text-white text-xs font-medium truncate">{conv.title}</p>
+                </div>
                 {conv.messages[0] && (
                   <p className="text-white/40 text-[11px] truncate mt-0.5">
                     {conv.messages[0].content}
@@ -604,13 +737,31 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
                 )}
                 <p className="text-white/25 text-[10px] mt-1">{formatDate(conv.updatedAt)}</p>
               </div>
-              <button
-                onClick={(e) => { e.stopPropagation(); deleteConversation(conv.id, e); }}
-                className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 p-1 rounded transition-all flex-shrink-0"
-                style={{ opacity: isMobile ? 1 : undefined }}
-              >
-                <Trash2 className="w-3 h-3" />
-              </button>
+              <div className="flex items-center gap-0.5 flex-shrink-0">
+                <button
+                  onClick={(e) => toggleFavorite(conv, e)}
+                  className={`p-1 rounded transition-all ${conv.favorite ? 'text-yellow-400' : 'text-white/30 hover:text-white/60 opacity-0 group-hover:opacity-100'}`}
+                  style={{ opacity: isMobile || conv.favorite ? 1 : undefined }}
+                  title="Favori"
+                >
+                  <Star className="w-3 h-3" fill={conv.favorite ? 'currentColor' : 'none'} />
+                </button>
+                <button
+                  onClick={(e) => togglePin(conv, e)}
+                  className={`p-1 rounded transition-all ${conv.pinned ? 'text-amber-400' : 'text-white/30 hover:text-white/60 opacity-0 group-hover:opacity-100'}`}
+                  style={{ opacity: isMobile || conv.pinned ? 1 : undefined }}
+                  title="Épingler"
+                >
+                  <Pin className="w-3 h-3" fill={conv.pinned ? 'currentColor' : 'none'} />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteConversation(conv.id, e); }}
+                  className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 p-1 rounded transition-all"
+                  style={{ opacity: isMobile ? 1 : undefined }}
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
             </div>
           </div>
         ))}
@@ -729,6 +880,13 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
                 <span className="text-white/30 text-[10px] sm:text-xs truncate max-w-[120px] sm:max-w-48">
                   {activeConversation.title}
                 </span>
+                <button
+                  onClick={() => exportConversation('md')}
+                  className="text-white/40 hover:text-white p-1 rounded transition-all"
+                  title="Exporter en Markdown"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
               </div>
             )}
           </div>
@@ -792,21 +950,48 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
                     )}
 
                     {/* Bulle message style iMessage */}
-                    <div
-                      className={`max-w-[82%] sm:max-w-[75%] px-[14px] py-[9px] shadow-sm ${
-                        isUser
-                          ? 'bg-[#007AFF] text-white imessage-user-bubble'
-                          : 'bg-[#E9E9EB] dark:bg-white/15 text-black dark:text-white/90 imessage-ai-bubble'
-                      }`}
-                    >
-                      {!isUser && (
-                        <p className="text-[10px] font-semibold text-[#007AFF] dark:text-blue-400 mb-1">Gradie</p>
-                      )}
                       <div
-                        className="text-[14px] sm:text-[15px] leading-[1.4] break-words"
-                        dangerouslySetInnerHTML={{ __html: renderMessage(msg.content) }}
-                      />
-                    </div>
+                        className={`max-w-[82%] sm:max-w-[75%] px-[14px] py-[9px] shadow-sm group ${
+                          isUser
+                            ? 'bg-[#007AFF] text-white imessage-user-bubble'
+                            : 'bg-[#E9E9EB] dark:bg-white/15 text-black dark:text-white/90 imessage-ai-bubble'
+                        }`}
+                      >
+                        {!isUser && (
+                          <p className="text-[10px] font-semibold text-[#007AFF] dark:text-blue-400 mb-1">Gradie</p>
+                        )}
+                        <div
+                          className="text-[14px] sm:text-[15px] leading-[1.4] break-words"
+                          dangerouslySetInnerHTML={{ __html: renderMessage(msg.content) }}
+                        />
+                        {!isUser && (
+                          <div className="flex items-center gap-2 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => navigator.clipboard?.writeText(msg.content)}
+                              className="text-[#007AFF] dark:text-blue-400 hover:opacity-70"
+                              title="Copier"
+                            >
+                              <Copy className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => speakMessage(msg.content)}
+                              className="text-[#007AFF] dark:text-blue-400 hover:opacity-70"
+                              title="Lire à voix haute"
+                            >
+                              <Volume2 className="w-3 h-3" />
+                            </button>
+                            {idx === activeConversation.messages.length - 1 && (
+                              <button
+                                onClick={regenerateLast}
+                                className="text-[#007AFF] dark:text-blue-400 hover:opacity-70"
+                                title="Régénérer"
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
                   </div>
 
                   {/* Horodatage discret sous la bulle (affiché uniquement sur dernier message ou gap > 5 min) */}
@@ -896,6 +1081,29 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
           {/* ── Zone de saisie style iMessage ────────────────────────────────── */}
           <div className="px-2.5 sm:px-4 pt-2 pb-3 sm:pb-4 border-t border-white/10 bg-black/20 backdrop-blur flex-shrink-0">
             <div className="flex items-end gap-2">
+              {/* Bouton vocal (push-to-talk) */}
+              <button
+                onClick={startVoice}
+                className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full transition-all flex-shrink-0 ${
+                  listening ? 'bg-red-500 text-white animate-pulse' : 'text-white/50 hover:text-blue-400 hover:bg-blue-500/10'
+                }`}
+                title="Dicter un message à voix haute"
+              >
+                <Mic className="w-5 h-5" />
+              </button>
+
+              {/* Sélecteur de langue (vocal + TTS) */}
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                className="bg-white/5 border border-white/10 rounded-full text-white/70 text-[11px] px-2 h-[44px] outline-none focus:border-blue-500/50 flex-shrink-0"
+                title="Langue vocale"
+              >
+                {Object.entries(speechLangMap).map(([code, label]) => (
+                  <option key={code} value={code} className="bg-slate-900">{label}</option>
+                ))}
+              </select>
+
               {/* Bouton joindre → ouvre l'Action Sheet */}
               <button
                 onClick={() => setShowUploadSheet(true)}
@@ -928,7 +1136,7 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
 
               {/* Bouton envoyer — style iMessage (bleu quand actif, gris sinon) */}
               <button
-                onClick={sendMessage}
+                onClick={() => sendMessage()}
                 disabled={!input.trim() || isStreaming}
                 className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full transition-all flex-shrink-0 ${
                   input.trim() && !isStreaming
