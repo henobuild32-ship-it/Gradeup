@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
         parentId: parentId || null,
         parentCode: parentCodeVal,
         isTitulaire: !!isTitulaire,
-        titulaireClassIds: Array.isArray(titulaireClassIds) ? titulaireClassIds : [],
+        titulaireClasses: Array.isArray(titulaireClassIds) ? { connect: titulaireClassIds.map(id => ({ id })) } : undefined,
       },
       include: {
         school: true,

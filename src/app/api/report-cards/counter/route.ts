@@ -4,47 +4,37 @@ import { db } from '@/lib/db';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { year, schoolId } = body;
+    const { schoolId, classId, trimester } = body;
 
-    if (!year) {
-      return NextResponse.json({ error: 'year is required' }, { status: 400 });
+    if (!schoolId || !classId || !trimester) {
+      return NextResponse.json({ error: 'schoolId, classId, trimester are required' }, { status: 400 });
     }
 
-    // Obtenir ou créer le compteur pour l'année
+    // Obtenir ou créer le compteur pour l'école/classe/trimestre
     let counter = await db.reportCounter.findUnique({
-      where: { year }
+      where: { schoolId_classId_trimester: { schoolId, classId, trimester } }
     });
 
     if (!counter) {
       counter = await db.reportCounter.create({
         data: {
-          year,
-          currentCount: 0,
-          maxLimit: 1000000
+          schoolId,
+          classId,
+          trimester,
+          count: 0
         }
-      });
-    }
-
-    // Vérifier si on peut encore générer
-    const canGenerate = counter.currentCount < counter.maxLimit;
-
-    if (!canGenerate) {
-      return NextResponse.json({
-        canGenerate: false,
-        counter: counter.currentCount,
-        message: 'Limite annuelle de 1.000.000 bulletins atteinte'
       });
     }
 
     // Incrémenter le compteur
     const updatedCounter = await db.reportCounter.update({
       where: { id: counter.id },
-      data: { currentCount: { increment: 1 } }
+      data: { count: { increment: 1 } }
     });
 
     return NextResponse.json({
       canGenerate: true,
-      counter: updatedCounter.currentCount
+      counter: updatedCounter.count
     });
   } catch (error) {
     console.error('Error with report counter:', error);

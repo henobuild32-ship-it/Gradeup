@@ -8,13 +8,13 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const course = await db.courseWithPoints.update({
+    const course = await db.course.update({
       where: { id },
       data: body
     });
     return NextResponse.json({ course });
   } catch (error) {
-    console.error('Error updating course with points:', error);
+    console.error('Error updating course:', error);
     return NextResponse.json({ error: 'Failed to update course' }, { status: 500 });
   }
 }
@@ -25,10 +25,13 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    await db.courseWithPoints.delete({ where: { id } });
+    await db.course.update({
+      where: { id },
+      data: { deletedAt: new Date() }
+    });
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting course with points:', error);
+    console.error('Error deleting course:', error);
     return NextResponse.json({ error: 'Failed to delete course' }, { status: 500 });
   }
 }

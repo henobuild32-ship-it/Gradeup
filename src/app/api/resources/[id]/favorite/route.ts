@@ -19,8 +19,8 @@ export async function POST(
     if (!resource) return NextResponse.json({ error: 'Ressource introuvable.' }, { status: 404 });
 
     await db.favori.upsert({
-      where: { userId_ressourceId: { userId, ressourceId: id } },
-      create: { userId, ressourceId: id },
+      where: { userId_resourceType_resourceId: { userId, resourceType: 'RESSOURCE', resourceId: id } },
+      create: { userId, resourceType: 'RESSOURCE', resourceId: id },
       update: {},
     });
     return NextResponse.json({ success: true });
@@ -40,7 +40,7 @@ export async function DELETE(
     const userId = searchParams.get('userId');
     if (!userId) return NextResponse.json({ error: 'userId requis.' }, { status: 400 });
 
-    await db.favori.deleteMany({ where: { userId, ressourceId: id } });
+    await db.favori.deleteMany({ where: { userId, resourceType: 'RESSOURCE', resourceId: id } });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error removing favorite:', error);

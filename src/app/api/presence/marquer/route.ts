@@ -100,12 +100,6 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Update user's last presence timestamp
-    await db.user.update({
-      where: { id: userId },
-      data: { dernierePresence: now },
-    });
-
     // ─── Notify admin via notification ───
     await db.notification.create({
       data: {

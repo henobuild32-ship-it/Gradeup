@@ -44,16 +44,13 @@ export async function GET(req: NextRequest) {
     let resources = await db.ressource.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      include: { favoris: userId ? { where: { userId } } : false },
     });
 
     const result: any[] = [];
     for (const r of resources) {
       const visible = !userId || (await isVisibleToUser(r, userId, userRole));
       if (!visible) continue;
-      if (favoritesOnly && (!r.favoris || r.favoris.length === 0)) continue;
-      const { favoris, ...rest } = r as any;
-      result.push({ ...rest, isFavorite: !!favoris && favoris.length > 0 });
+      result.push({ ...r, isFavorite: false });
     }
 
     // Catégories / matières disponibles pour les filtres

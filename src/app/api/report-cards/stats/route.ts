@@ -23,14 +23,13 @@ export async function GET(request: Request) {
       where: { schoolId }
     });
 
-    // Récupérer le compteur pour l'année en cours
-    const currentYear = new Date().getFullYear();
-    const counter = await db.reportCounter.findUnique({
-      where: { year: currentYear }
+    // Récupérer les compteurs pour cette école
+    const counters = await db.reportCounter.findMany({
+      where: { schoolId }
     });
 
-    const maxLimit = counter?.maxLimit ?? 1000000;
-    const globalGenerated = counter?.currentCount ?? 0;
+    const globalGenerated = counters.reduce((sum, c) => sum + c.count, 0);
+    const maxLimit = 1000000;
     const remaining = Math.max(0, maxLimit - globalGenerated);
     const percentageUsed = maxLimit > 0 ? (globalGenerated / maxLimit) * 100 : 0;
 
@@ -45,6 +44,12 @@ export async function GET(request: Request) {
       byYear[rc.academicYear] = (byYear[rc.academicYear] || 0) + 1;
     }
 
+    // Stats par classe
+    const byClass: Record<string, number> = {};
+    for (const c of counters) {
+      byClass[c.classId] = c.count;
+    }
+
     return NextResponse.json({
       totalGenerated,
       globalGenerated,
@@ -52,7 +57,7 @@ export async function GET(request: Request) {
       remaining,
       percentageUsed,
       bySchool: { [schoolId]: totalGenerated },
-      byClass: {},
+      byClass,
       byYear
     });
   } catch (error) {

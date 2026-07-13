@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     // 2. Fetch all evaluations for this course (optionally filtered by period)
     const evaluationWhere: Record<string, unknown> = { schoolId, classId, courseId };
     if (period) {
-      evaluationWhere.period = period;
+      evaluationWhere.trimester = period;
     }
 
     const evaluations = await db.cahierEvaluation.findMany({
@@ -72,11 +72,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { schoolId, classId, courseId, title, maxScore, period, date } = body;
+    const { schoolId, classId, courseId, title, maxScore, period, date, teacherId } = body;
 
-    if (!schoolId || !classId || !courseId || !title || !period) {
+    if (!schoolId || !classId || !courseId || !title || !period || !teacherId) {
       return NextResponse.json(
-        { error: 'Missing required fields: schoolId, classId, courseId, title, period' },
+        { error: 'Missing required fields: schoolId, classId, courseId, title, period, teacherId' },
         { status: 400 }
       );
     }
@@ -88,7 +88,8 @@ export async function POST(request: NextRequest) {
         courseId,
         title,
         maxScore: maxScore ? parseFloat(maxScore) : 20,
-        period,
+        trimester: period,
+        teacherId,
         date: date ? new Date(date) : new Date(),
       },
     });
@@ -142,7 +143,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Evaluation not found' }, { status: 404 });
     }
 
-    const { schoolId, courseId, period, maxScore: evalMaxScore } = evaluation;
+    const { schoolId, courseId, trimester, maxScore: evalMaxScore } = evaluation;
 
     // Fetch the teacher ID of the course to associate with the generated Grade records
     const course = await db.course.findUnique({
@@ -186,7 +187,7 @@ export async function PUT(request: NextRequest) {
           studentId,
           evaluation: {
             courseId,
-            period,
+            trimester,
           },
         },
         include: {
@@ -215,7 +216,7 @@ export async function PUT(request: NextRequest) {
             schoolId,
             courseId,
             studentId,
-            trimester: period,
+trimester: trimester,
           },
         });
 
@@ -237,8 +238,8 @@ export async function PUT(request: NextRequest) {
               teacherId,
               score: Math.round(averagePeriodScore * 10) / 10,
               maxScore: 20,
-              trimester: period,
-              comment: `Moyenne automatique - ${period}`,
+trimester: trimester,
+              comment: `Moyenne automatique - ${trimester}`,
             },
           });
         }
