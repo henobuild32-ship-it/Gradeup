@@ -35,7 +35,10 @@ BEGIN
     WHERE schemaname = 'public'
       AND lower(tablename) = ANY(rt_lower)
   LOOP
-    EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE %I', t);
+    BEGIN
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE %I', t);
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END;
     EXECUTE format('ALTER TABLE %I REPLICA IDENTITY FULL', t);
   END LOOP;
 END $$;
