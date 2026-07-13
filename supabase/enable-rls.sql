@@ -41,10 +41,13 @@ END $$;
 --    continuent de recevoir les événements.
 DO $$
 DECLARE
-  rt_tables text[] := ARRAY['Message', 'Participant', 'CourseSchedule', 'Notification', 'SchoolYear'];
+  rt_lower text[] := ARRAY['message', 'participant', 'courseschedule', 'notification', 'schoolyear'];
   t text;
 BEGIN
-  FOREACH t IN ARRAY rt_tables
+  FOR t IN
+    SELECT tablename FROM pg_tables
+    WHERE schemaname = 'public'
+      AND lower(tablename) = ANY(rt_lower)
   LOOP
     EXECUTE format('DROP POLICY IF EXISTS %I ON %I', 'realtime_select_' || t, t);
     EXECUTE format(
@@ -60,10 +63,13 @@ END $$;
 --    service_role contourne déjà RLS, mais documente l'intention.
 DO $$
 DECLARE
-  rt_tables text[] := ARRAY['Message', 'Participant', 'CourseSchedule', 'Notification', 'SchoolYear'];
+  rt_lower text[] := ARRAY['message', 'participant', 'courseschedule', 'notification', 'schoolyear'];
   t text;
 BEGIN
-  FOREACH t IN ARRAY rt_tables
+  FOR t IN
+    SELECT tablename FROM pg_tables
+    WHERE schemaname = 'public'
+      AND lower(tablename) = ANY(rt_lower)
   LOOP
     EXECUTE format('DROP POLICY IF EXISTS %I ON %I', 'service_role_all_' || t, t);
     EXECUTE format(

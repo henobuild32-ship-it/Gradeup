@@ -18,24 +18,27 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime'
   ) THEN
-    CREATE PUBLICATION supabase_realtime FOR TABLE
-      "Message", "Participant", "CourseSchedule", "Notification", "SchoolYear";
+    CREATE PUBLICATION supabase_realtime;
   END IF;
 END $$;
 
--- 2) Ajouter les tables manquantes à la publication existante
-ALTER PUBLICATION supabase_realtime ADD TABLE "Message";
-ALTER PUBLICATION supabase_realtime ADD TABLE "Participant";
-ALTER PUBLICATION supabase_realtime ADD TABLE "CourseSchedule";
-ALTER PUBLICATION supabase_realtime ADD TABLE "Notification";
-ALTER PUBLICATION supabase_realtime ADD TABLE "SchoolYear";
-
--- 3) (Recommandé) Activer la réplication au niveau ligne pour ces tables
-ALTER TABLE "Message" REPLICA IDENTITY FULL;
-ALTER TABLE "Participant" REPLICA IDENTITY FULL;
-ALTER TABLE "CourseSchedule" REPLICA IDENTITY FULL;
-ALTER TABLE "Notification" REPLICA IDENTITY FULL;
-ALTER TABLE "SchoolYear" REPLICA IDENTITY FULL;
+-- 2) Ajouter les tables temps réel EXISTANTES à la publication et activer
+--    REPLICA IDENTITY FULL. Les noms réels sont lus depuis pg_tables pour
+--    gérer l'absence de certaines tables ou un casing différent.
+DO $$
+DECLARE
+  rt_lower text[] := ARRAY['message', 'participant', 'courseschedule', 'notification', 'schoolyear'];
+  t text;
+BEGIN
+  FOR t IN
+    SELECT tablename FROM pg_tables
+    WHERE schemaname = 'public'
+      AND lower(tablename) = ANY(rt_lower)
+  LOOP
+    EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE %I', t);
+    EXECUTE format('ALTER TABLE %I REPLICA IDENTITY FULL', t);
+  END LOOP;
+END $$;
 
 -- Note : les événements de type `broadcast` (ex. year-closed) ne nécessitent
 -- pas de table ; ils passent par le canal Supabase Realtime (client).
