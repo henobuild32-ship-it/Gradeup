@@ -46,10 +46,10 @@ DECLARE
 BEGIN
   FOREACH t IN ARRAY rt_tables
   LOOP
-    EXECUTE format('DROP POLICY IF EXISTS "realtime_select_%I" ON %I', t, t);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I', 'realtime_select_' || t, t);
     EXECUTE format(
-      'CREATE POLICY "realtime_select_%I" ON %I FOR SELECT TO anon, authenticated USING (true)',
-      t, t
+      'CREATE POLICY %I ON %I FOR SELECT TO anon, authenticated USING (true)',
+      'realtime_select_' || t, t
     );
   END LOOP;
 END $$;
@@ -65,10 +65,10 @@ DECLARE
 BEGIN
   FOREACH t IN ARRAY rt_tables
   LOOP
-    EXECUTE format('DROP POLICY IF EXISTS "service_role_all_%I" ON %I', t, t);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I', 'service_role_all_' || t, t);
     EXECUTE format(
-      'CREATE POLICY "service_role_all_%I" ON %I FOR ALL TO service_role USING (true) WITH CHECK (true)',
-      t, t
+      'CREATE POLICY %I ON %I FOR ALL TO service_role USING (true) WITH CHECK (true)',
+      'service_role_all_' || t, t
     );
   END LOOP;
 END $$;
