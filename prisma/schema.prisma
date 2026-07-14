@@ -123,6 +123,8 @@ model User {
   children                User[]                @relation("ParentChild")
   school                  School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   titulaireClasses        SchoolClass[]         @relation("TitulaireClasses")
+  cotationTeacher         CotationTransmission[] @relation("CotationTeacher")
+  cotationTitulaire       CotationTransmission[] @relation("CotationTitulaire")
   presences               Presence[]
 
   @@unique([schoolId, fullName, role])
@@ -143,8 +145,10 @@ model SchoolClass {
   deletedAt        DateTime?
 
   courses          Course[]
+  evaluations      CahierEvaluation[]
   enrollments      EnrolledClass[]
   reportCards      ReportCard[]
+  transmissions    CotationTransmission[]
   school           School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   titulaire        User?     @relation("TitulaireClasses", fields: [titulaireId], references: [id], onDelete: SetNull)
   titulaireId      String?
@@ -188,9 +192,11 @@ model Course {
   teacher     User        @relation(fields: [teacherId], references: [id], onDelete: Restrict)
   grades      Grade[]
   detailedGrades DetailedGrade[]
+  evaluations CahierEvaluation[]
   homework    Homework[]
   lessons     Lesson[]
   schedules   CourseSchedule[]
+  transmissions CotationTransmission[]
 
   @@unique([schoolId, classId, name])
   @@index([schoolId, classId, status])
@@ -722,7 +728,10 @@ model CahierEvaluation {
   updatedAt   DateTime @updatedAt
   deletedAt   DateTime?
 
+  class       SchoolClass     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  course      Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
   marks       CahierMark[]
+  transmissions CotationTransmission[]
 
   @@index([schoolId, classId, courseId, trimester])
   @@index([teacherId, date])
@@ -742,5 +751,34 @@ model CahierMark {
 
   @@unique([evaluationId, studentId])
   @@index([studentId, createdAt])
+}
+
+model CotationTransmission {
+  id                String   @id @default(cuid())
+  schoolId          String
+  evaluationId      String
+  classId           String
+  courseId          String
+  teacherId         String
+  titulaireId       String
+  status            String   @default("PENDING") // PENDING | SENT | RECEIVED | PARTIAL | RESENT
+  sentAt            DateTime?
+  receivedAt        DateTime?
+  lastResentAt      DateTime?
+  resentCount       Int      @default(0)
+  notes             String   @default("")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  evaluation        CahierEvaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  class             SchoolClass      @relation(fields: [classId], references: [id], onDelete: Cascade)
+  course            Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  teacher           User             @relation("CotationTeacher", fields: [teacherId], references: [id], onDelete: Restrict)
+  titulaire         User             @relation("CotationTitulaire", fields: [titulaireId], references: [id], onDelete: Restrict)
+
+  @@unique([evaluationId, titulaireId])
+  @@index([schoolId, classId, status])
+  @@index([titulaireId, status])
+  @@index([evaluationId, status])
 }
 

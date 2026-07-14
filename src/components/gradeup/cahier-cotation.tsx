@@ -53,6 +53,9 @@ import {
   WifiOff,
   UserCheck,
   Zap,
+  Send,
+  AlertCircle,
+  Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -98,6 +101,9 @@ export default function CahierCotation() {
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Send to titulaire state
+  const [sendingEval, setSendingEval] = useState<string | null>(null);
 
   // Column creation dialog
   const [addColOpen, setAddColOpen] = useState(false);
@@ -366,6 +372,32 @@ export default function CahierCotation() {
     }
   };
 
+  // Send evaluations to titular professor
+  const handleSendToTitulaire = async (courseId: string) => {
+    if (!courseId || evaluations.length === 0) return;
+
+    if (!confirm(`Envoyer TOUTES les cotations de ce cours au professeur titulaire ?`)) return;
+
+    setSendingEval('all');
+    try {
+      const evaluationIds = evaluations.map((e) => e.id);
+      const res = await fetch('/api/cahier/transmissions/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ evaluationIds, courseId, teacherId: user?.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erreur serveur');
+      toast.success(`Cotations envoyées au titulaire ✅`);
+      fetchData();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erreur lors de l'envoi";
+      toast.error(msg);
+    } finally {
+      setSendingEval(null);
+    }
+  };
+
   // Calculate average out of 20 for a student across all period evaluations
   const getStudentPeriodAverage = (studentId: string) => {
     if (evaluations.length === 0) return 0;
@@ -493,13 +525,33 @@ export default function CahierCotation() {
           </Button>
 
           {canEdit && (
-            <Button
-              className="bg-emerald-600 hover:bg-emerald-700 text-white ml-auto gap-1.5"
-              onClick={() => setAddColOpen(true)}
-              disabled={!selectedCourseId}
-            >
-              <Plus className="w-4 h-4" /> Ajouter Évaluation
-            </Button>
+            <div className="flex gap-2 ml-auto">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSendToTitulaire(selectedCourseId)}
+                disabled={!selectedCourseId || !evaluations.length || sendingEval !== null}
+                className="gap-1.5"
+              >
+                {sendingEval !== null ? (
+                  <>
+                    <span className="animate-spin">⏳</span> Envoi...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Envoyer au titulaire
+                  </>
+                )}
+              </Button>
+              <Button
+                className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+                onClick={() => setAddColOpen(true)}
+                disabled={!selectedCourseId}
+              >
+                <Plus className="w-4 h-4" /> Ajouter Évaluation
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>
