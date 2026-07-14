@@ -45,6 +45,8 @@ export function serializeUser(user: any, school: any): UserInfo {
           inviteCode: school.inviteCode,
           subscriptionStatus: school.subscriptionStatus,
           subscriptionExpiry: school.subscriptionExpiry,
+          latitude: school.latitude,
+          longitude: school.longitude,
         }
       : undefined,
     classEnrollments: (user.classEnrollments || []).map((e: any) => ({

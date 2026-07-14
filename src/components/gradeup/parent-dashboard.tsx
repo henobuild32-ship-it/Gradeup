@@ -6,6 +6,7 @@ import type { UserInfo, GradeInfo, PaymentInfo, AttendanceInfo, NotificationInfo
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import WeeklyScheduleView from './weekly-schedule-view';
+import ParentPresence from './parent-presence';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -480,10 +481,11 @@ export default function ParentDashboard() {
 
           {/* Sleek iOS Segmented Control Tabs */}
           <Tabs defaultValue="today" className="w-full">
-            <TabsList className="grid grid-cols-4 bg-muted/50 p-1 rounded-xl h-11 mb-6">
+            <TabsList className="grid grid-cols-5 bg-muted/50 p-1 rounded-xl h-11 mb-6">
               <TabsTrigger value="today" className="rounded-lg text-xs font-bold py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">Aujourd'hui</TabsTrigger>
               <TabsTrigger value="notes" className="rounded-lg text-xs font-bold py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">Notes</TabsTrigger>
               <TabsTrigger value="absences" className="rounded-lg text-xs font-bold py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">Absences</TabsTrigger>
+              <TabsTrigger value="presence" className="rounded-lg text-xs font-bold py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">Présence</TabsTrigger>
               <TabsTrigger value="finances" className="rounded-lg text-xs font-bold py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">Finances</TabsTrigger>
             </TabsList>
 
@@ -658,7 +660,12 @@ export default function ParentDashboard() {
               </Card>
             </TabsContent>
 
-            {/* TAB 4: Finances */}
+            {/* TAB 4: Présence */}
+            <TabsContent value="presence" className="space-y-4 focus:outline-none">
+              <ParentPresence />
+            </TabsContent>
+
+            {/* TAB 5: Finances */}
             <TabsContent value="finances" className="space-y-4 focus:outline-none">
               <Card>
                 <CardHeader><CardTitle className="text-sm font-bold">Suivi des paiements & frais</CardTitle></CardHeader>

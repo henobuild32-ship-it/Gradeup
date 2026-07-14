@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 
 // Haversine formula — returns distance in meters between two GPS points
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -19,11 +20,18 @@ const CUTOFF_HOUR = 8; // Before 08h00 = PRESENT, after = RETARD
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = authenticateRequest(request);
+
     const body = await request.json();
     const { userId, schoolId, latitude, longitude, justification } = body;
 
     if (!userId || !schoolId) {
       return NextResponse.json({ error: 'userId et schoolId requis' }, { status: 400 });
+    }
+
+    // Vérifier que l'utilisateur marque sa propre présence
+    if (auth.userId !== userId) {
+      return NextResponse.json({ error: 'Vous ne pouvez marquer que votre propre présence' }, { status: 403 });
     }
 
     // Fetch user and school data
@@ -124,9 +132,12 @@ export async function POST(request: NextRequest) {
           ? '⚠️ Présence marquée — En retard'
           : '📝 Présence avec justification enregistrée',
     });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Erreur interne';
-    console.error('[PRESENCE/MARQUER]', error);
+  } catch (err: unknown) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message = err instanceof Error ? err.message : 'Erreur interne';
+    console.error('[PRESENCE/MARQUER]', err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

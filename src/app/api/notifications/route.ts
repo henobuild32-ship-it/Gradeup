@@ -1,20 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 import { notifyUser } from '@/services/notifications/notificationEngine';
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = authenticateRequest(request);
     const { searchParams } = new URL(request.url);
     const schoolId = searchParams.get('schoolId');
     const targetRole = searchParams.get('targetRole');
 
-    if (!schoolId) {
-      return NextResponse.json({ error: 'schoolId is required' }, { status: 400 });
+    if (!schoolId || schoolId !== auth.schoolId) {
+      return NextResponse.json({ error: 'schoolId invalide' }, { status: 400 });
     }
 
     const where: Record<string, unknown> = { schoolId };
 
     if (targetRole) {
+      // Parent can only see PARENT-targeted notifications
+      if (auth.role === 'PARENT' && targetRole !== 'PARENT') {
+        return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
+      }
       where.targetRole = targetRole;
     }
 
@@ -30,14 +36,21 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ notifications });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Internal server error';
+  } catch (err: unknown) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message = err instanceof Error ? err.message : 'Erreur serveur';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = authenticateRequest(request);
+    if (auth.role === 'PARENT') {
+      return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
+    }
     const body = await request.json();
     const { schoolId, senderId, targetRole, targetClassId, message, title, type, priority, metadata } = body;
 
@@ -62,8 +75,11 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ notification }, { status: 201 });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Internal server error';
+  } catch (err: unknown) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message = err instanceof Error ? err.message : 'Erreur serveur';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

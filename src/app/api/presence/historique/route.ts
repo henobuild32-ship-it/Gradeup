@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 
-// GET /api/presence/historique?schoolId=xxx&userId=yyy&days=30&role=STUDENT&classId=yyy
 export async function GET(request: NextRequest) {
   try {
+    const auth = authenticateRequest(request);
     const { searchParams } = new URL(request.url);
     const schoolId = searchParams.get('schoolId');
     const userId = searchParams.get('userId');
@@ -11,8 +12,18 @@ export async function GET(request: NextRequest) {
     const daysStr = searchParams.get('days') || '30';
     const days = Math.min(parseInt(daysStr, 10) || 30, 90);
 
-    if (!schoolId) {
-      return NextResponse.json({ error: 'schoolId requis' }, { status: 400 });
+    if (!schoolId || schoolId !== auth.schoolId) {
+      return NextResponse.json({ error: 'schoolId invalide' }, { status: 400 });
+    }
+
+    if (auth.role === 'PARENT' && userId) {
+      const student = await db.user.findUnique({
+        where: { id: userId },
+        select: { parentId: true, schoolId: true },
+      });
+      if (!student || student.parentId !== auth.userId || student.schoolId !== schoolId) {
+        return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
+      }
     }
 
     const since = new Date();
@@ -45,7 +56,6 @@ export async function GET(request: NextRequest) {
       orderBy: { date: 'desc' },
     });
 
-    // Build daily aggregation for charts
     const dailyMap = new Map<string, { present: number; retard: number; justifie: number; absent: number }>();
     presences.forEach((p) => {
       const key = p.date.toISOString().split('T')[0];
@@ -60,34 +70,45 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => a.date.localeCompare(b.date));
 
     return NextResponse.json({ presences, chartData, total: presences.length });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Erreur interne';
-    console.error('[PRESENCE/HISTORIQUE]', error);
+  } catch (err: unknown) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message = err instanceof Error ? err.message : 'Erreur interne';
+    console.error('[PRESENCE/HISTORIQUE]', err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
-// PUT /api/presence/historique — admin validates a justification
 export async function PUT(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { presenceId, adminId, statut } = body;
+    const auth = authenticateRequest(request);
+    if (auth.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Seul un administrateur peut valider des justifications' }, { status: 403 });
+    }
 
-    if (!presenceId || !adminId) {
-      return NextResponse.json({ error: 'presenceId et adminId requis' }, { status: 400 });
+    const body = await request.json();
+    const { presenceId } = body;
+
+    if (!presenceId) {
+      return NextResponse.json({ error: 'presenceId requis' }, { status: 400 });
     }
 
     const updated = await db.presence.update({
       where: { id: presenceId },
       data: {
-        statut: statut || 'JUSTIFIE',
-        validePar: adminId,
+        statut: 'JUSTIFIE',
+        validePar: auth.userId,
       },
     });
 
     return NextResponse.json({ presence: updated });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Erreur interne';
+  } catch (err: unknown) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message = err instanceof Error ? err.message : 'Erreur interne';
+    console.error('[PRESENCE/HISTORIQUE PUT]', err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

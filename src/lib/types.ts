@@ -12,6 +12,8 @@ export interface SchoolInfo {
   inviteCode?: string;
   subscriptionStatus?: string;
   subscriptionExpiry?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface UserInfo {

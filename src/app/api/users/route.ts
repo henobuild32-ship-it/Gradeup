@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 import { notifyUser } from '@/services/notifications/notificationEngine';
 import { hashPassword } from '@/lib/password';
 
@@ -14,6 +15,7 @@ function generateParentCode(): string {
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = authenticateRequest(request);
     const { searchParams } = new URL(request.url);
     const schoolId = searchParams.get('schoolId');
     const role = searchParams.get('role');
@@ -21,8 +23,13 @@ export async function GET(request: NextRequest) {
     const parentId = searchParams.get('parentId');
     const search = searchParams.get('search');
 
-    if (!schoolId) {
-      return NextResponse.json({ error: 'schoolId is required' }, { status: 400 });
+    if (!schoolId || schoolId !== auth.schoolId) {
+      return NextResponse.json({ error: 'schoolId invalide' }, { status: 400 });
+    }
+
+    // Parent can only filter by their own parentId
+    if (auth.role === 'PARENT' && parentId !== auth.userId) {
+      return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
     }
 
     const where: Record<string, unknown> = { schoolId };
@@ -63,8 +70,11 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json({ users });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Internal server error';
+  } catch (err: unknown) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message = err instanceof Error ? err.message : 'Erreur serveur';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -159,8 +169,11 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ user: userWithEnrollments }, { status: 201 });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Internal server error';
+  } catch (err: unknown) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message = err instanceof Error ? err.message : 'Erreur serveur';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -219,8 +232,11 @@ export async function PATCH(request: NextRequest) {
     });
 
     return NextResponse.json({ user });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Erreur interne.';
+  } catch (err: unknown) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message = err instanceof Error ? err.message : 'Erreur interne.';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -247,8 +263,11 @@ export async function DELETE(request: NextRequest) {
     await db.user.delete({ where: { id: userId } });
 
     return NextResponse.json({ success: true });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Erreur interne.';
+  } catch (err: unknown) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message = err instanceof Error ? err.message : 'Erreur interne.';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -1,25 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 
-// GET /api/presence/aujourdhui?schoolId=xxx&userId=yyy
-// Returns today's presence for a specific user or all users in a school
 export async function GET(request: NextRequest) {
   try {
+    const auth = authenticateRequest(request);
     const { searchParams } = new URL(request.url);
     const schoolId = searchParams.get('schoolId');
     const userId = searchParams.get('userId');
 
-    if (!schoolId) {
-      return NextResponse.json({ error: 'schoolId requis' }, { status: 400 });
+    if (!schoolId || schoolId !== auth.schoolId) {
+      return NextResponse.json({ error: 'schoolId invalide' }, { status: 400 });
     }
 
-    // Start of today (UTC midnight)
+    if (auth.role === 'PARENT' && userId) {
+      const student = await db.user.findUnique({
+        where: { id: userId },
+        select: { parentId: true, schoolId: true },
+      });
+      if (!student || student.parentId !== auth.userId || student.schoolId !== schoolId) {
+        return NextResponse.json({ error: 'Vous ne pouvez consulter que la présence de vos enfants' }, { status: 403 });
+      }
+    }
+
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const tomorrow = new Date(today.getTime() + 86400000);
 
     if (userId) {
-      // Single user check
       const presence = await db.presence.findFirst({
         where: {
           schoolId,
@@ -34,7 +42,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ presence });
     }
 
-    // All users today (for admin dashboard)
     const presences = await db.presence.findMany({
       where: {
         schoolId,
@@ -57,7 +64,6 @@ export async function GET(request: NextRequest) {
       orderBy: { heureArrivee: 'asc' },
     });
 
-    // Get total students and teachers for rate calculation
     const [totalStudents, totalTeachers] = await Promise.all([
       db.user.count({ where: { schoolId, role: 'STUDENT', active: true } }),
       db.user.count({ where: { schoolId, role: 'TEACHER', active: true } }),
@@ -84,9 +90,12 @@ export async function GET(request: NextRequest) {
         date: today.toISOString(),
       },
     });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Erreur interne';
-    console.error('[PRESENCE/AUJOURDHUI]', error);
+  } catch (err: unknown) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message = err instanceof Error ? err.message : 'Erreur interne';
+    console.error('[PRESENCE/AUJOURDHUI]', err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

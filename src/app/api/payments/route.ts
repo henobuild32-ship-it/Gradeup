@@ -1,57 +1,68 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = authenticateRequest(request);
     const { searchParams } = new URL(request.url);
     const schoolId = searchParams.get('schoolId');
     const studentId = searchParams.get('studentId');
     const status = searchParams.get('status');
     const month = searchParams.get('month');
 
-    if (!schoolId) {
-      return NextResponse.json({ error: 'schoolId is required' }, { status: 400 });
+    if (!schoolId || schoolId !== auth.schoolId) {
+      return NextResponse.json({ error: 'schoolId invalide' }, { status: 400 });
     }
 
     const where: Record<string, unknown> = { schoolId };
 
     if (studentId) {
+      if (auth.role === 'PARENT') {
+        const student = await db.user.findUnique({
+          where: { id: studentId },
+          select: { parentId: true, schoolId: true },
+        });
+        if (!student || student.parentId !== auth.userId || student.schoolId !== schoolId) {
+          return NextResponse.json({ error: 'Vous ne pouvez consulter que les paiements de vos enfants' }, { status: 403 });
+        }
+      }
       where.studentId = studentId;
     }
-
-    if (status) {
-      where.status = status;
-    }
-
-    if (month) {
-      where.month = month;
-    }
+    if (status) where.status = status;
+    if (month) where.month = month;
 
     const payments = await db.payment.findMany({
       where,
       include: {
-        student: {
-          select: { id: true, fullName: true, role: true },
-        },
+        student: { select: { id: true, fullName: true, role: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
 
     return NextResponse.json({ payments });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Internal server error';
+  } catch (err: unknown) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message = err instanceof Error ? err.message : 'Erreur serveur';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = authenticateRequest(request);
+    if (auth.role === 'PARENT') {
+      return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { schoolId, studentId, amount, status, month, method } = body;
 
     if (!schoolId || !studentId || amount === undefined) {
       return NextResponse.json(
-        { error: 'Missing required fields: schoolId, studentId, amount' },
+        { error: 'Champs requis manquants: schoolId, studentId, amount' },
         { status: 400 }
       );
     }
@@ -66,15 +77,16 @@ export async function POST(request: NextRequest) {
         method: method || 'cash',
       },
       include: {
-        student: {
-          select: { id: true, fullName: true, role: true },
-        },
+        student: { select: { id: true, fullName: true, role: true } },
       },
     });
 
     return NextResponse.json({ payment }, { status: 201 });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Internal server error';
+  } catch (err: unknown) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message = err instanceof Error ? err.message : 'Erreur serveur';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
