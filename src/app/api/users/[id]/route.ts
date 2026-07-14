@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 import { notifyUser } from '@/services/notifications/notificationEngine';
 import { hashPassword, verifyPassword } from '@/lib/password';
 
@@ -8,7 +9,19 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = authenticateRequest(request);
     const { id } = await params;
+
+    // Parent can only view their own profile or their children
+    if (auth.role === 'PARENT' && id !== auth.userId) {
+      const child = await db.user.findUnique({
+        where: { id },
+        select: { parentId: true },
+      });
+      if (!child || child.parentId !== auth.userId) {
+        return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
+      }
+    }
 
     const user = await db.user.findUnique({
       where: { id },
@@ -23,12 +36,19 @@ export async function GET(
     });
 
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Utilisateur introuvable' }, { status: 404 });
+    }
+
+    if (user.schoolId !== auth.schoolId) {
+      return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
     }
 
     return NextResponse.json({ user });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Internal server error';
+  } catch (err: unknown) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message = err instanceof Error ? err.message : 'Erreur serveur';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -38,7 +58,14 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = authenticateRequest(request);
     const { id } = await params;
+
+    // Seul l'utilisateur lui-même ou un admin peut modifier le profil
+    if (auth.role !== 'ADMIN' && id !== auth.userId) {
+      return NextResponse.json({ error: 'Vous ne pouvez modifier que votre propre profil' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { fullName, email, password, newPassword, oldPassword, role, photoUrl, parentId, isTitulaire, titulaireClassIds } = body;
 
@@ -102,8 +129,11 @@ export async function PUT(
     });
 
     return NextResponse.json({ user });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Internal server error';
+  } catch (err: unknown) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message = err instanceof Error ? err.message : 'Erreur serveur';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -113,19 +143,27 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = authenticateRequest(request);
+    if (auth.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Seul un administrateur peut supprimer des utilisateurs' }, { status: 403 });
+    }
+
     const { id } = await params;
 
     const existing = await db.user.findUnique({ where: { id } });
     if (!existing) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Utilisateur introuvable' }, { status: 404 });
     }
 
     await db.enrolledClass.deleteMany({ where: { userId: id } });
     await db.user.delete({ where: { id } });
 
-    return NextResponse.json({ message: 'User deleted successfully' });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json({ message: 'Utilisateur supprimé avec succès' });
+  } catch (err: unknown) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message = err instanceof Error ? err.message : 'Erreur serveur';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
