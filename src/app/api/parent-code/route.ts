@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 
 function generateParentCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -13,6 +14,11 @@ function generateParentCode(): string {
 // POST: Generate or regenerate parent code for a student
 export async function POST(request: NextRequest) {
   try {
+    const auth = authenticateRequest(request);
+    if (auth.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Seul un administrateur peut générer un code parent' }, { status: 403 });
+    }
+
     const { userId } = await request.json();
     if (!userId) {
       return NextResponse.json({ error: 'userId requis.' }, { status: 400 });
@@ -34,8 +40,11 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ parentCode: updated.parentCode });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Erreur interne.';
+  } catch (err: unknown) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message = err instanceof Error ? err.message : 'Erreur interne.';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

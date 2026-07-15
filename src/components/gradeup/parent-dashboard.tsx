@@ -56,6 +56,7 @@ export default function ParentDashboard() {
   const [attendance, setAttendance] = useState<AttendanceInfo[]>([]);
   const [payments, setPayments] = useState<PaymentInfo[]>([]);
   const [notifications, setNotifications] = useState<NotificationInfo[]>([]);
+  const [childPresence, setChildPresence] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [parentCodeInput, setParentCodeInput] = useState('');
@@ -73,6 +74,8 @@ export default function ParentDashboard() {
 
   useEffect(() => {
     fetchChildren();
+    const interval = setInterval(fetchChildren, 30000);
+    return () => clearInterval(interval);
   }, [user]);
 
   useEffect(() => {
@@ -95,10 +98,26 @@ export default function ParentDashboard() {
         const data = await res.json();
         const list = Array.isArray(data.users) ? data.users : [];
         setChildren(list);
+        // Fetch presence for all children
+        fetchAllPresence(list);
       }
     } catch {
       toast.error('Erreur lors du chargement des enfants');
     }
+  };
+
+  const fetchAllPresence = async (childrenList: { id: string }[]) => {
+    const results: Record<string, boolean> = {};
+    for (const child of childrenList) {
+      try {
+        const res = await fetch(`/api/presence/aujourdhui?schoolId=${schoolId}&userId=${child.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          results[child.id] = data.presence?.statut === 'PRESENT';
+        }
+      } catch { /* silent */ }
+    }
+    setChildPresence(results);
   };
 
   const fetchChildData = async (childId: string) => {
@@ -383,11 +402,16 @@ export default function ParentDashboard() {
                 onClick={() => setSelectedChildIndex(idx)}
                 className="flex flex-col items-center gap-1.5 focus:outline-none shrink-0"
               >
-                <div className={`rounded-full p-[2.5px] transition-all duration-300 ${
+                <div className={`rounded-full p-[2.5px] transition-all duration-300 relative ${
                   selectedChildIndex === idx 
                     ? 'bg-gradient-to-tr from-blue-600 to-indigo-600 ring-2 ring-blue-500/20' 
                     : 'bg-transparent'
                 }`}>
+                  {childPresence[child.id] && (
+                    <span className="absolute -top-0.5 -right-0.5 size-4 bg-emerald-500 border-2 border-background rounded-full flex items-center justify-center z-10">
+                      <CheckCircle2 className="size-2.5 text-white" />
+                    </span>
+                  )}
                   <Avatar className="size-14 ring-2 ring-background shadow-md">
                     <AvatarImage src={child.photoUrl} alt={child.fullName} />
                     <AvatarFallback className="text-sm bg-muted text-foreground font-bold">

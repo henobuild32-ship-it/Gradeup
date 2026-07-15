@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { notificationEmitter } from '@/services/notifications/notificationEmitter';
+import { verifyAccessToken, ACCESS_COOKIE } from '@/lib/auth/jwt';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +12,16 @@ export async function GET(request: NextRequest) {
 
   if (!schoolId) {
     return new Response('schoolId is required', { status: 400 });
+  }
+
+  // Vérifier le JWT
+  const token = request.cookies.get(ACCESS_COOKIE)?.value;
+  if (!token) {
+    return new Response('Non authentifié', { status: 401 });
+  }
+  const claims = verifyAccessToken(token);
+  if (!claims || claims.sub !== userId || claims.schoolId !== schoolId) {
+    return new Response('Session invalide', { status: 401 });
   }
 
   const responseStream = new ReadableStream({

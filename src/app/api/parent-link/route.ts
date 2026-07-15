@@ -1,20 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 
 export async function POST(request: NextRequest) {
   try {
-    const { parentCode, parentUserId } = await request.json();
+    const auth = authenticateRequest(request);
+    if (auth.role !== 'PARENT') {
+      return NextResponse.json({ error: 'Seul un parent peut lier un enfant' }, { status: 403 });
+    }
 
-    if (!parentCode || !parentUserId) {
+    const { parentCode } = await request.json();
+
+    if (!parentCode) {
       return NextResponse.json(
-        { error: 'Code parent et identifiant parent requis.' },
+        { error: 'Code parent requis.' },
         { status: 400 }
       );
     }
 
     const cleanCode = (parentCode as string).trim().toUpperCase();
 
-    const parentUser = await db.user.findUnique({ where: { id: parentUserId } });
+    // L'utilisateur authentifié est le parent
+    const parentUser = await db.user.findUnique({ where: { id: auth.userId } });
     if (!parentUser || parentUser.role !== 'PARENT') {
       return NextResponse.json(
         { error: 'Compte parent invalide.' },
@@ -39,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     const updated = await db.user.update({
       where: { id: student.id },
-      data: { parentId: parentUserId },
+      data: { parentId: auth.userId },
       include: {
         classEnrollments: {
           include: { class: true },
@@ -56,8 +63,11 @@ export async function POST(request: NextRequest) {
         classEnrollments: updated.classEnrollments,
       },
     });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Erreur interne.';
+  } catch (err: unknown) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message = err instanceof Error ? err.message : 'Erreur interne.';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
