@@ -26,10 +26,11 @@ export default function StudentAttendance() {
       setLoading(true);
       try {
         const res = await fetch(`/api/attendance?schoolId=${user.schoolId}&studentId=${user.id}`);
+        if (!res.ok) throw new Error();
         const data = await res.json();
         const sorted = (Array.isArray(data.attendance) ? data.attendance : []).sort((a: AttendanceInfo, b: AttendanceInfo) => new Date(b.date).getTime() - new Date(a.date).getTime());
         setAttendance(sorted);
-      } catch (err) { console.error('Erreur chargement présences:', err); } finally { setLoading(false); }
+      } catch { /* ignore */ } finally { setLoading(false); }
     };
     fetchAttendance();
   }, [user?.schoolId, user?.id]);
@@ -67,6 +68,7 @@ export default function StudentAttendance() {
       case 'present': return <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200">Présent</Badge>;
       case 'absent': return <Badge className="bg-red-50 text-red-700 border-red-200">Absent</Badge>;
       case 'late': return <Badge className="bg-amber-50 text-amber-700 border-amber-200">En retard</Badge>;
+      case 'justified': return <Badge className="bg-purple-50 text-purple-700 border-purple-200">Justifié</Badge>;
       default: return <Badge variant="secondary">{status}</Badge>;
     }
   };
@@ -151,6 +153,7 @@ export default function StudentAttendance() {
               if (record.status === 'present') statusDot = <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 mt-1" />;
               else if (record.status === 'late') statusDot = <div className="h-1.5 w-1.5 rounded-full bg-amber-500 mt-1" />;
               else if (record.status === 'absent') statusDot = <div className="h-1.5 w-1.5 rounded-full bg-red-500 mt-1" />;
+              else if (record.status === 'justified') statusDot = <div className="h-1.5 w-1.5 rounded-full bg-purple-500 mt-1" />;
             }
             
             const dayName = day.toLocaleDateString('fr-FR', { weekday: 'short' }).substring(0, 3);
@@ -205,10 +208,12 @@ export default function StudentAttendance() {
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-lg ${
                   record.status === 'present' ? 'bg-emerald-50 text-emerald-600' :
-                  record.status === 'late' ? 'bg-amber-50 text-amber-600' : 'bg-red-50 text-red-600'
+                  record.status === 'late' ? 'bg-amber-50 text-amber-600' :
+                  record.status === 'justified' ? 'bg-purple-50 text-purple-600' : 'bg-red-50 text-red-600'
                 }`}>
                   {record.status === 'present' ? <UserCheck className="w-5 h-5" /> :
-                   record.status === 'late' ? <Clock className="w-5 h-5" /> : <UserX className="w-5 h-5" />}
+                   record.status === 'late' ? <Clock className="w-5 h-5" /> :
+                   record.status === 'justified' ? <CalendarCheck className="w-5 h-5" /> : <UserX className="w-5 h-5" />}
                 </div>
                 <div>
                   <p className="font-semibold text-sm text-foreground">{formatDate(record.date)}</p>

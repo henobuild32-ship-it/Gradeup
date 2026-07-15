@@ -18,6 +18,15 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import {
   DollarSign,
   Search,
   Lock,
@@ -320,6 +329,68 @@ export default function TuitionTracking() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={paymentDialog !== null} onOpenChange={(open) => { if (!open) setPaymentDialog(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Marquer payé</DialogTitle>
+            <DialogDescription>
+              Enregistrer un paiement pour cet élève
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="amount">Montant (USD)</Label>
+              <Input
+                id="amount"
+                type="number"
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(e.target.value)}
+                placeholder="Ex: 50000"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="month">Mois concerné</Label>
+              <Select value={paymentMonth} onValueChange={setPaymentMonth}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un mois" />
+                </SelectTrigger>
+                <SelectContent>
+                  {['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'].map((m) => (
+                    <SelectItem key={m} value={m}>{m}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="method">Méthode de paiement</Label>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Espèces</SelectItem>
+                  <SelectItem value="mobile">Mobile Money</SelectItem>
+                  <SelectItem value="bank">Virement bancaire</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPaymentDialog(null)}>Annuler</Button>
+            <Button
+              onClick={() => paymentDialog && handleAction(paymentDialog, 'payment', {
+                amount: parseFloat(paymentAmount),
+                month: paymentMonth,
+                method: paymentMethod,
+              })}
+              disabled={!paymentAmount || !paymentMonth || actionLoading === paymentDialog}
+            >
+              {actionLoading === paymentDialog ? 'Enregistrement...' : 'Confirmer le paiement'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

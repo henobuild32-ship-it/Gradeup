@@ -28,8 +28,12 @@ export async function GET(request: NextRequest) {
         if (!student || student.parentId !== auth.userId || student.schoolId !== schoolId) {
           return NextResponse.json({ error: 'Vous ne pouvez consulter que les notes de vos enfants' }, { status: 403 });
         }
+      } else if (auth.role === 'STUDENT' && studentId !== auth.userId) {
+        return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
       }
       where.studentId = studentId;
+    } else if (auth.role === 'STUDENT') {
+      where.studentId = auth.userId;
     }
     if (courseId) where.courseId = courseId;
     if (trimester) where.trimester = trimester;
@@ -90,9 +94,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    syncStudentReport(schoolId, studentId, trimester || '1').catch((err) => {
-      console.error('[grade-sync] background sync error after POST /api/grades:', err);
-    });
+    syncStudentReport(schoolId, studentId, trimester || '1').catch(() => {});
 
     return NextResponse.json({ grade }, { status: 201 });
   } catch (err: unknown) {

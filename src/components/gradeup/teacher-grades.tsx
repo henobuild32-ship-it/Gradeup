@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAppStore } from '@/lib/store';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -200,8 +200,7 @@ export default function TeacherGrades() {
         const hData = await res.json();
         setGradeHistoryList(hData.history || []);
       }
-    } catch (e) {
-      console.error(e);
+    } catch {
     } finally {
       setLoadingHistory(false);
     }
@@ -278,10 +277,15 @@ export default function TeacherGrades() {
     }
   };
 
+  const lastSaved = useRef<Record<string, string>>({});
+
   const handleAutoSave = async (studentId: string, scoreStr: string, commentStr: string) => {
     if (!user || !filterCourseId) return;
     if (scoreStr === '') return;
     
+    const key = `${studentId}-${filterCourseId}-${filterTrimester}`;
+    if (lastSaved.current[key] === scoreStr) return;
+
     const score = parseFloat(scoreStr);
     if (isNaN(score)) return;
 
@@ -309,6 +313,7 @@ export default function TeacherGrades() {
       });
 
       if (res.ok) {
+        lastSaved.current[key] = scoreStr;
         const studentName = gridStudents.find(s => s.id === studentId)?.fullName || 'Élève';
         toast.success(`Note de ${studentName} enregistrée`);
         // Refresh local grades query
@@ -353,11 +358,28 @@ export default function TeacherGrades() {
 
   const getClassAverage = () => {
     if (grades.length === 0) return '—';
-    const total = grades.reduce((sum, g) => sum + (g.score / g.maxScore) * 20, 0);
-    return (total / grades.length).toFixed(2);
+    const studentMap = new Map<string, { sum: number; count: number }>();
+    for (const g of grades) {
+      const entry = studentMap.get(g.studentId) || { sum: 0, count: 0 };
+      entry.sum += (g.score / g.maxScore) * 20;
+      entry.count++;
+      studentMap.set(g.studentId, entry);
+    }
+    const studentAverages = Array.from(studentMap.values()).map((e) => e.sum / e.count);
+    const avg = studentAverages.reduce((s, a) => s + a, 0) / studentAverages.length;
+    return avg.toFixed(2);
   };
 
-  const getPassCount = () => grades.filter((g) => (g.score / g.maxScore) * 20 >= 10).length;
+  const getPassCount = () => {
+    const studentMap = new Map<string, number[]>();
+    for (const g of grades) {
+      const list = studentMap.get(g.studentId) || [];
+      list.push((g.score / g.maxScore) * 20);
+      studentMap.set(g.studentId, list);
+    }
+    const studentAverages = Array.from(studentMap.values()).map((scores) => scores.reduce((a, b) => a + b, 0) / scores.length);
+    return studentAverages.filter((avg) => avg >= 10).length;
+  };
 
   // Real-time Class Grid stats
   const gridStats = useMemo(() => {

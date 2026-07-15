@@ -156,20 +156,22 @@ export default function AdminUsers() {
   const fetchClasses = useCallback(async () => {
     try {
       const res = await fetch(`/api/classes?schoolId=${user?.schoolId}`);
+      if (!res.ok) return;
       const data = await res.json();
       setClasses(Array.isArray(data.classes) ? data.classes : []);
     } catch {
-      console.error('Failed to fetch classes');
+      // silencieux
     }
   }, [user?.schoolId]);
 
   const fetchParents = useCallback(async () => {
     try {
       const res = await fetch(`/api/users?schoolId=${user?.schoolId}&role=PARENT`);
+      if (!res.ok) return;
       const data = await res.json();
       setParents(Array.isArray(data.users) ? data.users : []);
     } catch {
-      console.error('Failed to fetch parents');
+      // silencieux
     }
   }, [user?.schoolId]);
 

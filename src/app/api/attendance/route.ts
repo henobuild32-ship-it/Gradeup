@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
     const schoolId = searchParams.get('schoolId');
     const studentId = searchParams.get('studentId');
     const date = searchParams.get('date');
+    const courseId = searchParams.get('courseId');
 
     if (!schoolId || schoolId !== auth.schoolId) {
       return NextResponse.json({ error: 'schoolId invalide' }, { status: 400 });
@@ -25,10 +26,15 @@ export async function GET(request: NextRequest) {
         if (!student || student.parentId !== auth.userId || student.schoolId !== schoolId) {
           return NextResponse.json({ error: 'Vous ne pouvez consulter que les absences de vos enfants' }, { status: 403 });
         }
+      } else if (auth.role === 'STUDENT' && studentId !== auth.userId) {
+        return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
       }
       where.studentId = studentId;
+    } else if (auth.role === 'STUDENT') {
+      where.studentId = auth.userId;
     }
     if (date) where.date = date;
+    if (courseId) where.courseId = courseId;
 
     const attendance = await db.attendance.findMany({
       where,
@@ -56,7 +62,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { schoolId, studentId, teacherId, date, status, reason } = body;
+    const { schoolId, studentId, teacherId, courseId, date, status, reason } = body;
 
     if (!schoolId || !studentId || !teacherId || !date) {
       return NextResponse.json(
@@ -65,8 +71,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const attCourseId = courseId || '';
     const existing = await db.attendance.findUnique({
-      where: { studentId_date: { studentId, date } },
+      where: { studentId_date_courseId: { studentId, date, courseId: attCourseId } },
     });
 
     if (existing) {
@@ -81,6 +88,7 @@ export async function POST(request: NextRequest) {
         schoolId,
         studentId,
         teacherId,
+        courseId: attCourseId,
         date,
         status: status || 'absent',
         reason: reason || '',

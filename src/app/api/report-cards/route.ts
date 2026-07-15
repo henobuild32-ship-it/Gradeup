@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = authenticateRequest(request);
     const { searchParams } = new URL(request.url);
     const schoolId = searchParams.get('schoolId');
     const teacherId = searchParams.get('teacherId');
@@ -28,6 +30,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ reportCards });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -35,6 +40,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: Request) {
   try {
+    authenticateRequest(request);
     const body = await request.json();
     const { reportNumber, schoolId, classId, studentId, teacherId, trimester, academicYear,
       studentName, studentGender, studentBirthDate, totalPointsObtained, totalPointsPossible,
@@ -64,6 +70,9 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ reportCard });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -71,6 +80,7 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    authenticateRequest(request);
     const body = await request.json();
     const { id, status, teacherId, ...data } = body;
 
@@ -106,6 +116,9 @@ export async function PUT(request: Request) {
 
     return NextResponse.json({ reportCard });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -113,6 +126,7 @@ export async function PUT(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    authenticateRequest(request);
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     if (!id) {
@@ -121,6 +135,9 @@ export async function DELETE(request: Request) {
     await db.reportCard.delete({ where: { id } });
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }

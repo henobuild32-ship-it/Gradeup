@@ -309,7 +309,7 @@ export default function AdminReports() {
       const data = await res.json();
       setClasses(Array.isArray(data.classes) ? data.classes : []);
     } catch {
-      console.error('Failed to fetch classes');
+      // silencieux
     }
   }, [user?.schoolId]);
 
@@ -321,7 +321,7 @@ export default function AdminReports() {
       const data = await res.json();
       setStudents(data.users || []);
     } catch {
-      console.error('Failed to fetch students');
+      // silencieux
     }
   }, [selectedClass, user?.schoolId]);
 
@@ -333,7 +333,7 @@ export default function AdminReports() {
       const data = await res.json();
       setCourses(data.courses || []);
     } catch {
-      console.error('Failed to fetch courses');
+      // silencieux
     }
   }, [selectedClass, user?.schoolId]);
 
@@ -346,7 +346,7 @@ export default function AdminReports() {
       setReportStats(data);
       setCanGenerateMore(data?.remaining > 0);
     } catch {
-      console.error('Failed to fetch report stats');
+      // silencieux
     } finally {
       setLoading(false);
     }
@@ -366,8 +366,7 @@ export default function AdminReports() {
       if (!res.ok) throw new Error("Failed to fetch archive");
       const data = await res.json();
       setArchiveReports(data.reportCards || []);
-    } catch (err) {
-      console.error(err);
+    } catch {
       toast.error("Impossible de charger les bulletins archivés");
     } finally {
       setArchiveLoading(false);
@@ -491,8 +490,7 @@ export default function AdminReports() {
       // Switch back to generate tab so they can see it!
       setActiveTab('generate');
       toast.success("Bulletin chargé dans le dessinateur.");
-    } catch (err) {
-      console.error(err);
+    } catch {
       toast.error("Impossible de charger ce bulletin.");
     }
   };
@@ -513,9 +511,8 @@ export default function AdminReports() {
       if (!res.ok) throw new Error("Failed to delete");
       toast.success("Bulletin supprimé de l'archive");
       fetchArchive();
-      fetchReportStats(); // update limit counter display too!
-    } catch (err) {
-      console.error(err);
+      fetchReportStats();
+    } catch {
       toast.error("Erreur lors de la suppression du bulletin");
     }
   };
@@ -540,7 +537,7 @@ export default function AdminReports() {
             }));
           }
         })
-        .catch(console.error);
+        .catch(() => {});
     }
   }, [fetchClasses, fetchReportStats, user?.schoolId]);
 
@@ -655,8 +652,8 @@ export default function AdminReports() {
             const gd = await gradesRes.json();
             studentGrades = Array.isArray(gd) ? gd : (Array.isArray(gd.grades) ? gd.grades : []);
           }
-        } catch (e) {
-          console.error("Failed to fetch student grades", e);
+        } catch {
+          // silencieux
         }
 
         // Fetch EPST curriculum rules for student's section and class level
@@ -668,8 +665,8 @@ export default function AdminReports() {
           if (epstRes.ok) {
             epstRules = await epstRes.json();
           }
-        } catch (e) {
-          console.error("Failed to fetch EPST curriculum rules", e);
+        } catch {
+          // silencieux
         }
 
         // Set student metadata
@@ -734,8 +731,7 @@ export default function AdminReports() {
 
         setShowRDCBulletin(true);
         toast.success('Le bulletin a été dessiné avec succès !');
-      } catch (err) {
-        console.error(err);
+      } catch {
         toast.error('Erreur lors de la génération du bulletin');
       } finally {
         setGeneratingReport(false);
@@ -1060,8 +1056,7 @@ export default function AdminReports() {
         const err = await saveRes.json();
         toast.error(err.error || "Erreur lors de la sauvegarde du bulletin");
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
       toast.error("Erreur de communication avec le serveur");
     }
   };

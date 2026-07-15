@@ -143,12 +143,13 @@ export default function AdminDashboard() {
   const fetchStats = async () => {
     try {
       const res = await fetch(`/api/stats?schoolId=${user?.schoolId}`);
+      if (!res.ok) return;
       const data = await res.json();
       if (data.stats) {
         setStats(data.stats);
       }
-    } catch (error) {
-      console.error('Failed to fetch stats:', error);
+    } catch {
+      // silencieux
     } finally {
       setLoading(false);
     }
@@ -164,8 +165,8 @@ export default function AdminDashboard() {
       const overdueData = await overdueRes.json();
       setPendingPayments(pendingData.payments?.slice(0, 5) || []);
       setOverduePayments(overdueData.payments?.slice(0, 5) || []);
-    } catch (error) {
-      console.error('Failed to fetch alerts:', error);
+    } catch {
+      // silencieux
     }
   };
 
@@ -740,8 +741,8 @@ export default function AdminDashboard() {
               <Input 
                 placeholder="Saisir TRANSITION..." 
                 value={confirmText} 
-                onChange={(e) => setConfirmText(e.target.value)} 
-                className="h-11 rounded-xl text-center font-bold tracking-widest bg-muted/30 focus:ring-2 focus:ring-red-500/20"
+                onChange={(e) => setConfirmText(e.target.value.toUpperCase())} 
+                className="h-11 rounded-xl text-center font-bold tracking-widest bg-muted/30 focus:ring-2 focus:ring-red-500/20 uppercase"
               />
 
               <DialogFooter className="pt-4 border-t gap-2">

@@ -135,6 +135,7 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Cours', page: 'student-courses', icon: BookOpen, emoji: '📚' },
     { label: 'Leçons', page: 'student-lessons', icon: FileText, emoji: '📖' },
     { label: 'Notes', page: 'student-grades', icon: ClipboardList, emoji: '📝' },
+    { label: 'Devoirs', page: 'student-homework', icon: ClipboardCheck, emoji: '📋' },
     { label: 'Absences', page: 'student-attendance', icon: Calendar, emoji: '📅' },
     { label: 'Étudier avec Grady', page: 'student-ai', icon: Bot, emoji: '🤖' },
     { label: 'Visioconférences', page: 'meetings', icon: Video, emoji: '🎥' },
@@ -243,6 +244,7 @@ const pageTitles: Record<PageView, string> = {
   'student-attendance': 'Absences',
   'student-payments': 'Paiements',
   'student-ai': 'IA Gradie',
+  'student-homework': 'Devoirs',
   'student-notifications': 'Notifications',
   'parent-dashboard': 'Tableau de bord',
   'parent-grades': 'Suivi scolaire',
@@ -276,12 +278,13 @@ function SidebarContent({
   if (user.role === 'TEACHER' && !user.isTitulaire) {
     navItems = navItems.filter(item => item.page !== 'teacher-reports' && item.page !== 'auto-report-sync');
   }
-  const initials = user.fullName
+  const initials = (user.fullName || '')
     .split(' ')
-    .map((n) => n[0])
+    .filter(Boolean)
+    .map((n) => n[0] || '')
     .join('')
     .toUpperCase()
-    .slice(0, 2);
+    .slice(0, 2) || '?';
 
   const { isInstallable, isAppInstalled, installPWA } = usePWAInstall();
 
@@ -652,12 +655,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
     }
   };
 
-  const initials = user.fullName
+  const initials = (user.fullName || '')
     .split(' ')
-    .map((n) => n[0])
+    .filter(Boolean)
+    .map((n) => n[0] || '')
     .join('')
     .toUpperCase()
-    .slice(0, 2);
+    .slice(0, 2) || '?';
 
   return (
     // ✅ Container principal: utilise h-dvh pour la hauteur dynamique du viewport

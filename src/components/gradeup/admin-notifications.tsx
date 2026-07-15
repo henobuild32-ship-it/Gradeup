@@ -112,10 +112,11 @@ export default function AdminNotifications() {
   const fetchClasses = useCallback(async () => {
     try {
       const res = await fetch(`/api/classes?schoolId=${user?.schoolId}`);
+      if (!res.ok) return;
       const data = await res.json();
       setClasses(Array.isArray(data.classes) ? data.classes : []);
     } catch {
-      console.error('Failed to fetch classes');
+      // silencieux
     }
   }, [user?.schoolId]);
 

@@ -75,7 +75,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
     const message = err instanceof Error ? err.message : 'Erreur interne';
-    console.error('[PRESENCE/HISTORIQUE]', err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -108,7 +107,6 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
     const message = err instanceof Error ? err.message : 'Erreur interne';
-    console.error('[PRESENCE/HISTORIQUE PUT]', err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

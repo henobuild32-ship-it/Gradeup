@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Plus, FileText, Trash2, AlertTriangle, Upload, BookOpen } from 'lucide-react';
+import { Plus, FileText, Trash2, AlertTriangle, Upload, BookOpen, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import type { CourseInfo, LessonInfo } from '@/lib/types';
 
@@ -29,6 +29,8 @@ export default function TeacherLessons() {
   const [formTitle, setFormTitle] = useState('');
   const [formContent, setFormContent] = useState('');
   const [formFileName, setFormFileName] = useState('');
+  const [formFileUrl, setFormFileUrl] = useState('');
+  const formFileRef = useRef<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
 
@@ -68,6 +70,8 @@ export default function TeacherLessons() {
     setFormTitle('');
     setFormContent('');
     setFormFileName('');
+    setFormFileUrl('');
+    formFileRef.current = null;
   };
 
   const handleCreate = async () => {
@@ -82,6 +86,21 @@ export default function TeacherLessons() {
 
     setSubmitting(true);
     try {
+      let fileUrl = formFileUrl;
+      if (formFileRef.current) {
+        const uploadFormData = new FormData();
+        uploadFormData.append('file', formFileRef.current);
+        const uploadRes = await fetch('/api/resources/upload', { method: 'POST', body: uploadFormData });
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          fileUrl = uploadData.url;
+        } else {
+          toast.error('Erreur lors de l\'upload du fichier');
+          setSubmitting(false);
+          return;
+        }
+      }
+
       const res = await fetch('/api/lessons', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -91,6 +110,7 @@ export default function TeacherLessons() {
           teacherId: user.id,
           title: formTitle.trim(),
           content: formContent.trim(),
+          fileUrl,
           fileName: formFileName.trim(),
         }),
       });
@@ -244,9 +264,18 @@ export default function TeacherLessons() {
                         </p>
                       )}
                       {lesson.fileName && (
-                        <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                          <Upload className="h-3 w-3" />
-                          {lesson.fileName}
+                        <div className="flex items-center gap-2 mt-2 text-xs">
+                          {lesson.fileUrl ? (
+                            <a href={lesson.fileUrl} download={lesson.fileName || true} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 hover:underline">
+                              <Download className="h-3 w-3" />
+                              {lesson.fileName}
+                            </a>
+                          ) : (
+                            <span className="flex items-center gap-1.5 text-muted-foreground">
+                              <Upload className="h-3 w-3" />
+                              {lesson.fileName}
+                            </span>
+                          )}
                         </div>
                       )}
                     </CardContent>
@@ -324,7 +353,10 @@ export default function TeacherLessons() {
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) setFormFileName(file.name);
+                  if (file) {
+                    setFormFileName(file.name);
+                    formFileRef.current = file;
+                  }
                 }}
               />
               <div className="flex gap-2">
@@ -350,7 +382,7 @@ export default function TeacherLessons() {
                     variant="ghost"
                     size="icon"
                     className="shrink-0 text-muted-foreground hover:text-red-500"
-                    onClick={() => { setFormFileName(''); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                    onClick={() => { setFormFileName(''); setFormFileUrl(''); formFileRef.current = null; if (fileInputRef.current) fileInputRef.current.value = ''; }}
                   >
                     ✕
                   </Button>

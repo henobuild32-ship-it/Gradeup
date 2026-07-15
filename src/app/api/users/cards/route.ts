@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 import { notifyUser } from '@/services/notifications/notificationEngine';
 
 async function generateUniqueCardId(fullName: string) {
@@ -24,6 +25,7 @@ async function generateUniqueCardId(fullName: string) {
 
 export async function POST(request: NextRequest) {
   try {
+    authenticateRequest(request);
     const { schoolId, action, classId, userId } = await request.json();
 
     if (!schoolId || !action) {
@@ -123,6 +125,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
 
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

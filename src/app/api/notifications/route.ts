@@ -24,6 +24,19 @@ export async function GET(request: NextRequest) {
       where.targetRole = targetRole;
     }
 
+    // STUDENT can only see notifications addressed to them or their class
+    if (auth.role === 'STUDENT') {
+      const enrollments = await db.enrolledClass.findMany({
+        where: { userId: auth.userId },
+        select: { classId: true },
+      });
+      const classIds = enrollments.map(e => e.classId);
+      where.OR = [
+        { userId: auth.userId },
+        { targetClassId: { in: classIds } },
+      ];
+    }
+
     const notifications = await db.notification.findMany({
       where,
       orderBy: { createdAt: 'desc' },

@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 
 export async function PATCH(request: NextRequest) {
   try {
+    const auth = authenticateRequest(request);
     const body = await request.json();
     const { transmissionId, titulaireId, action } = body; // action: 'RECEIVE' | 'REJECT'
 
@@ -29,7 +31,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Vérifier que l'utilisateur est bien le titulaire
-    if (transmission.titulaireId !== titulaireId) {
+    if (transmission.titulaireId !== auth.userId) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 403 });
     }
 
@@ -65,8 +67,10 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const msg = error instanceof Error ? error.message : 'Erreur serveur';
-    console.error('[PATCH /api/cahier/transmissions/receive]', error);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

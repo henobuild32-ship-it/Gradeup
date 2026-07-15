@@ -25,10 +25,11 @@ export default function StudentGrades() {
     if (showLoading) setLoading(true);
     try {
       const res = await fetch(`/api/grades?schoolId=${user.schoolId}&studentId=${user.id}&trimester=${trimester}`);
+      if (!res.ok) throw new Error();
       const data = await res.json();
       setGrades(Array.isArray(data.grades) ? data.grades : []);
-    } catch (err) {
-      console.error('Erreur chargement notes:', err);
+    } catch {
+      // ignore
     } finally {
       if (showLoading) setLoading(false);
     }

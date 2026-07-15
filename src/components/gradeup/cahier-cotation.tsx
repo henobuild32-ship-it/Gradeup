@@ -405,9 +405,9 @@ export default function CahierCotation() {
     let count = 0;
     for (const e of evaluations) {
       const mark = e.marks.find((m) => m.studentId === studentId);
-      const score = mark ? mark.score : 0;
+      if (!mark) continue;
       const max = e.maxScore > 0 ? e.maxScore : 20;
-      sum += (score / max) * 20;
+      sum += (mark.score / max) * 20;
       count++;
     }
     return count > 0 ? Math.round((sum / count) * 10) / 10 : 0;

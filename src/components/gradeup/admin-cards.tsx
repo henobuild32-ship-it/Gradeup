@@ -32,6 +32,7 @@ interface StudentItem {
   gender?: string;
   birthDate?: string;
   matricule?: string;
+  ine?: string;
   phone?: string;
   parentPhone?: string;
   parentPhone2?: string;
@@ -48,6 +49,10 @@ interface StudentItem {
   className?: string;
   bloodType?: string;
   nationality?: string;
+  tuteur?: string;
+  contactTuteur?: string;
+  allergies?: string;
+  assurance?: string;
 }
 
 export default function AdminCards() {
@@ -212,6 +217,13 @@ export default function AdminCards() {
       className: student.classEnrollments?.[0]?.class?.name || '',
       bloodType: student.bloodType || '',
       nationality: student.nationality || '',
+      ine: student.ine || student.cardId || '',
+      tuteur: student.tuteur || '',
+      contactTuteur: student.contactTuteur || '',
+      allergies: student.allergies || '',
+      assurance: student.assurance || '',
+      cardIssuedDate: student.cardIssuedDate || '',
+      cardExpiryDate: student.cardExpiryDate || '',
     });
   };
 
@@ -307,15 +319,7 @@ export default function AdminCards() {
   };
 
   const handlePrint = () => {
-    const printContents = printRef.current?.innerHTML;
-    const originalContents = document.body.innerHTML;
-    
-    if (printContents) {
-      document.body.innerHTML = printContents;
-      window.print();
-      document.body.innerHTML = originalContents;
-      window.location.reload();
-    }
+    window.print();
   };
 
   // Grouping logic (Only for students. Teachers will be shown in a single list)
@@ -362,13 +366,17 @@ export default function AdminCards() {
           user={{
             ...student,
             role: cardRole,
+            roleLabel: cardRole === 'STUDENT' ? 'Élève' : 'Enseignant',
             className: student.classEnrollments?.[0]?.class?.name || student.className,
-            courseName: student.section, // use section as subject for teachers if editing
+            courseName: student.section,
+            ine: student.cardId || student.id.slice(-8),
           }} 
-          schoolName={user?.school?.name || 'Établissement GradeUp'} 
-          schoolLogo={schoolLogo}
-          schoolEmail={schoolEmail}
-          schoolAddress={schoolAddress}
+          school={{
+            name: user?.school?.name || 'Établissement GradeUp',
+            logoUrl: schoolLogo,
+            color: user?.school?.color || '#2563eb',
+            academicYear: user?.school?.academicYear || new Date().getFullYear() + '-' + (new Date().getFullYear() + 1),
+          }}
           role={cardRole} 
         />
       </div>
@@ -649,6 +657,51 @@ export default function AdminCards() {
                 value={formData.nationality || ''} 
                 onChange={(e) => setFormData({...formData, nationality: e.target.value})} 
                 placeholder="Nationalité"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>INE / Identifiant National</Label>
+              <Input 
+                value={formData.ine || ''} 
+                onChange={(e) => setFormData({...formData, ine: e.target.value})} 
+                placeholder="Identifiant National Élève"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Tuteur</Label>
+              <Input 
+                value={formData.tuteur || ''} 
+                onChange={(e) => setFormData({...formData, tuteur: e.target.value})} 
+                placeholder="Nom du tuteur"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Contact Tuteur</Label>
+              <Input 
+                value={formData.contactTuteur || ''} 
+                onChange={(e) => setFormData({...formData, contactTuteur: e.target.value})} 
+                placeholder="Téléphone du tuteur"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Allergies</Label>
+              <Input 
+                value={formData.allergies || ''} 
+                onChange={(e) => setFormData({...formData, allergies: e.target.value})} 
+                placeholder="Ex: Arachides, Latex"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Assurance</Label>
+              <Input 
+                value={formData.assurance || ''} 
+                onChange={(e) => setFormData({...formData, assurance: e.target.value})} 
+                placeholder="Nom de l'assurance"
               />
             </div>
             

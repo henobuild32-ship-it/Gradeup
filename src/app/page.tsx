@@ -60,6 +60,7 @@ const StudentGrades = dynamic(() => import('@/components/gradeup/student-grades'
 const StudentAttendance = dynamic(() => import('@/components/gradeup/student-attendance'), { ssr: false, loading: () => <PageSkeleton /> });
 const StudentPayments = dynamic(() => import('@/components/gradeup/student-payments'), { ssr: false, loading: () => <PageSkeleton /> });
 const StudentAI = dynamic(() => import('@/components/gradeup/student-ai'), { ssr: false, loading: () => <PageSkeleton /> });
+const StudentHomework = dynamic(() => import('@/components/gradeup/student-homework'), { ssr: false, loading: () => <PageSkeleton /> });
 const StudentNotifications = dynamic(() => import('@/components/gradeup/student-notifications'), { ssr: false, loading: () => <PageSkeleton /> });
 const ParentDashboard = dynamic(() => import('@/components/gradeup/parent-dashboard'), { ssr: false, loading: () => <PageSkeleton /> });
 const ParentGrades = dynamic(() => import('@/components/gradeup/parent-grades'), { ssr: false, loading: () => <PageSkeleton /> });
@@ -110,6 +111,7 @@ function PageRouter({ page }: { page: PageView }) {
   if (page === 'student-attendance') return <StudentAttendance />;
   if (page === 'student-payments') return <StudentPayments />;
   if (page === 'student-ai') return <StudentAI />;
+  if (page === 'student-homework') return <StudentHomework />;
   if (page === 'student-notifications') return <StudentNotifications />;
   if (page === 'parent-dashboard') return <ParentDashboard />;
   if (page === 'parent-grades') return <ParentGrades />;

@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 
 export async function POST(request: Request) {
   try {
+    authenticateRequest(request);
     const body = await request.json();
     const { schoolId, classId, trimester } = body;
 
@@ -37,7 +39,9 @@ export async function POST(request: Request) {
       counter: updatedCounter.count
     });
   } catch (error) {
-    console.error('Error with report counter:', error);
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     return NextResponse.json({ error: 'Failed to process report counter' }, { status: 500 });
   }
 }

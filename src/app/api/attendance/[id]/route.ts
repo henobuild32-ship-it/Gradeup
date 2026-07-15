@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    authenticateRequest(request);
     const { id } = await params;
 
     const attendance = await db.attendance.findUnique({
@@ -23,6 +25,9 @@ export async function GET(
 
     return NextResponse.json({ attendance });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -33,9 +38,10 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    authenticateRequest(request);
     const { id } = await params;
     const body = await request.json();
-    const { status, reason, date } = body;
+    const { status, reason, date, courseId } = body;
 
     const existing = await db.attendance.findUnique({ where: { id } });
     if (!existing) {
@@ -43,11 +49,13 @@ export async function PUT(
     }
 
     if (date && date !== existing.date) {
+      const newCourseId = courseId || existing.courseId;
       const conflicting = await db.attendance.findUnique({
         where: {
-          studentId_date: {
+          studentId_date_courseId: {
             studentId: existing.studentId,
             date,
+            courseId: newCourseId,
           },
         },
       });
@@ -66,6 +74,7 @@ export async function PUT(
         ...(status !== undefined && { status }),
         ...(reason !== undefined && { reason }),
         ...(date !== undefined && { date }),
+        ...(courseId !== undefined && { courseId }),
       },
       include: {
         student: {
@@ -76,6 +85,9 @@ export async function PUT(
 
     return NextResponse.json({ attendance });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -86,6 +98,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    authenticateRequest(request);
     const { id } = await params;
 
     const existing = await db.attendance.findUnique({ where: { id } });
@@ -97,6 +110,9 @@ export async function DELETE(
 
     return NextResponse.json({ message: 'Attendance record deleted successfully' });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }

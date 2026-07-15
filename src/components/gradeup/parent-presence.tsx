@@ -32,6 +32,7 @@ export default function ParentPresence() {
   const [children, setChildren] = useState<ChildInfo[]>([]);
   const [presences, setPresences] = useState<Record<string, PresenceRecord | null>>({});
   const [loading, setLoading] = useState(true);
+  const [selectedMapChildId, setSelectedMapChildId] = useState<string | null>(null);
   const schoolId = user?.schoolId || '';
 
   const fetchChildren = useCallback(async () => {
@@ -59,16 +60,32 @@ export default function ParentPresence() {
     return null;
   }, [schoolId]);
 
+  const [liveLocations, setLiveLocations] = useState<Record<string, { latitude: number; longitude: number; updatedAt: string } | null>>({});
+
+  const fetchLiveLocation = useCallback(async (childId: string) => {
+    try {
+      const res = await fetch(`/api/location?userId=${childId}`);
+      if (res.ok) {
+        const data = await res.json();
+        return data.location || null;
+      }
+    } catch { /* silent */ }
+    return null;
+  }, []);
+
   const fetchAllPresences = useCallback(async () => {
     setLoading(true);
     const childList = await fetchChildren();
     const results: Record<string, PresenceRecord | null> = {};
+    const locResults: Record<string, { latitude: number; longitude: number; updatedAt: string } | null> = {};
     for (const child of childList) {
       results[child.id] = await fetchPresence(child.id);
+      locResults[child.id] = await fetchLiveLocation(child.id);
     }
     setPresences(results);
+    setLiveLocations(locResults);
     setLoading(false);
-  }, [fetchChildren, fetchPresence]);
+  }, [fetchChildren, fetchPresence, fetchLiveLocation]);
 
   useEffect(() => {
     fetchAllPresences();
@@ -102,12 +119,22 @@ export default function ParentPresence() {
     }
   };
 
-  const hasCoordinates = user?.school?.latitude && user?.school?.longitude;
-  const mapSrc = hasCoordinates
-    ? `https://www.openstreetmap.org/export/embed.html?bbox=${user!.school!.longitude! - 0.01}%2C${user!.school!.latitude! - 0.01}%2C${user!.school!.longitude! + 0.01}%2C${user!.school!.latitude! + 0.01}&layer=mapnik&marker=${user!.school!.latitude}%2C${user!.school!.longitude}`
+  if (!user) return null;
+
+  const schoolCoords = user?.school?.latitude && user?.school?.longitude
+    ? { lat: user.school.latitude, lng: user.school.longitude }
     : null;
 
-  if (!user) return null;
+  const mapChildId = selectedMapChildId && liveLocations[selectedMapChildId] ? selectedMapChildId : children.find(c => liveLocations[c.id])?.id || null;
+  const liveLoc = mapChildId ? liveLocations[mapChildId] : null;
+  const mapChildName = mapChildId ? children.find(c => c.id === mapChildId)?.fullName || "l'enfant" : null;
+  const mapLat = liveLoc?.latitude || schoolCoords?.lat || 0;
+  const mapLng = liveLoc?.longitude || schoolCoords?.lng || 0;
+  const showMap = !!(schoolCoords || liveLoc);
+  const mapPadding = 0.005;
+  const mapSrc = showMap
+    ? `https://www.openstreetmap.org/export/embed.html?bbox=${mapLng - mapPadding}%2C${mapLat - mapPadding}%2C${mapLng + mapPadding}%2C${mapLat + mapPadding}&layer=mapnik&marker=${mapLat}%2C${mapLng}`
+    : null;
 
   return (
     <Card className="shadow-sm border border-border">
@@ -143,7 +170,8 @@ export default function ParentPresence() {
               return (
                 <div
                   key={child.id}
-                  className="flex items-center justify-between p-4 rounded-xl bg-muted/10 border border-border/50"
+                  className={'flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-all hover:shadow-sm ' + (mapChildId === child.id ? 'bg-blue-50 border-blue-200' : 'bg-muted/10 border-border/50')}
+                  onClick={() => setSelectedMapChildId(mapChildId === child.id ? null : child.id)}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="size-10 rounded-full bg-muted flex items-center justify-center shrink-0 text-sm font-bold text-foreground">
@@ -181,28 +209,42 @@ export default function ParentPresence() {
           </div>
         )}
 
-        {/* Map */}
+        {/* Carte de localisation en temps réel */}
         {mapSrc ? (
           <div className="rounded-xl overflow-hidden border border-border/50">
             <div className="flex items-center gap-1.5 px-3 py-2 bg-muted/20 text-xs text-muted-foreground">
               <MapPin className="size-3.5 text-blue-500" />
-              Localisation de l&apos;école : {user.school?.name}
+              {liveLoc
+                ? `Position de ${mapChildName || "l'enfant"} (GPS en temps réel)`
+                : `Localisation de l'école : ${user.school?.name || ''}`
+              }
             </div>
             <iframe
-              title="Localisation de l'école"
+              title="Localisation en temps réel"
               src={mapSrc}
               width="100%"
-              height="200"
+              height="250"
               className="border-0 w-full"
               loading="lazy"
               referrerPolicy="no-referrer"
             />
+            {liveLoc && (
+              <div className="flex items-center justify-between px-3 py-2 bg-emerald-50/50 text-xs text-muted-foreground border-t border-border/50">
+                <span className="flex items-center gap-1">
+                  <Navigation className="size-3 text-emerald-500" />
+                  Dernière position mise à jour
+                </span>
+                <span className="font-mono text-emerald-600">
+                  {new Date(liveLoc.updatedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </span>
+              </div>
+            )}
           </div>
         ) : (
           <div className="rounded-xl bg-muted/10 border border-dashed border-muted p-6 text-center">
             <Navigation className="size-6 text-muted-foreground/50 mx-auto mb-2" />
             <p className="text-xs text-muted-foreground">
-              Coordonnées de l&apos;école non définies. Contactez l&apos;administration.
+              Coordonnées non disponibles. L&apos;élève n&apos;a pas encore partagé sa position.
             </p>
           </div>
         )}

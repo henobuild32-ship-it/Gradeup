@@ -10,10 +10,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 import { syncStudentReport, type SyncResult } from '@/lib/grade-sync';
 
 export async function POST(request: NextRequest) {
   try {
+    authenticateRequest(request);
     const body = await request.json();
     const { schoolId, classId, trimester, studentId } = body;
 
@@ -76,6 +78,9 @@ export async function POST(request: NextRequest) {
       total: studentIds.length,
     });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -87,6 +92,7 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    authenticateRequest(request);
     const { searchParams } = new URL(request.url);
     const schoolId = searchParams.get('schoolId');
     const studentId = searchParams.get('studentId');
@@ -117,6 +123,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ reportCards });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }

@@ -10,7 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { CreditCard, CheckCircle, Clock, AlertCircle, Receipt, Wallet } from 'lucide-react';
+import { CreditCard, CheckCircle, Clock, AlertCircle, Receipt } from 'lucide-react';
 
 export default function StudentPayments() {
   const user = useAppStore((s) => s.user);
@@ -23,10 +23,11 @@ export default function StudentPayments() {
       setLoading(true);
       try {
         const res = await fetch(`/api/payments?schoolId=${user.schoolId}&studentId=${user.id}`);
+        if (!res.ok) throw new Error();
         const data = await res.json();
         const sorted = (Array.isArray(data.payments) ? data.payments : []).sort((a: PaymentInfo, b: PaymentInfo) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         setPayments(sorted);
-      } catch (err) { console.error('Erreur chargement paiements:', err); } finally { setLoading(false); }
+      } catch { /* ignore */ } finally { setLoading(false); }
     };
     fetchPayments();
   }, [user?.schoolId, user?.id]);

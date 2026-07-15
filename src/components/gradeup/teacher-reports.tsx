@@ -79,6 +79,7 @@ export default function TeacherReports() {
   const [wizClassId, setWizClassId] = useState('');
   const [wizStudentId, setWizStudentId] = useState('');
   const [wizGrades, setWizGrades] = useState<Record<string, number>>({});
+  const [wizTrimester, setWizTrimester] = useState('1');
   const [wizAppreciation, setWizAppreciation] = useState('');
   const [wizAverage, setWizAverage] = useState(0);
   const [submittingWiz, setSubmittingWiz] = useState(false);
@@ -117,7 +118,7 @@ export default function TeacherReports() {
   const loadStudentGradesForWizard = async (studentId: string) => {
     if (!studentId || !schoolId) return;
     try {
-      const res = await fetch(`/api/grades?schoolId=${schoolId}&studentId=${studentId}&trimester=3`);
+      const res = await fetch(`/api/grades?schoolId=${schoolId}&studentId=${studentId}&trimester=${wizTrimester}`);
       const data = await res.json();
       const list = Array.isArray(data.grades) ? data.grades : [];
       const gradesMap: Record<string, number> = {};
@@ -168,7 +169,7 @@ export default function TeacherReports() {
           classId: wizClassId,
           studentId: wizStudentId,
           teacherId: user.id,
-          trimester: '3',
+          trimester: wizTrimester,
           studentName: student?.fullName || 'Élève',
           studentGender: student?.gender || 'M',
           studentBirthDate: student?.birthDate || '',
@@ -383,7 +384,20 @@ export default function TeacherReports() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">2. Sélectionner l'élève</Label>
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">2. Trimestre</Label>
+                  <select
+                    value={wizTrimester}
+                    onChange={(e) => setWizTrimester(e.target.value)}
+                    className="w-full h-11 border border-input rounded-xl px-3 bg-background text-sm focus:ring-2 focus:ring-blue-500/20 font-medium"
+                  >
+                    <option value="1">Trimestre 1</option>
+                    <option value="2">Trimestre 2</option>
+                    <option value="3">Trimestre 3</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">3. Sélectionner l'élève</Label>
                   <select
                     value={wizStudentId}
                     onChange={(e) => {
@@ -408,7 +422,7 @@ export default function TeacherReports() {
                 <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Notes enregistrées</h3>
                 {Object.keys(wizGrades).length === 0 ? (
                   <div className="p-6 text-center border border-dashed rounded-xl text-muted-foreground">
-                    Aucune note trouvée pour cet élève au Trimestre 3
+                    Aucune note trouvée pour cet élève au Trimestre {wizTrimester}
                   </div>
                 ) : (
                   <div className="border rounded-xl overflow-hidden">

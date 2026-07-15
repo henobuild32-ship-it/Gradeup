@@ -104,7 +104,10 @@ export default function AdminPayments() {
     try {
       let url = `/api/payments?schoolId=${user?.schoolId}`;
       if (activeTab !== 'ALL') url += `&status=${activeTab}`;
+      if (filterClass !== 'ALL') url += `&classId=${filterClass}`;
+      if (filterMonth !== 'ALL') url += `&month=${filterMonth}`;
       const res = await fetch(url);
+      if (!res.ok) throw new Error();
       const data = await res.json();
       setPayments(Array.isArray(data.payments) ? data.payments : []);
     } catch {
@@ -112,25 +115,27 @@ export default function AdminPayments() {
     } finally {
       setLoading(false);
     }
-  }, [user?.schoolId, activeTab]);
+  }, [user?.schoolId, activeTab, filterClass, filterMonth]);
 
   const fetchStudents = useCallback(async () => {
     try {
       const res = await fetch(`/api/users?schoolId=${user?.schoolId}&role=STUDENT`);
+      if (!res.ok) return;
       const data = await res.json();
       setStudents(Array.isArray(data.users) ? data.users : []);
     } catch {
-      console.error('Failed to fetch students');
+      // silencieux
     }
   }, [user?.schoolId]);
 
   const fetchClasses = useCallback(async () => {
     try {
       const res = await fetch(`/api/classes?schoolId=${user?.schoolId}`);
+      if (!res.ok) return;
       const data = await res.json();
       setClasses(Array.isArray(data.classes) ? data.classes : []);
     } catch {
-      console.error('Failed to fetch classes');
+      // silencieux
     }
   }, [user?.schoolId]);
 

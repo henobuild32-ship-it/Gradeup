@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { TrendingUp, BookOpen, CalendarX, CreditCard, User, Bell, FileText, Clock, Sparkles, Target, Award, Key, Copy, Check, RefreshCw, Users } from 'lucide-react';
+import { TrendingUp, BookOpen, CalendarX, CreditCard, User, Bell, FileText, Clock, Sparkles, Award, Key, Copy, Check, RefreshCw, Users } from 'lucide-react';
 import { AttendanceTrendChart } from './charts-widget';
 import PresenceWidget from './presence-widget';
 import WeeklyScheduleView from './weekly-schedule-view';
@@ -58,17 +58,20 @@ export default function StudentDashboard() {
       try {
         const params = new URLSearchParams({ schoolId: user.schoolId });
 
-        const [coursesRes, gradesRes, attendanceRes, paymentsRes, lessonsRes, notifsRes] = await Promise.all([
+        const handleRes = async (url: string) => {
+          const r = await fetch(url);
+          if (!r.ok) throw new Error('Erreur API: ' + url);
+          return r.json();
+        };
+
+        const [coursesRes, gradesRes, attendanceRes, paymentsRes, notifsRes] = await Promise.all([
           classId
-            ? fetch(`/api/courses?${params}&classId=${classId}`).then((r) => r.json())
+            ? handleRes(`/api/courses?${params}&classId=${classId}`)
             : Promise.resolve([]),
-          fetch(`/api/grades?${params}&studentId=${user.id}`).then((r) => r.json()),
-          fetch(`/api/attendance?${params}&studentId=${user.id}`).then((r) => r.json()),
-          fetch(`/api/payments?${params}&studentId=${user.id}`).then((r) => r.json()),
-          classId
-            ? fetch(`/api/lessons?${params}&courseId=${courses.map(c => c.id).join(',') || 'none'}`).then((r) => r.json()).catch(() => [])
-            : Promise.resolve([]),
-          fetch(`/api/notifications?${params}&targetRole=STUDENT`).then((r) => r.json()),
+          handleRes(`/api/grades?${params}&studentId=${user.id}`),
+          handleRes(`/api/attendance?${params}&studentId=${user.id}`),
+          handleRes(`/api/payments?${params}&studentId=${user.id}`),
+          handleRes(`/api/notifications?${params}&targetRole=STUDENT`).catch(() => []),
         ]);
 
         setCourses(Array.isArray(coursesRes) ? coursesRes : []);
@@ -97,8 +100,8 @@ export default function StudentDashboard() {
             setHomework(Array.isArray(hwData?.homework) ? hwData.homework : []);
           } catch { setHomework([]); }
         }
-      } catch (err) {
-        console.error('Erreur chargement dashboard:', err);
+      } catch {
+        // ignore
       } finally {
         setLoading(false);
       }
@@ -128,6 +131,34 @@ export default function StudentDashboard() {
     };
     fetchLessons();
   }, [user?.schoolId, courses]);
+
+  // Partage GPS périodique pour les parents
+  useEffect(() => {
+    if (!user?.id || user?.role !== 'STUDENT') return;
+    const shareLocation = () => {
+      if (typeof navigator === 'undefined' || !navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          try {
+            await fetch('/api/location', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                latitude: pos.coords.latitude,
+                longitude: pos.coords.longitude,
+                accuracy: pos.coords.accuracy,
+              }),
+            });
+          } catch { /* ignore */ }
+        },
+        () => { /* permission refusée */ },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+      );
+    };
+    shareLocation();
+    const interval = setInterval(shareLocation, 60000);
+    return () => clearInterval(interval);
+  }, [user?.id, user?.role]);
 
   const generalAverage =
     grades.length > 0
@@ -354,7 +385,7 @@ export default function StudentDashboard() {
               <CalendarX className="h-4 w-4 text-red-500 shrink-0" />
             </div>
             <p className="text-2xl font-bold text-red-600 mt-1">
-              {absenceCount} {absenceCount > 1 ? 'retards' : 'retard'}
+              {absenceCount} {absenceCount > 1 ? 'absences' : 'absence'}
             </p>
             <p className="text-[10px] text-muted-foreground truncate mt-1">jours d'absence</p>
           </CardContent>
@@ -378,7 +409,7 @@ export default function StudentDashboard() {
 
         <Card 
           className="overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 group cursor-pointer"
-          onClick={() => setCurrentPage('student-courses')}
+          onClick={() => setCurrentPage('student-homework')}
         >
           <CardContent className="p-4 flex flex-col justify-between h-full min-h-[110px]">
             <div className="flex items-center justify-between">

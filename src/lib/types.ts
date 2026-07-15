@@ -1,6 +1,6 @@
 export type UserRole = 'ADMIN' | 'TEACHER' | 'STUDENT' | 'PARENT';
 export type PaymentStatus = 'paid' | 'pending' | 'overdue';
-export type AttendanceStatus = 'present' | 'absent' | 'late';
+export type AttendanceStatus = 'present' | 'absent' | 'late' | 'justified';
 export type ClassLevel = 'Maternelle' | 'Primaire' | 'Secondaire';
 
 export interface SchoolInfo {
@@ -117,6 +117,9 @@ export interface HomeworkInfo {
   title: string;
   description: string;
   dueDate: string;
+  gradingType: string;
+  fileUrl: string;
+  fileName: string;
   createdAt: string;
   course?: CourseInfo;
   teacher?: UserInfo;
@@ -127,10 +130,29 @@ export interface AttendanceInfo {
   schoolId: string;
   studentId: string;
   teacherId: string;
+  courseId: string;
   date: string;
   status: AttendanceStatus;
   reason: string;
   student?: UserInfo;
+}
+
+export interface SubmissionInfo {
+  id: string;
+  homeworkId: string;
+  studentId: string;
+  schoolId: string;
+  fileUrl: string;
+  fileName: string;
+  content: string;
+  submittedAt: string;
+  score: number | null;
+  maxScore: number | null;
+  gradedAt: string | null;
+  gradedBy: string | null;
+  status: string;
+  student?: UserInfo;
+  homework?: HomeworkInfo;
 }
 
 export interface PaymentInfo {

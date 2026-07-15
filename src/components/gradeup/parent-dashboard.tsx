@@ -58,6 +58,7 @@ export default function ParentDashboard() {
   const [notifications, setNotifications] = useState<NotificationInfo[]>([]);
   const [childPresence, setChildPresence] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
+  const [childHomework, setChildHomework] = useState<any[]>([]);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [parentCodeInput, setParentCodeInput] = useState('');
   const [linking, setLinking] = useState(false);
@@ -123,6 +124,9 @@ export default function ParentDashboard() {
   const fetchChildData = async (childId: string) => {
     setLoading(true);
     try {
+      const child = safeChildren.find(c => c.id === childId);
+      const classId = child?.classEnrollments?.[0]?.classId;
+
       const [gradesRes, attendanceRes, paymentsRes] = await Promise.all([
         fetch(`/api/grades?schoolId=${schoolId}&studentId=${childId}`),
         fetch(`/api/attendance?schoolId=${schoolId}&studentId=${childId}`),
@@ -140,6 +144,14 @@ export default function ParentDashboard() {
       if (paymentsRes.ok) {
         const d = await paymentsRes.json();
         setPayments(Array.isArray(d) ? d : (Array.isArray(d?.payments) ? d.payments : []));
+      }
+
+      if (classId) {
+        const hwRes = await fetch(`/api/homework?schoolId=${schoolId}&classId=${classId}`);
+        if (hwRes.ok) {
+          const hwData = await hwRes.json();
+          setChildHomework(Array.isArray(hwData.homework) ? hwData.homework : []);
+        }
       }
     } catch {
       toast.error('Erreur lors du chargement des données');
@@ -505,9 +517,10 @@ export default function ParentDashboard() {
 
           {/* Sleek iOS Segmented Control Tabs */}
           <Tabs defaultValue="today" className="w-full">
-            <TabsList className="grid grid-cols-5 bg-muted/50 p-1 rounded-xl h-11 mb-6">
+            <TabsList className="grid grid-cols-6 bg-muted/50 p-1 rounded-xl h-11 mb-6">
               <TabsTrigger value="today" className="rounded-lg text-xs font-bold py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">Aujourd'hui</TabsTrigger>
               <TabsTrigger value="notes" className="rounded-lg text-xs font-bold py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">Notes</TabsTrigger>
+              <TabsTrigger value="homework" className="rounded-lg text-xs font-bold py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">Devoirs</TabsTrigger>
               <TabsTrigger value="absences" className="rounded-lg text-xs font-bold py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">Absences</TabsTrigger>
               <TabsTrigger value="presence" className="rounded-lg text-xs font-bold py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">Présence</TabsTrigger>
               <TabsTrigger value="finances" className="rounded-lg text-xs font-bold py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">Finances</TabsTrigger>
@@ -656,7 +669,38 @@ export default function ParentDashboard() {
               </Card>
             </TabsContent>
 
-            {/* TAB 3: Absences */}
+            {/* TAB 3: Devoirs */}
+            <TabsContent value="homework" className="space-y-4 focus:outline-none">
+              <Card>
+                <CardHeader><CardTitle className="text-sm font-bold">Devoirs de {selectedChild?.fullName}</CardTitle></CardHeader>
+                <CardContent>
+                  {childHomework.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-12 text-center">Aucun devoir pour le moment.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {childHomework.sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()).map((hw: any) => {
+                        const daysLeft = Math.ceil((new Date(hw.dueDate).getTime() - Date.now()) / 86400000);
+                        return (
+                          <div key={hw.id} className={'p-4 rounded-xl border text-sm ' + (daysLeft < 0 ? 'bg-red-50 border-red-200' : daysLeft <= 3 ? 'bg-amber-50 border-amber-200' : 'bg-muted/10 border-border')}>
+                            <div className="flex justify-between items-start mb-1">
+                              <p className="font-bold">{hw.title}</p>
+                              <Badge className={'text-[10px] ' + (daysLeft < 0 ? 'bg-red-100 text-red-700 border-red-200' : daysLeft <= 3 ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-blue-100 text-blue-700 border-blue-200')}>
+                                {daysLeft < 0 ? 'Expiré' : daysLeft === 0 ? "Aujourd'hui" : daysLeft + ' jour(s)'}
+                              </Badge>
+                            </div>
+                            {hw.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{hw.description}</p>}
+                            <p className="text-xs text-muted-foreground mt-1">Matière : {hw.course?.name || '—'}</p>
+                            <p className="text-xs text-muted-foreground">À rendre le : {new Date(hw.dueDate).toLocaleDateString('fr-FR')}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* TAB 4: Absences */}
             <TabsContent value="absences" className="space-y-4 focus:outline-none">
               <Card>
                 <CardHeader><CardTitle className="text-sm font-bold">Suivi des absences & retards</CardTitle></CardHeader>
@@ -675,6 +719,7 @@ export default function ParentDashboard() {
                             {record.status === 'present' && <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-100">Présent</Badge>}
                             {record.status === 'absent' && <Badge className="bg-red-50 text-red-700 border border-red-100">Absent</Badge>}
                             {record.status === 'late' && <Badge className="bg-amber-50 text-amber-700 border border-amber-100">En retard</Badge>}
+                            {record.status === 'justified' && <Badge className="bg-purple-50 text-purple-700 border border-purple-100">Justifié</Badge>}
                           </div>
                         </div>
                       ))}

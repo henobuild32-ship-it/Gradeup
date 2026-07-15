@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 
 export async function GET(request: Request) {
   try {
+    authenticateRequest(request);
     const { searchParams } = new URL(request.url);
     const schoolId = searchParams.get('schoolId');
 
@@ -61,7 +63,9 @@ export async function GET(request: Request) {
       byYear
     });
   } catch (error) {
-    console.error('Error fetching report stats:', error);
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     return NextResponse.json({ error: 'Failed to fetch report stats' }, { status: 500 });
   }
 }

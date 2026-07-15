@@ -26,8 +26,12 @@ export async function GET(request: NextRequest) {
         if (!student || student.parentId !== auth.userId || student.schoolId !== schoolId) {
           return NextResponse.json({ error: 'Vous ne pouvez consulter que les paiements de vos enfants' }, { status: 403 });
         }
+      } else if (auth.role === 'STUDENT' && studentId !== auth.userId) {
+        return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
       }
       where.studentId = studentId;
+    } else if (auth.role === 'STUDENT') {
+      where.studentId = auth.userId;
     }
     if (status) where.status = status;
     if (month) where.month = month;

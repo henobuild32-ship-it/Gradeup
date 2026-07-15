@@ -67,6 +67,7 @@ const navItemsByRole: Record<UserRole, PaletteItem[]> = {
     { label: 'Cours', page: 'student-courses', icon: BookOpen },
     { label: 'Leçons', page: 'student-lessons', icon: FileText },
     { label: 'Notes', page: 'student-grades', icon: ClipboardList },
+    { label: 'Devoirs', page: 'student-homework', icon: ClipboardCheck },
     { label: 'Absences', page: 'student-attendance', icon: Calendar },
     { label: 'Paiements', page: 'student-payments', icon: CreditCard },
     { label: 'IA Gradie', page: 'student-ai', icon: Bot },

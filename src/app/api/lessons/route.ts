@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = authenticateRequest(request);
     const { searchParams } = new URL(request.url);
     const schoolId = searchParams.get('schoolId');
     const courseId = searchParams.get('courseId');
@@ -22,6 +24,26 @@ export async function GET(request: NextRequest) {
       where.teacherId = teacherId;
     }
 
+    // STUDENT can only see lessons for courses they are enrolled in
+    if (auth.role === 'STUDENT') {
+      const enrollments = await db.enrolledClass.findMany({
+        where: { userId: auth.userId },
+        select: { classId: true },
+      });
+      const classIds = enrollments.map(e => e.classId);
+      const accessibleCourses = await db.course.findMany({
+        where: { classId: { in: classIds }, schoolId },
+        select: { id: true },
+      });
+      const accessibleCourseIds = accessibleCourses.map(c => c.id);
+      if (courseId && !accessibleCourseIds.includes(courseId)) {
+        return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
+      }
+      if (!courseId) {
+        where.courseId = { in: accessibleCourseIds };
+      }
+    }
+
     const lessons = await db.lesson.findMany({
       where,
       include: {
@@ -37,6 +59,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ lessons });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -44,6 +69,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = authenticateRequest(request);
     const body = await request.json();
     const { schoolId, courseId, teacherId, title, content, fileUrl, fileName } = body;
 
@@ -98,6 +124,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ lesson }, { status: 201 });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }

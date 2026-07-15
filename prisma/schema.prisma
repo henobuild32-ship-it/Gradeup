@@ -20,6 +20,8 @@ model School {
   city                 String    @default("")
   commune              String    @default("")
   schoolCode           String    @default("")
+  color                String    @default("#2563eb")
+  academicYear         String    @default("")
   subscriptionStatus   String    @default("active")
   subscriptionExpiry   DateTime?
   createdAt            DateTime  @default(now())
@@ -47,6 +49,7 @@ model School {
   longitude            Float?
   presences            Presence[]
   years                SchoolYear[]
+  submissions          Submission[]
 
   @@index([subscriptionStatus])
   @@index([inviteCode])
@@ -91,6 +94,17 @@ model User {
   matricule               String    @default("")
   academicYear            String    @default("")
   section                 String    @default("")
+  bloodType               String    @default("")
+  nationality             String    @default("")
+  address                 String    @default("")
+  parentEmail             String    @default("")
+  cardIssuedDate          String    @default("")
+  cardExpiryDate          String    @default("")
+  ine                     String    @default("")
+  tuteur                  String    @default("")
+  contactTuteur           String    @default("")
+  allergies               String    @default("")
+  assurance               String    @default("")
   aiPreferences           String    @default("{}")
   isTitulaire             Boolean   @default(false)
   createdAt               DateTime  @default(now())
@@ -126,6 +140,8 @@ model User {
   cotationTeacher         CotationTransmission[] @relation("CotationTeacher")
   cotationTitulaire       CotationTransmission[] @relation("CotationTitulaire")
   presences               Presence[]
+  liveLocation            LiveLocation?
+  submissions             Submission[]        @relation("SubmissionStudent")
 
   @@unique([schoolId, fullName, role])
   @@index([schoolId, role, active])
@@ -197,6 +213,7 @@ model Course {
   lessons     Lesson[]
   schedules   CourseSchedule[]
   transmissions CotationTransmission[]
+  attendanceCourse Attendance[]
 
   @@unique([schoolId, classId, name])
   @@index([schoolId, classId, status])
@@ -258,6 +275,8 @@ model Homework {
   description String   @default("")
   dueDate     String   @default("")
   gradingType String   @default("manual")
+  fileUrl     String   @default("")
+  fileName    String   @default("")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   deletedAt   DateTime?
@@ -265,6 +284,7 @@ model Homework {
   course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   teacher     User     @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  submissions Submission[]
 
   @@index([courseId, dueDate])
   @@index([schoolId, teacherId])
@@ -275,6 +295,7 @@ model Attendance {
   schoolId  String
   studentId String
   teacherId String
+  courseId  String   @default("")
   date      String
   status    String   @default("absent")
   reason    String   @default("")
@@ -284,11 +305,38 @@ model Attendance {
   school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   student   User     @relation("AttendanceStudent", fields: [studentId], references: [id], onDelete: Cascade)
   teacher   User     @relation("AttendanceTeacher", fields: [teacherId], references: [id], onDelete: Restrict)
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: SetNull)
 
-  @@unique([studentId, date])
-  @@index([schoolId, date])
+  @@unique([studentId, date, courseId])
+  @@index([schoolId, date, courseId])
   @@index([schoolId, studentId])
   @@index([teacherId, date])
+  @@index([courseId])
+}
+
+model Submission {
+  id          String   @id @default(cuid())
+  homeworkId  String
+  studentId   String
+  schoolId    String
+  fileUrl     String   @default("")
+  fileName    String   @default("")
+  content     String   @default("")
+  submittedAt DateTime @default(now())
+  score       Float?
+  maxScore    Float?
+  gradedAt    DateTime?
+  gradedBy    String?
+  status      String   @default("submitted")
+
+  homework Homework @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  student  User     @relation("SubmissionStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  school   School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([homeworkId, studentId])
+  @@index([homeworkId])
+  @@index([studentId])
+  @@index([schoolId])
 }
 
 model Payment {
@@ -710,6 +758,22 @@ model Presence {
   @@map("presences")
   @@index([schoolId, date])
   @@index([schoolId, userId, date])
+}
+
+model LiveLocation {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  latitude  Float
+  longitude Float
+  accuracy  Float?
+  source    String   @default("gps")
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("live_locations")
 }
 
 model CahierEvaluation {

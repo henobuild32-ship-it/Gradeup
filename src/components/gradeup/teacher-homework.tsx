@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '@/lib/store';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,9 +11,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Edit, Trash2, BookOpen, Calendar, Clock, AlertTriangle, ClipboardList } from 'lucide-react';
+import { Plus, Edit, Trash2, BookOpen, Calendar, Clock, AlertTriangle, ClipboardList, Upload, Download, Eye } from 'lucide-react';
 import { toast } from 'sonner';
-import type { CourseInfo, HomeworkInfo } from '@/lib/types';
+import type { CourseInfo, HomeworkInfo, SubmissionInfo } from '@/lib/types';
 
 export default function TeacherHomework() {
   const { user } = useAppStore();
@@ -29,6 +29,43 @@ export default function TeacherHomework() {
   const [formDescription, setFormDescription] = useState('');
   const [formDueDate, setFormDueDate] = useState('');
   const [formGradingType, setFormGradingType] = useState('manual');
+  const [formFileName, setFormFileName] = useState('');
+  const [formFileUrl, setFormFileUrl] = useState('');
+  const formFileRef = useRef<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [submissions, setSubmissions] = useState<SubmissionInfo[]>([]);
+  const [submissionsOpen, setSubmissionsOpen] = useState(false);
+  const [submissionsHomework, setSubmissionsHomework] = useState<HomeworkInfo | null>(null);
+  const [loadingSubmissions, setLoadingSubmissions] = useState(false);
+  const [gradingSubId, setGradingSubId] = useState<string | null>(null);
+  const [gradingScore, setGradingScore] = useState('');
+
+  const viewSubmissions = async (hw: HomeworkInfo) => {
+    setSubmissionsHomework(hw);
+    setSubmissionsOpen(true);
+    setLoadingSubmissions(true);
+    try {
+      const res = await fetch(`/api/submissions?homeworkId=${hw.id}&schoolId=${user?.schoolId}`);
+      const data = await res.json();
+      setSubmissions(Array.isArray(data.submissions) ? data.submissions : []);
+    } catch { toast.error('Erreur chargement soumissions'); setSubmissions([]); } finally { setLoadingSubmissions(false); }
+  };
+
+  const handleGradeSubmission = async (subId: string) => {
+    if (!gradingScore.trim()) { toast.error('Veuillez entrer une note'); return; }
+    try {
+      const res = await fetch(`/api/submissions/${subId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ score: gradingScore, maxScore: 20 }),
+      });
+      if (!res.ok) { toast.error('Erreur lors de la notation'); return; }
+      toast.success('Note enregistrée');
+      setGradingSubId(null); setGradingScore('');
+      if (submissionsHomework) viewSubmissions(submissionsHomework);
+    } catch { toast.error('Erreur lors de la notation'); }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -70,6 +107,9 @@ export default function TeacherHomework() {
     setFormDescription('');
     setFormDueDate('');
     setFormGradingType('manual');
+    setFormFileName('');
+    setFormFileUrl('');
+    formFileRef.current = null;
     setEditingHomework(null);
   };
 
@@ -81,6 +121,8 @@ export default function TeacherHomework() {
     setFormDescription(hw.description);
     setFormDueDate(hw.dueDate.split('T')[0]);
     setFormGradingType(hw.gradingType || 'manual');
+    setFormFileName(hw.fileName || '');
+    setFormFileUrl(hw.fileUrl || '');
     setDialogOpen(true);
   };
 
@@ -91,6 +133,21 @@ export default function TeacherHomework() {
     }
     setSubmitting(true);
     try {
+      let fileUrl = formFileUrl;
+      if (formFileRef.current) {
+        const uploadFormData = new FormData();
+        uploadFormData.append('file', formFileRef.current);
+        const uploadRes = await fetch('/api/resources/upload', { method: 'POST', body: uploadFormData });
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          fileUrl = uploadData.url;
+        } else {
+          toast.error("Erreur lors de l'upload du fichier");
+          setSubmitting(false);
+          return;
+        }
+      }
+
       const body = {
         schoolId: user.schoolId,
         courseId: formCourseId,
@@ -99,6 +156,8 @@ export default function TeacherHomework() {
         description: formDescription.trim(),
         dueDate: formDueDate,
         gradingType: formGradingType,
+        fileUrl,
+        fileName: formFileName,
       };
       const url = editingHomework ? `/api/homework/${editingHomework.id}` : '/api/homework';
       const method = editingHomework ? 'PUT' : 'POST';
@@ -172,6 +231,7 @@ export default function TeacherHomework() {
                       <CardTitle className="text-base">{hw.title}</CardTitle>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-purple-50 hover:text-purple-600 transition-colors" onClick={() => viewSubmissions(hw)} title="Voir les soumissions"><Eye className="h-3.5 w-3.5" /></Button>
                       <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-blue-50 hover:text-blue-600 transition-colors" onClick={() => openEditDialog(hw)}><Edit className="h-3.5 w-3.5" /></Button>
                       <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-red-50 hover:text-red-600 transition-colors" onClick={() => handleDelete(hw.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
@@ -191,6 +251,21 @@ export default function TeacherHomework() {
                       <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-700">{daysRemaining} jour(s)</Badge>
                     )}
                   </div>
+                  {hw.fileName && (
+                    <div className="mt-3 text-xs">
+                      {hw.fileUrl ? (
+                        <a href={hw.fileUrl} download={hw.fileName || true} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 hover:underline">
+                          <Download className="h-3 w-3" />
+                          {hw.fileName}
+                        </a>
+                      ) : (
+                        <span className="flex items-center gap-1.5 text-muted-foreground">
+                          <Upload className="h-3 w-3" />
+                          {hw.fileName}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             );
@@ -230,7 +305,7 @@ export default function TeacherHomework() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Date limite *</Label>
-                <Input type="date" value={formDueDate} onChange={(e) => setFormDueDate(e.target.value)} className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" />
+                <Input type="date" min={new Date().toISOString().split('T')[0]} value={formDueDate} onChange={(e) => setFormDueDate(e.target.value)} className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" />
               </div>
               <div className="space-y-2">
                 <Label>Type de correction *</Label>
@@ -245,6 +320,29 @@ export default function TeacherHomework() {
                 </Select>
               </div>
             </div>
+            <div className="space-y-2">
+              <Label>Fichier joint (optionnel)</Label>
+              <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) { setFormFileName(file.name); formFileRef.current = file; }
+              }} />
+              <div className="flex gap-2">
+                <Input placeholder="Aucun fichier sélectionné" value={formFileName} readOnly
+                  className="focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:border-blue-500 transition-all cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()} />
+                <Button type="button" variant="outline" size="icon" className="shrink-0 border-blue-200 text-blue-600 hover:bg-blue-50"
+                  onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="h-4 w-4" />
+                </Button>
+                {formFileName && (
+                  <Button type="button" variant="ghost" size="icon"
+                    className="shrink-0 text-muted-foreground hover:text-red-500"
+                    onClick={() => { setFormFileName(''); setFormFileUrl(''); formFileRef.current = null; if (fileInputRef.current) fileInputRef.current.value = ''; }}>
+                    ✕
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }} className="hover:scale-[1.02] active:scale-[0.98] transition-all">Annuler</Button>
@@ -252,6 +350,60 @@ export default function TeacherHomework() {
               {submitting ? 'Enregistrement...' : editingHomework ? 'Modifier' : 'Créer'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Submissions Dialog */}
+      <Dialog open={submissionsOpen} onOpenChange={setSubmissionsOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardList className="h-5 w-5 text-purple-500" />
+              Soumissions — {submissionsHomework?.title}
+            </DialogTitle>
+            <DialogDescription>Consultez et notez les travaux rendus par les élèves</DialogDescription>
+          </DialogHeader>
+          {loadingSubmissions ? (
+            <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-16 rounded-lg" />)}</div>
+          ) : submissions.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">Aucune soumission pour ce devoir</div>
+          ) : (
+            <div className="divide-y">
+              {submissions.map((sub) => (
+                <div key={sub.id} className="py-3 flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm">{sub.student?.fullName || 'Élève'}</p>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                      <span>Rendu le {new Date(sub.submittedAt).toLocaleDateString('fr-FR')}</span>
+                      {sub.fileUrl && (
+                        <a href={sub.fileUrl} download={sub.fileName || true} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
+                          <Download className="h-3 w-3" />{sub.fileName || 'Fichier'}
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {sub.status === 'graded' ? (
+                      <Badge className="bg-emerald-100 text-emerald-700 text-xs">{sub.score}/{sub.maxScore || 20}</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-amber-600 border-amber-200 text-xs">Non noté</Badge>
+                    )}
+                    {gradingSubId === sub.id ? (
+                      <div className="flex items-center gap-1">
+                        <Input type="number" className="w-16 h-8 text-xs" min="0" max="20" step="0.5" value={gradingScore} onChange={(e) => setGradingScore(e.target.value)} placeholder="Note" />
+                        <Button size="sm" className="h-8 text-xs" onClick={() => handleGradeSubmission(sub.id)}>OK</Button>
+                        <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { setGradingSubId(null); setGradingScore(''); }}>Annuler</Button>
+                      </div>
+                    ) : (
+                      <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => { setGradingSubId(sub.id); setGradingScore(''); }}>
+                        Noter
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

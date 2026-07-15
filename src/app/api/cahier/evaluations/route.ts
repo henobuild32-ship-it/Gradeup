@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 
 /**
  * GET /api/cahier/evaluations
@@ -8,6 +9,7 @@ import { db } from '@/lib/db';
  */
 export async function GET(request: NextRequest) {
   try {
+    const auth = authenticateRequest(request);
     const { searchParams } = new URL(request.url);
     const schoolId = searchParams.get('schoolId');
     const classId = searchParams.get('classId');
@@ -59,6 +61,9 @@ export async function GET(request: NextRequest) {
       evaluations,
     });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const msg = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: msg }, { status: 500 });
   }
@@ -71,6 +76,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const auth = authenticateRequest(request);
     const body = await request.json();
     const { schoolId, classId, courseId, title, maxScore, period, date, teacherId } = body;
 
@@ -113,6 +119,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ evaluation }, { status: 201 });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const msg = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: msg }, { status: 500 });
   }
@@ -125,6 +134,7 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
+    authenticateRequest(request);
     const body = await request.json();
     const { evaluationId, marks } = body;
 
@@ -248,6 +258,9 @@ trimester: trimester,
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const msg = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: msg }, { status: 500 });
   }
@@ -260,6 +273,7 @@ trimester: trimester,
  */
 export async function DELETE(request: NextRequest) {
   try {
+    authenticateRequest(request);
     const { searchParams } = new URL(request.url);
     const evaluationId = searchParams.get('evaluationId');
 
@@ -273,6 +287,9 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const msg = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: msg }, { status: 500 });
   }

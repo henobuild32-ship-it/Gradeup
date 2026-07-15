@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = authenticateRequest(request);
     const body = await request.json();
     const { evaluationIds, teacherId } = body;
 
@@ -34,7 +36,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Vérifier que le professeur est bien l'auteur de l'évaluation
-        if (evaluation.teacherId !== teacherId) {
+        if (evaluation.teacherId !== auth.userId) {
           errors.push({ evaluationId, error: 'Non autorisé : vous n\'êtes pas l\'auteur de cette évaluation' });
           continue;
         }
@@ -109,8 +111,10 @@ export async function POST(request: NextRequest) {
       message: `${evaluationIds.length - errors.length} évaluation(s) envoyée(s) au titulaire`,
     });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const msg = error instanceof Error ? error.message : 'Erreur serveur';
-    console.error('[POST /api/cahier/transmissions/send]', error);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

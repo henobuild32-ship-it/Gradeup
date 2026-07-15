@@ -12,7 +12,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { CheckCircle2, XCircle, Clock, Save, Users, Calendar, History, UserCheck } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, Save, Users, Calendar, History, UserCheck, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import type { UserInfo, AttendanceInfo, CourseInfo, AttendanceStatus } from '@/lib/types';
 
@@ -56,7 +56,7 @@ export default function TeacherAttendance() {
       if (!course) return;
       const studentsRes = await fetch(`/api/users?schoolId=${user.schoolId}&role=STUDENT&classId=${course.classId}`);
       const studentsData = await studentsRes.json();
-      const attendanceRes = await fetch(`/api/attendance?schoolId=${user.schoolId}&date=${selectedDate}`);
+      const attendanceRes = await fetch(`/api/attendance?schoolId=${user.schoolId}&date=${selectedDate}&courseId=${selectedCourseId}`);
       const attendanceData = await attendanceRes.json();
       const studentsList = Array.isArray(studentsData.users) ? studentsData.users : (Array.isArray(studentsData) ? studentsData : []);
       const attendanceList = Array.isArray(attendanceData.attendance) ? attendanceData.attendance : (Array.isArray(attendanceData) ? attendanceData : []);
@@ -81,14 +81,13 @@ export default function TeacherAttendance() {
     if (!user || !selectedCourseId) return;
     setSaving(true);
     try {
-      for (const record of attendance) {
-        const body = { schoolId: user.schoolId, studentId: record.studentId, teacherId: user.id, date: selectedDate, status: record.status, reason: record.reason };
-        if (record.existingId) {
-          await fetch(`/api/attendance/${record.existingId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        } else {
-          await fetch('/api/attendance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        }
-      }
+      const records = attendance.map((r) => ({ studentId: r.studentId, status: r.status, reason: r.reason }));
+      const res = await fetch('/api/attendance/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schoolId: user.schoolId, courseId: selectedCourseId, teacherId: user.id, date: selectedDate, records }),
+      });
+      if (!res.ok) { toast.error("Erreur lors de l'enregistrement"); return; }
       toast.success('Appel enregistré avec succès');
       fetchStudentsAndAttendance();
     } catch { toast.error("Erreur lors de l'enregistrement"); } finally { setSaving(false); }
@@ -101,7 +100,9 @@ export default function TeacherAttendance() {
   const fetchHistory = async () => {
     if (!user) return;
     try {
-      const res = await fetch(`/api/attendance?schoolId=${user.schoolId}`);
+      const params = new URLSearchParams({ schoolId: user.schoolId });
+      if (selectedCourseId) params.set('courseId', selectedCourseId);
+      const res = await fetch(`/api/attendance?${params}`);
       const data = await res.json();
       setHistory((Array.isArray(data.attendance) ? data.attendance : []).filter((a: AttendanceInfo) => a.teacherId === user.id).sort((a: AttendanceInfo, b: AttendanceInfo) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 50));
     } catch { /* silent */ }
@@ -112,6 +113,7 @@ export default function TeacherAttendance() {
       case 'present': return <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-xs"><CheckCircle2 className="h-3 w-3 mr-1" />Présent</Badge>;
       case 'absent': return <Badge className="bg-red-100 text-red-700 border-red-200 text-xs"><XCircle className="h-3 w-3 mr-1" />Absent</Badge>;
       case 'late': return <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-xs"><Clock className="h-3 w-3 mr-1" />En retard</Badge>;
+      case 'justified': return <Badge className="bg-purple-100 text-purple-700 border-purple-200 text-xs"><ShieldCheck className="h-3 w-3 mr-1" />Justifié</Badge>;
     }
   };
 
@@ -119,7 +121,8 @@ export default function TeacherAttendance() {
     const present = attendance.filter((a) => a.status === 'present').length;
     const absent = attendance.filter((a) => a.status === 'absent').length;
     const late = attendance.filter((a) => a.status === 'late').length;
-    return { present, absent, late, total: attendance.length };
+    const justified = attendance.filter((a) => a.status === 'justified').length;
+    return { present, absent, late, justified, total: attendance.length };
   };
 
   const stats = getStats();
@@ -170,7 +173,7 @@ export default function TeacherAttendance() {
 
           {/* Stats Row */}
           {selectedCourseId && attendance.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
               <div className="p-4 rounded-xl bg-blue-50 text-center border border-blue-100 dark:bg-blue-950/20">
                 <p className="text-2xl font-bold text-blue-600">{stats.total}</p>
                 <p className="text-xs text-blue-600/80 font-medium">Total</p>
@@ -182,6 +185,10 @@ export default function TeacherAttendance() {
               <div className="p-4 rounded-xl bg-red-50 text-center border border-red-100 dark:bg-red-950/20">
                 <p className="text-2xl font-bold text-red-600">{stats.absent}</p>
                 <p className="text-xs text-red-600/80 font-medium">Absents</p>
+              </div>
+              <div className="p-4 rounded-xl bg-purple-50 text-center border border-purple-100 dark:bg-purple-950/20">
+                <p className="text-2xl font-bold text-purple-600">{stats.justified}</p>
+                <p className="text-xs text-purple-600/80 font-medium">Justifiés</p>
               </div>
               <div className="p-4 rounded-xl bg-amber-50 text-center border border-amber-100 dark:bg-amber-950/20">
                 <p className="text-2xl font-bold text-amber-600">{stats.late}</p>
@@ -207,10 +214,10 @@ export default function TeacherAttendance() {
             <Card className="shadow-sm border border-border">
               <div className="divide-y">
                 {attendance.map((record) => (
-                  <div key={record.studentId} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 transition-colors ${record.status === 'absent' ? 'bg-red-50/30' : record.status === 'late' ? 'bg-amber-50/30' : 'hover:bg-muted/10'}`}>
+                  <div key={record.studentId} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 transition-colors ${record.status === 'absent' ? 'bg-red-50/30' : record.status === 'late' ? 'bg-amber-50/30' : record.status === 'justified' ? 'bg-purple-50/30' : 'hover:bg-muted/10'}`}>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-sm ${record.status === 'present' ? 'bg-emerald-500' : record.status === 'absent' ? 'bg-red-500' : 'bg-amber-500'}`}>
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-sm ${record.status === 'present' ? 'bg-emerald-500' : record.status === 'absent' ? 'bg-red-500' : record.status === 'justified' ? 'bg-purple-500' : 'bg-amber-500'}`}>
                           {record.studentName.charAt(0)}
                         </div>
                         <p className="font-semibold text-sm text-foreground">{record.studentName}</p>
@@ -260,6 +267,19 @@ export default function TeacherAttendance() {
                         onClick={() => updateStatus(record.studentId, 'late')}
                       >
                         <Clock className="h-5 w-5" />
+                      </Button>
+                      <Button 
+                        type="button" 
+                        size="icon" 
+                        variant={record.status === 'justified' ? 'default' : 'outline'} 
+                        className={`h-11 w-11 rounded-xl transition-all hover:scale-[1.05] active:scale-[0.95] ${
+                          record.status === 'justified' 
+                            ? 'bg-purple-500 hover:bg-purple-600 text-white shadow-md shadow-purple-500/25' 
+                            : 'border-purple-200 text-purple-700 hover:bg-purple-50'
+                        }`} 
+                        onClick={() => updateStatus(record.studentId, 'justified')}
+                      >
+                        <ShieldCheck className="h-5 w-5" />
                       </Button>
                     </div>
                   </div>

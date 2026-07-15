@@ -72,7 +72,7 @@ export default function MessageCenter() {
           setClasses(Array.isArray(classesData) ? classesData : []);
         }
       } catch {
-        console.error('Erreur chargement des messages');
+        // silencieux
       } finally {
         setLoading(false);
       }

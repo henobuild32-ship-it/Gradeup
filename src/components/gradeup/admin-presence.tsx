@@ -187,7 +187,7 @@ async function exportPDF(
     }
 
     const classe = p.user.classEnrollments?.[0]?.class?.name || '-';
-    const heure  = new Date(p.heureArrivee).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    const heure  = p.heureArrivee ? new Date(p.heureArrivee).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '-';
     const role   = p.user.role === 'STUDENT' ? 'Élève' : 'Professeur';
     const justif = p.justification ? p.justification.slice(0, 25) : '-';
     const sc     = statutColors[p.statut] || [107, 114, 128];
@@ -425,8 +425,7 @@ export default function AdminPresence() {
         setSchoolCoords({ lat: cfg.latitude, lng: cfg.longitude });
         if (cfg.latitude) setCoordsInput({ latitude: String(cfg.latitude), longitude: String(cfg.longitude) });
       }
-    } catch (e) {
-      console.error(e);
+    } catch {
       toast.error('Erreur lors du chargement des données');
     } finally {
       setLoading(false);

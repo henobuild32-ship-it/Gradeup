@@ -30,9 +30,10 @@ export default function StudentLessons() {
       setLoading(true);
       try {
         const res = await fetch(`/api/courses?schoolId=${user.schoolId}&classId=${classId}`);
+        if (!res.ok) throw new Error();
         const data = await res.json();
         setCourses(Array.isArray(data.courses) ? data.courses : []);
-      } catch (err) { console.error('Erreur chargement cours:', err); } finally { setLoading(false); }
+      } catch { /* ignore */ } finally { setLoading(false); }
     };
     fetchCourses();
   }, [user?.schoolId, classId]);
@@ -45,10 +46,11 @@ export default function StudentLessons() {
         const params = new URLSearchParams({ schoolId: user.schoolId });
         if (selectedCourseId !== 'all') { params.set('courseId', selectedCourseId); }
         const res = await fetch(`/api/lessons?${params}`);
+        if (!res.ok) throw new Error();
         const data = await res.json();
         const sorted = (Array.isArray(data.lessons) ? data.lessons : []).sort((a: LessonInfo, b: LessonInfo) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         setLessons(sorted);
-      } catch (err) { console.error('Erreur chargement leçons:', err); setLessons([]); } finally { setLoadingLessons(false); }
+      } catch { setLessons([]); } finally { setLoadingLessons(false); }
     };
     fetchLessons();
   }, [user?.schoolId, selectedCourseId]);

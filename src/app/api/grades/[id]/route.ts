@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 import { syncStudentReport } from '@/lib/grade-sync';
 
 export async function GET(
@@ -7,6 +8,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    authenticateRequest(request);
     const { id } = await params;
 
     const grade = await db.grade.findUnique({
@@ -30,6 +32,9 @@ export async function GET(
 
     return NextResponse.json({ grade });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -40,9 +45,11 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = authenticateRequest(request);
     const { id } = await params;
     const body = await request.json();
-    const { score, maxScore, trimester, comment, modifiedBy, reason } = body;
+    const { score, maxScore, trimester, comment, reason } = body;
+    const modifiedBy = auth.fullName || auth.userId;
 
     const existing = await db.grade.findUnique({ where: { id } });
     if (!existing) {
@@ -87,12 +94,13 @@ export async function PUT(
     }
 
     // ── Auto-sync: recompute and update the student's report card ───────────
-    syncStudentReport(existing.schoolId, existing.studentId, updatedTrimester).catch((err) => {
-      console.error('[grade-sync] background sync error after PUT /api/grades/[id]:', err);
-    });
+    syncStudentReport(existing.schoolId, existing.studentId, updatedTrimester).catch(() => {});
 
     return NextResponse.json({ grade });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -103,6 +111,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = authenticateRequest(request);
     const { id } = await params;
 
     const existing = await db.grade.findUnique({ where: { id } });
@@ -113,12 +122,13 @@ export async function DELETE(
     await db.grade.delete({ where: { id } });
 
     // ── Auto-sync after deletion: recompute bulletin without the deleted grade
-    syncStudentReport(existing.schoolId, existing.studentId, existing.trimester).catch((err) => {
-      console.error('[grade-sync] background sync error after DELETE /api/grades/[id]:', err);
-    });
+    syncStudentReport(existing.schoolId, existing.studentId, existing.trimester).catch(() => {});
 
     return NextResponse.json({ message: 'Grade deleted successfully' });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }

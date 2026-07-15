@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    authenticateRequest(request);
     const { id } = await params;
 
     const homework = await db.homework.findUnique({
@@ -26,6 +28,9 @@ export async function GET(
 
     return NextResponse.json({ homework });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -36,9 +41,10 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    authenticateRequest(request);
     const { id } = await params;
     const body = await request.json();
-    const { title, description, dueDate } = body;
+    const { title, description, dueDate, gradingType, courseId, fileUrl, fileName } = body;
 
     const existing = await db.homework.findUnique({ where: { id } });
     if (!existing) {
@@ -51,6 +57,10 @@ export async function PUT(
         ...(title !== undefined && { title }),
         ...(description !== undefined && { description }),
         ...(dueDate !== undefined && { dueDate }),
+        ...(gradingType !== undefined && { gradingType }),
+        ...(courseId !== undefined && { courseId }),
+        ...(fileUrl !== undefined && { fileUrl }),
+        ...(fileName !== undefined && { fileName }),
       },
       include: {
         course: {
@@ -64,6 +74,9 @@ export async function PUT(
 
     return NextResponse.json({ homework });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -74,6 +87,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    authenticateRequest(request);
     const { id } = await params;
 
     const existing = await db.homework.findUnique({ where: { id } });
@@ -85,6 +99,9 @@ export async function DELETE(
 
     return NextResponse.json({ message: 'Homework deleted successfully' });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }

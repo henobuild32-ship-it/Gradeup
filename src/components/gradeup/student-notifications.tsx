@@ -20,12 +20,13 @@ export default function StudentNotifications() {
     if (!user?.schoolId) return;
     try {
       const res = await fetch(`/api/notifications?schoolId=${user.schoolId}&targetRole=STUDENT`);
+      if (!res.ok) throw new Error();
       const data = await res.json();
       // Safe, flexible parsing supporting both flat array and object formats
       const rawList = Array.isArray(data) ? data : (Array.isArray(data?.notifications) ? data.notifications : []);
       const sorted = [...rawList].sort((a: NotificationInfo, b: NotificationInfo) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setNotifications(sorted);
-    } catch (err) { console.error('Erreur chargement notifications:', err); } finally { setLoading(false); }
+    } catch { /* ignore */ } finally { setLoading(false); }
   }, [user?.schoolId]);
 
   useEffect(() => { setLoading(true); fetchNotifications(); }, [fetchNotifications]);
@@ -50,7 +51,7 @@ export default function StudentNotifications() {
         // Notify the layout shell to refresh badge count
         window.dispatchEvent(new CustomEvent('gradeup-notification-read'));
       }
-    } catch (err) { console.error('Erreur marquage notification:', err); toast.error('Impossible de marquer la notification comme lue'); }
+    } catch { toast.error('Impossible de marquer la notification comme lue'); }
   };
 
   const markAllAsRead = async () => {
@@ -62,7 +63,7 @@ export default function StudentNotifications() {
       toast.success('Toutes les notifications ont été marquées comme lues');
       // Notify the layout shell to refresh badge count
       window.dispatchEvent(new CustomEvent('gradeup-notification-read'));
-    } catch (err) { console.error('Erreur marquage notifications:', err); toast.error('Impossible de marquer toutes les notifications'); }
+    } catch { toast.error('Impossible de marquer toutes les notifications'); }
   };
 
   const formatRelativeTime = (dateStr: string) => {

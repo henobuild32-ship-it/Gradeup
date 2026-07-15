@@ -186,6 +186,8 @@ export async function PATCH(request: NextRequest) {
       userId, active, fullName, email,
       postName, gender, birthDate, matricule, 
       phone, parentPhone, parentPhone2, academicYear, section, photoUrl,
+      bloodType, nationality, address, parentEmail,
+      cardIssuedDate, cardExpiryDate, ine, tuteur, contactTuteur, allergies, assurance,
       isTitulaire, titulaireClassIds
     } = body;
 
@@ -207,6 +209,17 @@ export async function PATCH(request: NextRequest) {
     if (academicYear !== undefined) updateData.academicYear = academicYear;
     if (section !== undefined) updateData.section = section;
     if (photoUrl !== undefined) updateData.photoUrl = photoUrl;
+    if (bloodType !== undefined) updateData.bloodType = bloodType;
+    if (nationality !== undefined) updateData.nationality = nationality;
+    if (address !== undefined) updateData.address = address;
+    if (parentEmail !== undefined) updateData.parentEmail = parentEmail;
+    if (cardIssuedDate !== undefined) updateData.cardIssuedDate = cardIssuedDate;
+    if (cardExpiryDate !== undefined) updateData.cardExpiryDate = cardExpiryDate;
+    if (ine !== undefined) updateData.ine = ine;
+    if (tuteur !== undefined) updateData.tuteur = tuteur;
+    if (contactTuteur !== undefined) updateData.contactTuteur = contactTuteur;
+    if (allergies !== undefined) updateData.allergies = allergies;
+    if (assurance !== undefined) updateData.assurance = assurance;
     if (isTitulaire !== undefined) updateData.isTitulaire = isTitulaire;
     if (titulaireClassIds !== undefined) updateData.titulaireClassIds = Array.isArray(titulaireClassIds) ? titulaireClassIds : [];
 

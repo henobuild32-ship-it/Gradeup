@@ -32,16 +32,17 @@ export default function TeacherDashboard() {
       const coursesData = await coursesRes.json();
       const lessonsData = await lessonsRes.json();
 
-      setCourses(Array.isArray(coursesData) ? coursesData : []);
-      setLessons(Array.isArray(lessonsData) ? lessonsData : []);
+      setCourses(Array.isArray(coursesData.courses) ? coursesData.courses : []);
+      setLessons(Array.isArray(lessonsData.lessons) ? lessonsData.lessons : []);
 
       // Count unique students across all courses
-      const classIds = [...new Set((Array.isArray(coursesData) ? coursesData : []).map((c: CourseInfo) => c.classId))];
+      const classIds = [...new Set((Array.isArray(coursesData.courses) ? coursesData.courses : []).map((c: CourseInfo) => c.classId))];
       let total = 0;
       for (const classId of classIds) {
         const studentsRes = await fetch(`/api/users?schoolId=${user.schoolId}&role=STUDENT&classId=${classId}`);
+        if (!studentsRes.ok) continue;
         const studentsData = await studentsRes.json();
-        total += (Array.isArray(studentsData) ? studentsData : [studentsData].filter(Boolean)).length;
+        total += (Array.isArray(studentsData.users) ? studentsData.users.length : 0);
       }
       setTotalStudents(total);
     } catch {

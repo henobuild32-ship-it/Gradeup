@@ -80,8 +80,8 @@ export default function ProfilePage() {
           if (data.user) {
             setFullUser(data.user);
           }
-        } catch (err) {
-          console.error("Erreur de chargement de la carte d'identité:", err);
+        } catch {
+          // silencieux
         } finally {
           setLoadingCard(false);
         }

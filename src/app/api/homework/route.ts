@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = authenticateRequest(request);
     const { searchParams } = new URL(request.url);
     const schoolId = searchParams.get('schoolId');
     const courseId = searchParams.get('courseId');
@@ -47,6 +49,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ homework });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -55,8 +60,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = authenticateRequest(request);
     const body = await request.json();
-    const { schoolId, courseId, teacherId, title, description, dueDate, gradingType } = body;
+    const { schoolId, courseId, teacherId, title, description, dueDate, gradingType, fileUrl, fileName } = body;
 
     if (!schoolId || !courseId || !teacherId || !title) {
       return NextResponse.json(
@@ -74,6 +80,8 @@ export async function POST(request: NextRequest) {
         description: description || '',
         dueDate: dueDate || '',
         gradingType: gradingType || 'manual',
+        fileUrl: fileUrl || '',
+        fileName: fileName || '',
       },
       include: {
         course: {
@@ -87,6 +95,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ homework }, { status: 201 });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
