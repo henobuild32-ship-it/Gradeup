@@ -86,7 +86,7 @@ export default function MeetingRoom() {
       channelName: `realtime-participants-${activeMeetingId}`,
       onEvent: (payload: any) => {
         const row = payload.eventType === 'DELETE' ? payload.old : payload.new;
-        if (row && row.conferenceId === activeMeetingId) {
+        if (row && row.meetingId === activeMeetingId) {
           fetchMeeting();
         }
       },
