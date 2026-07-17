@@ -68,6 +68,7 @@ interface StudentResult {
 export default function AdminDashboard() {
   const { user, setCurrentPage } = useAppStore();
   const [stats, setStats] = useState<Stats | null>(null);
+  const [progression, setProgression] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [pendingPayments, setPendingPayments] = useState<any[]>([]);
   const [overduePayments, setOverduePayments] = useState<any[]>([]);
@@ -137,6 +138,7 @@ export default function AdminDashboard() {
     if (user?.schoolId) {
       fetchStats();
       fetchAlerts();
+      fetchProgression();
     }
   }, [user?.schoolId]);
 
@@ -152,6 +154,18 @@ export default function AdminDashboard() {
       // silencieux
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchProgression = async () => {
+    try {
+      const res = await fetch(`/api/stats/progression?schoolId=${user?.schoolId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setProgression(data);
+      }
+    } catch {
+      // silencieux
     }
   };
 
@@ -365,6 +379,9 @@ export default function AdminDashboard() {
             <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Année en cours</Badge>
           </div>
 
+          {progression === null ? (
+            <div className="py-8 text-center text-muted-foreground">Calcul de la progression…</div>
+          ) : (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-6 items-center">
             {/* Round Gauge */}
             <div className="flex flex-col items-center justify-center shrink-0">
@@ -376,11 +393,11 @@ export default function AdminDashboard() {
                     fill="none" strokeWidth="8" strokeLinecap="round" 
                     className="stroke-blue-600" 
                     strokeDasharray={263.8} 
-                    strokeDashoffset={263.8 * (1 - 0.78)} 
+                    strokeDashoffset={263.8 * (1 - progression.progression / 100)} 
                   />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-2xl font-extrabold text-blue-600">78%</span>
+                  <span className="text-2xl font-extrabold text-blue-600">{progression.progression}%</span>
                   <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider">Complété</span>
                 </div>
               </div>
@@ -391,26 +408,31 @@ export default function AdminDashboard() {
               <div className="space-y-1">
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground font-semibold">Taux de saisie des notes</span>
-                  <span className="font-bold">84%</span>
+                  <span className="font-bold">{progression.components.coverageNotes}%</span>
                 </div>
                 <div className="w-full bg-muted h-2 rounded-full overflow-hidden">
-                  <div className="bg-emerald-500 h-full rounded-full" style={{ width: '84%' }} />
+                  <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${progression.components.coverageNotes}%` }} />
                 </div>
               </div>
 
               <div className="space-y-1">
                 <div className="flex justify-between text-xs">
                   <span className="text-muted-foreground font-semibold">Performance générale moyenne</span>
-                  <span className="font-bold">13.8/20</span>
+                  <span className="font-bold">{progression.raw.totalGrades > 0 ? 'En cours' : '—'}</span>
                 </div>
                 <div className="w-full bg-muted h-2 rounded-full overflow-hidden">
-                  <div className="bg-blue-500 h-full rounded-full" style={{ width: '69%' }} />
+                  <div className="bg-blue-500 h-full rounded-full" style={{ width: `${progression.components.coverageCours}%` }} />
                 </div>
               </div>
 
-              <p className="text-[10px] text-muted-foreground italic">Dernière mise à jour des calculs aujourd'hui à 04:00.</p>
+              <p className="text-[10px] text-muted-foreground italic">
+                {progression.raw.totalStudents > 0 
+                  ? `Dernière mise à jour : ${progression.raw.totalStudents} élèves, ${progression.raw.totalCourses} cours`
+                  : 'Aucune donnée — ajoutez des élèves et des cours pour voir la progression.'}
+              </p>
             </div>
           </div>
+          )}
         </CardContent>
       </Card>
 
