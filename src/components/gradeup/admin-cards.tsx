@@ -265,18 +265,32 @@ export default function AdminCards() {
     }
   }, [formData.fullName, isCreating]);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        toast.error('L\'image est trop grande (max 2MB)');
-        return;
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('L\'image est trop grande (max 2MB)');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const fd = new FormData();
+      fd.append('photo', file);
+      const res = await fetch('/api/upload/photo', {
+        method: 'POST',
+        body: fd,
+      });
+      if (res.ok) {
+        const { url } = await res.json();
+        setFormData(prev => ({ ...prev, photoUrl: url }));
+        toast.success('Photo uploadée');
+      } else {
+        toast.error('Erreur upload');
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData(prev => ({ ...prev, photoUrl: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
+    } catch {
+      toast.error('Erreur réseau');
+    } finally {
+      setSubmitting(false);
     }
   };
 

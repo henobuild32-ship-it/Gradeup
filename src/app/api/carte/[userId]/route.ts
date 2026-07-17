@@ -8,8 +8,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'userId requis' }, { status: 400 });
     }
 
-    const user = await db.user.findUnique({
-      where: { id: userId },
+    const user = await db.user.findFirst({
+      where: {
+        OR: [
+          { id: userId },
+          { matricule: userId },
+          { cardId: userId },
+        ],
+      },
       include: {
         school: true,
         classEnrollments: { include: { class: true } },

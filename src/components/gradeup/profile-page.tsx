@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '@/lib/store';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -44,6 +44,8 @@ export default function ProfilePage() {
   const [name, setName] = useState(user?.fullName || '');
   const [email, setEmail] = useState(user?.email || '');
   const [saving, setSaving] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -99,6 +101,32 @@ export default function ProfilePage() {
     .toUpperCase()
     .slice(0, 2);
 
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: 'Erreur', description: 'Image trop grande (max 2MB)', variant: 'destructive' });
+      return;
+    }
+    setPhotoUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('photo', file);
+      const res = await fetch('/api/upload/photo', { method: 'POST', body: fd });
+      if (res.ok) {
+        const { url } = await res.json();
+        setUser({ ...user, photoUrl: url });
+        toast({ title: 'Photo mise à jour' });
+      } else {
+        toast({ title: 'Erreur upload', variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Erreur réseau', variant: 'destructive' });
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
   const handleLogout = () => {
     logout();
     toast({ title: 'Déconnexion', description: 'Vous avez été déconnecté.' });
@@ -115,7 +143,7 @@ export default function ProfilePage() {
       const res = await fetch(`/api/users/${user.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fullName: name.trim(), email: email.trim() }),
+        body: JSON.stringify({ fullName: name.trim(), email: email.trim(), photoUrl: user.photoUrl }),
       });
 
       if (!res.ok) {
@@ -217,10 +245,22 @@ export default function ProfilePage() {
         <div className="bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600 p-6 text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Avatar className="h-20 w-20 ring-4 ring-white/30 shadow-lg">
-                <AvatarFallback className="text-2xl bg-white/20 text-white font-bold">
-                  {initials}
-                </AvatarFallback>
+              <Avatar className="h-20 w-20 ring-4 ring-white/30 shadow-lg relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                {user.photoUrl ? (
+                  <img src={user.photoUrl} alt="" className="h-full w-full object-cover rounded-full" />
+                ) : (
+                  <AvatarFallback className="text-2xl bg-white/20 text-white font-bold">
+                    {initials}
+                  </AvatarFallback>
+                )}
+                <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  {photoUploading ? (
+                    <Loader2 className="h-6 w-6 text-white animate-spin" />
+                  ) : (
+                    <Camera className="h-6 w-6 text-white" />
+                  )}
+                </div>
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
               </Avatar>
               <div>
                 <h2 className="text-2xl font-bold">{user.fullName}</h2>
@@ -273,10 +313,14 @@ export default function ProfilePage() {
                 user={{
                   ...fullUser,
                   className: fullUser.classEnrollments?.[0]?.class?.name || fullUser.className,
-                  courseName: fullUser.section, // use section as subject for teachers
+                  courseName: fullUser.section,
                 }}
-                schoolName={fullUser.school?.name || 'Établissement GradeUp'}
-                schoolLogo={fullUser.school?.logoUrl}
+                school={{
+                  name: fullUser.school?.name || 'Établissement GradeUp',
+                  logoUrl: fullUser.school?.logoUrl,
+                  color: fullUser.school?.color || '#2563eb',
+                  academicYear: fullUser.school?.academicYear,
+                }}
                 role={user.role as 'STUDENT' | 'TEACHER'}
               />
             ) : (

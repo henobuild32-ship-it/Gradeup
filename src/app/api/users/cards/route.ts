@@ -52,9 +52,15 @@ export async function POST(request: NextRequest) {
       let generatedCount = 0;
       for (const student of students) {
         const newCardId = await generateUniqueCardId(student.fullName);
+        const issued = new Date().toISOString().slice(0, 10);
+        const expiry = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
         await db.user.update({
           where: { id: student.id },
-          data: { cardId: newCardId }
+          data: {
+            cardId: newCardId,
+            cardIssuedDate: issued,
+            cardExpiryDate: expiry,
+          },
         });
 
         // 1. Notify Student in real-time
