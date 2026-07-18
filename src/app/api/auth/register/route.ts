@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { hashPassword } from '@/lib/password';
+import { setAuthCookies } from '@/lib/auth/session';
 
 function generateCode(prefix: string, length: number = 6): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -83,10 +84,12 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      return NextResponse.json({
+      const response = NextResponse.json({
         user: formatUser(user, school),
         inviteCode: code,
       }, { status: 201 });
+      setAuthCookies(response, user, school);
+      return response;
     }
 
     // === MODE: join-school (Non-admin joins an existing school) ===
@@ -223,9 +226,12 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      return NextResponse.json({
+      const finalUserData = finalUser || user;
+      const response = NextResponse.json({
         user: finalUser ? formatUser(finalUser, school) : formatUser(user, school),
       }, { status: 201 });
+      setAuthCookies(response, finalUserData, school);
+      return response;
     }
 
     return NextResponse.json(

@@ -47,7 +47,7 @@ export const useAppStore = create<AppState>()(
       // Session
       hydrateSession: async () => {
         try {
-          const res = await fetch('/api/auth/me');
+          const res = await fetch('/api/auth/me', { credentials: 'include' });
           if (res.ok) {
             const data = await res.json();
             if (data.user) {
@@ -55,8 +55,7 @@ export const useAppStore = create<AppState>()(
               return;
             }
           }
-          // Access token expiré ou absent : tenter un rafraîchissement via le refresh token
-          const refreshed = await fetch('/api/auth/refresh', { method: 'POST' });
+          const refreshed = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' });
           if (refreshed.ok) {
             const data = await refreshed.json();
             if (data.user) set({ user: data.user });
