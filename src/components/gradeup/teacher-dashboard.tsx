@@ -7,9 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { BookOpen, Users, FileText, Plus, GraduationCap, Clock, Lightbulb, RefreshCw } from 'lucide-react';
+import { BookOpen, Users, FileText, Plus, GraduationCap, Clock, Lightbulb, RefreshCw, CalendarDays } from 'lucide-react';
 import type { CourseInfo, LessonInfo, UserInfo } from '@/lib/types';
 import PresenceWidget from './presence-widget';
+import WeeklyScheduleView from './weekly-schedule-view';
 
 export default function TeacherDashboard() {
   const { user } = useAppStore();
@@ -163,6 +164,28 @@ export default function TeacherDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Schedule View */}
+      {courses.length > 0 && (
+        <Card className="transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-indigo-50">
+                <CalendarDays className="h-4 w-4 text-indigo-500" />
+              </div>
+              Mon Emploi du Temps
+            </CardTitle>
+            <CardDescription>Vos cours planifiés pour la semaine</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <WeeklyScheduleView
+              schoolId={user.schoolId}
+              classId={courses[0]?.classId}
+              classNameLabel={courses[0]?.class?.name || 'Ma classe'}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Leçons du jour - Timeline */}

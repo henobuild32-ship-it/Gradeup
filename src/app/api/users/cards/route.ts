@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
         });
 
         // 1. Notify Student in real-time
-        await notifyUser({
+        try { await notifyUser({
           schoolId,
           userId: student.id,
           title: 'Carte Élève Générée 🆔',
@@ -72,11 +72,11 @@ export async function POST(request: NextRequest) {
           type: 'CARD',
           priority: 'NORMAL',
           metadata: { cardId: newCardId, studentName: student.fullName },
-        });
+        }); } catch (e) { console.error('[Cards] Student notification failed (non-blocking):', e); }
 
         // 2. Notify Parent if linked
         if (student.parentId) {
-          await notifyUser({
+          try { await notifyUser({
             schoolId,
             userId: student.parentId,
             title: 'Carte Scolaire Enfant Disponible 🆔',
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
             type: 'CARD',
             priority: 'NORMAL',
             metadata: { cardId: newCardId, studentId: student.id, studentName: student.fullName },
-          });
+          }); } catch (e) { console.error('[Cards] Parent notification failed (non-blocking):', e); }
         }
 
         generatedCount++;
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
       });
 
       // 1. Notify Student in real-time
-      await notifyUser({
+      try { await notifyUser({
         schoolId,
         userId: student.id,
         title: 'Carte Élève Générée 🆔',
@@ -110,11 +110,11 @@ export async function POST(request: NextRequest) {
         type: 'CARD',
         priority: 'NORMAL',
         metadata: { cardId: newCardId, studentName: student.fullName },
-      });
+      }); } catch (e) { console.error('[Cards] Student notification failed (non-blocking):', e); }
 
       // 2. Notify Parent if linked
       if (student.parentId) {
-        await notifyUser({
+        try { await notifyUser({
           schoolId,
           userId: student.parentId,
           title: 'Carte Scolaire Enfant Disponible 🆔',
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
           type: 'CARD',
           priority: 'NORMAL',
           metadata: { cardId: newCardId, studentId: student.id, studentName: student.fullName },
-        });
+        }); } catch (e) { console.error('[Cards] Parent notification failed (non-blocking):', e); }
       }
 
       return NextResponse.json({ success: true, user: updated });

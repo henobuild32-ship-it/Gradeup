@@ -58,7 +58,7 @@ export async function POST(req: Request) {
     // Create Notification using centralized real-time service
     let message = `Nouvelle visioconférence: "${title}" programmée le ${date} à ${time}. Lien pour rejoindre: ${roomUrl}`;
     
-    await notifyUser({
+    try { await notifyUser({
       schoolId,
       senderId: creatorId || 'admin',
       targetRole: targetRole || 'ALL',
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
       type: 'CONFERENCE',
       priority: 'HIGH',
       metadata: { conferenceId: conference.id, roomUrl, date, time },
-    });
+    }); } catch (e) { console.error('[Conferences] Notification failed (non-blocking):', e); }
 
     return NextResponse.json({ conference });
   } catch (error: any) {

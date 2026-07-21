@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { subscribeToTable, isRealtimeEnabled } from '@/lib/realtime';
+import { Separator } from '@/components/ui/separator';
 import {
   CalendarDays,
   Plus,
@@ -677,6 +678,4 @@ export default function AdminSchedules() {
   );
 }
 
-function Separator() {
-  return <div className="h-px bg-muted w-full my-2" />;
-}
+

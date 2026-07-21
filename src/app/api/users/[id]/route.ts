@@ -118,7 +118,7 @@ export async function PUT(
     });
 
     // Notify the user in real-time that their profile was updated
-    await notifyUser({
+    try { await notifyUser({
       schoolId: user.schoolId,
       userId: user.id,
       title: 'Profil Modifié 👤',
@@ -126,7 +126,7 @@ export async function PUT(
       type: 'PROFILE',
       priority: 'LOW',
       metadata: { userId: user.id },
-    });
+    }); } catch (e) { console.error('[Users] Notification failed (non-blocking):', e); }
 
     return NextResponse.json({ user });
   } catch (err: unknown) {

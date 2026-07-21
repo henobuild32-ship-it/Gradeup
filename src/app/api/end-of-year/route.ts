@@ -460,23 +460,23 @@ async function executeSchoolWideTransition(schoolId: string, adminId: string, ne
 
   // Notifications temps réel (déjà diffusées via Supabase Realtime)
   for (const n of notified) {
-    await notifyUser({
+    try { await notifyUser({
       schoolId,
       userId: n.userId,
       title: 'Résultat de fin d\'année',
       message: `Votre situation pour ${newYear} : ${n.label}.`,
       type: 'SYSTEM',
       priority: 'HIGH',
-    });
+    }); } catch (e) { console.error('[EndOfYear] Student notification failed (non-blocking):', e); }
     if (n.parentId) {
-      await notifyUser({
+      try { await notifyUser({
         schoolId,
         userId: n.parentId,
         title: `Résultat : ${n.fullName}`,
         message: `Situation de fin d'année de ${n.fullName} (${newYear}) : ${n.label}.`,
         type: 'SYSTEM',
         priority: 'HIGH',
-      });
+      }); } catch (e) { console.error('[EndOfYear] Parent notification failed (non-blocking):', e); }
     }
   }
 

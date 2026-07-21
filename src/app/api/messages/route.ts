@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
     const senderName = message.sender?.fullName || 'Un utilisateur';
     const preview = content.trim().substring(0, 80) + (content.trim().length > 80 ? '...' : '');
     
-    await notifyUser({
+    try { await notifyUser({
       schoolId,
       userId: recipientId,
       senderId,
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
       type: 'MESSAGE',
       priority: 'NORMAL',
       metadata: { messageId: message.id, senderName },
-    });
+    }); } catch (e) { console.error('[Messages] Notification failed (non-blocking):', e); }
 
     return NextResponse.json(message, { status: 201 });
   } catch (error) {

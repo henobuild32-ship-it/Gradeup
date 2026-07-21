@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!isInstant) {
-      await notifyUser({
+      try { await notifyUser({
         schoolId,
         senderId: creatorId || 'admin',
         targetRole: targetRole || 'ALL',
@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
         type: 'CONFERENCE',
         priority: 'HIGH',
         metadata: { conferenceId: meeting.id, roomUrl, date: meetingDate, time: meetingTime },
-      });
+      }); } catch (e) { console.error('[Meetings] Notification failed (non-blocking):', e); }
     }
 
     return NextResponse.json({ meeting });

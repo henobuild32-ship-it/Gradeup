@@ -72,15 +72,19 @@ export async function POST(request: NextRequest) {
     });
 
     // Broad broadcast to everyone in the school when a new class is added
-    await notifyUser({
-      schoolId,
-      title: 'Nouvelle Classe Créée 🏫',
-      message: `La classe "${name}" (${level || 'Primaire'}) a été officiellement ajoutée à l'établissement.`,
-      type: 'CLASS',
-      priority: 'NORMAL',
-      targetRole: 'ALL',
-      metadata: { classId: schoolClass.id, className: name, level },
-    });
+    try {
+      await notifyUser({
+        schoolId,
+        title: 'Nouvelle Classe Créée 🏫',
+        message: `La classe "${name}" (${level || 'Primaire'}) a été officiellement ajoutée à l'établissement.`,
+        type: 'CLASS',
+        priority: 'NORMAL',
+        targetRole: 'ALL',
+        metadata: { classId: schoolClass.id, className: name, level },
+      });
+    } catch (notifErr) {
+      console.error('[Classes] Notification failed (non-blocking):', notifErr);
+    }
 
     return NextResponse.json({ class: schoolClass }, { status: 201 });
   } catch (error: unknown) {
