@@ -112,21 +112,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
 
-    await db.notification.create({
-      data: {
-        schoolId: student.schoolId,
-        userId: student.id,
-        title: action === 'block' ? 'Accès bloqué' : action === 'restore' ? 'Accès rétabli' : 'Paiement enregistré',
-        message:
-          action === 'block'
-            ? `Votre accès à la plateforme a été désactivé par l'administration. Veuillez contacter l'école.`
-            : action === 'restore'
-              ? `Votre accès à la plateforme a été rétabli. Bienvenue !`
-              : `Un paiement de ${amount} FCFA a été enregistré sur votre compte.`,
-        type: 'tuition',
-        senderId: adminId,
-      },
-    });
+    try {
+      await db.notification.create({
+        data: {
+          schoolId: student.schoolId,
+          userId: student.id,
+          title: action === 'block' ? 'Accès bloqué' : action === 'restore' ? 'Accès rétabli' : 'Paiement enregistré',
+          message:
+            action === 'block'
+              ? `Votre accès à la plateforme a été désactivé par l'administration. Veuillez contacter l'école.`
+              : action === 'restore'
+                ? `Votre accès à la plateforme a été rétabli. Bienvenue !`
+                : `Un paiement de ${amount} FCFA a été enregistré sur votre compte.`,
+          type: 'tuition',
+          senderId: adminId,
+        },
+      });
+    } catch (notifErr) {
+      console.error('[Tuition] Notification failed (non-blocking):', notifErr);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

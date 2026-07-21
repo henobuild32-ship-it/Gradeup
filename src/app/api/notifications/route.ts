@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
-import { notifyUser } from '@/services/notifications/notificationEngine';
+import { createNotification } from '@/services/notifications/createNotification';
 
 export async function GET(request: NextRequest) {
   try {
@@ -74,8 +74,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Call centralized creator which persists to database and fires real-time engine
-    const notification = await notifyUser({
+    // Persist notification to database first (this must succeed)
+    const notification = await createNotification({
       schoolId,
       senderId: senderId || '',
       targetRole: targetRole || 'ALL',
