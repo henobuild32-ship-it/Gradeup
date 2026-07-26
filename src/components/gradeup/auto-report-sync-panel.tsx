@@ -96,6 +96,8 @@ export default function AutoReportSyncPanel() {
   const [syncing, setSyncing] = useState(false);
   const [viewReport, setViewReport] = useState<SyncedReport | null>(null);
   const [validating, setValidating] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkPublishing, setBulkPublishing] = useState(false);
 
   // Load classes
   useEffect(() => {
@@ -149,6 +151,51 @@ export default function AutoReportSyncPanel() {
       toast.error('Erreur lors de la synchronisation');
     } finally {
       setSyncing(false);
+    }
+  };
+
+  // Selection handlers
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === reports.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(reports.map((r) => r.id)));
+    }
+  };
+
+  // Bulk publish selected bulletins
+  const handleBulkPublish = async () => {
+    if (selectedIds.size === 0) return;
+    setBulkPublishing(true);
+    try {
+      let published = 0;
+      for (const id of selectedIds) {
+        const report = reports.find((r) => r.id === id);
+        if (report && report.status !== 'published') {
+          const res = await fetch('/api/report-cards', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, status: 'published' }),
+          });
+          if (res.ok) published++;
+        }
+      }
+      toast.success(`${published} bulletin(s) publié(s)`);
+      setSelectedIds(new Set());
+      fetchReports();
+    } catch {
+      toast.error("Erreur lors de la publication");
+    } finally {
+      setBulkPublishing(false);
     }
   };
 
@@ -384,16 +431,27 @@ export default function AutoReportSyncPanel() {
       {/* ── Bulletin list ── */}
       <Card className="shadow-sm border border-border">
         <CardHeader>
-          <CardTitle className="text-base font-bold flex items-center gap-2">
-            <Zap className="w-4 h-4 text-amber-500" />
-            Bulletins des élèves (T{selectedTrimester})
-          </CardTitle>
-          <CardDescription>
-            Cliquez sur{' '}
-            <strong className="text-foreground">Voir</strong> pour consulter les
-            détails, puis sur{' '}
-            <strong className="text-foreground">Transmettre</strong> pour valider.
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <Zap className="w-4 h-4 text-amber-500" />
+                Bulletins des élèves (T{selectedTrimester})
+              </CardTitle>
+              <CardDescription>
+                Cochez les élèves dont vous souhaitez publier le bulletin, puis cliquez sur{' '}
+                <strong className="text-foreground">Publier la sélection</strong>.
+              </CardDescription>
+            </div>
+            {selectedIds.size > 0 && (
+              <Button
+                onClick={handleBulkPublish}
+                disabled={bulkPublishing}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+              >
+                {bulkPublishing ? 'Publication...' : `Publier (${selectedIds.size})`}
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -419,6 +477,14 @@ export default function AutoReportSyncPanel() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/30">
+                      <TableHead className="font-bold text-xs w-10">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.size === reports.length && reports.length > 0}
+                          onChange={toggleSelectAll}
+                          className="rounded border-gray-300"
+                        />
+                      </TableHead>
                       <TableHead className="font-bold text-xs">Élève</TableHead>
                       <TableHead className="font-bold text-xs">Classe</TableHead>
                       <TableHead className="font-bold text-xs text-center">
@@ -438,8 +504,16 @@ export default function AutoReportSyncPanel() {
                     {reports.map((report) => (
                       <TableRow
                         key={report.id}
-                        className="hover:bg-muted/10 transition-colors"
+                        className={`hover:bg-muted/10 transition-colors ${selectedIds.has(report.id) ? 'bg-blue-50/50' : ''}`}
                       >
+                        <TableCell className="w-10">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(report.id)}
+                            onChange={() => toggleSelect(report.id)}
+                            className="rounded border-gray-300"
+                          />
+                        </TableCell>
                         <TableCell className="font-semibold text-sm">
                           {report.studentName}
                         </TableCell>
