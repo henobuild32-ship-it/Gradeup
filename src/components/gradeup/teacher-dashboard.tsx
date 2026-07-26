@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { BookOpen, Users, FileText, Plus, GraduationCap, Clock, Lightbulb, RefreshCw, CalendarDays } from 'lucide-react';
+import { BookOpen, Users, FileText, Plus, GraduationCap, Clock, Lightbulb, RefreshCw, CalendarDays, AlertTriangle } from 'lucide-react';
 import type { CourseInfo, LessonInfo, UserInfo } from '@/lib/types';
 import PresenceWidget from './presence-widget';
 import WeeklyScheduleView from './weekly-schedule-view';
@@ -111,6 +111,19 @@ export default function TeacherDashboard() {
 
       {/* Pointage de présence */}
       <PresenceWidget compact />
+
+      {/* No courses warning */}
+      {!loading && courses.length === 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold text-amber-800">Aucun cours assigné</p>
+            <p className="text-sm text-amber-700 mt-1">
+              Veuillez contacter l&apos;administrateur pour qu&apos;il vous attribue des cours. Vous ne pourrez pas publier de leçons ou de devoirs tant que des cours ne vous sont pas assignés.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

@@ -14,8 +14,9 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Edit, Trash2, GraduationCap, Filter, Calculator, Sparkles, Check, Zap, RefreshCw } from 'lucide-react';
+import { Plus, Edit, Trash2, GraduationCap, Filter, Calculator, Sparkles, Check, Zap, RefreshCw, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { CourseInfo, GradeInfo, UserInfo } from '@/lib/types';
 
 export default function TeacherGrades() {
@@ -427,12 +428,23 @@ export default function TeacherGrades() {
           <Button
             className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-lg shadow-blue-500/20 gap-2"
             onClick={openCreateDialog}
+            disabled={courses.length === 0}
           >
             <Plus className="h-4 w-4" />
             Ajouter une note
           </Button>
         </div>
       </div>
+
+      {/* No courses assigned */}
+      {!loading && courses.length === 0 && (
+        <Alert className="border-amber-200 bg-amber-50 text-amber-800">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertDescription>
+            Aucun cours ne vous est assigné. Veuillez contacter l&apos;administrateur pour qu&apos;il vous attribue des cours avant de pouvoir ajouter des notes.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Controls / Filter Bar */}
       <Card className="shadow-sm border border-border bg-card">

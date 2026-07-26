@@ -187,22 +187,15 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // If teacher, optionally create courses for selected classes
+      // If teacher, enroll in selected classes (same as students)
       if (role === 'TEACHER' && classIds && classIds.length > 0) {
         for (const classId of classIds) {
           const schoolClass = await db.schoolClass.findFirst({
             where: { id: classId, schoolId: school.id },
           });
           if (schoolClass) {
-            // Create a generic course for this teacher in this class
-            await db.course.create({
-              data: {
-                schoolId: school.id,
-                classId: schoolClass.id,
-                teacherId: user.id,
-                name: `${user.fullName} - ${schoolClass.name}`,
-                description: `Cours dispensé par ${user.fullName}`,
-              },
+            await db.enrolledClass.create({
+              data: { userId: user.id, classId: schoolClass.id },
             });
           }
         }

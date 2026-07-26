@@ -171,7 +171,7 @@ export default function TeacherLessons() {
           <Button
             className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:scale-[1.02] active:scale-[0.98] transition-transform gap-2"
             onClick={() => setDialogOpen(true)}
-            disabled={isAtLimit}
+            disabled={isAtLimit || courses.length === 0}
           >
             <Plus className="h-4 w-4" />
             Publier une leçon
@@ -190,6 +190,16 @@ export default function TeacherLessons() {
             {isAtLimit
               ? 'Vous avez atteint la limite de 3 leçons pour aujourd\'hui.'
               : `Attention : il ne vous reste plus qu'une seule leçon pour aujourd'hui.`}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* No courses assigned */}
+      {!loading && courses.length === 0 && (
+        <Alert className="border-amber-200 bg-amber-50 text-amber-800">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertDescription>
+            Aucun cours ne vous est assigné. Veuillez contacter l&apos;administrateur pour qu&apos;il vous attribue des cours avant de pouvoir publier des leçons.
           </AlertDescription>
         </Alert>
       )}

@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Edit, Trash2, BookOpen, Calendar, Clock, AlertTriangle, ClipboardList, Upload, Download, Eye } from 'lucide-react';
 import { toast } from 'sonner';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { CourseInfo, HomeworkInfo, SubmissionInfo } from '@/lib/types';
 
 export default function TeacherHomework() {
@@ -190,11 +191,21 @@ export default function TeacherHomework() {
             <h1 className="text-2xl font-bold">Devoirs</h1>
             <p className="text-sm text-muted-foreground mt-1">Créez et gérez les devoirs de vos élèves</p>
           </div>
-          <Button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-lg shadow-blue-500/20 gap-2" onClick={openCreateDialog}>
+          <Button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-lg shadow-blue-500/20 gap-2" onClick={openCreateDialog} disabled={courses.length === 0}>
             <Plus className="h-4 w-4" /> Créer un devoir
           </Button>
         </div>
       </div>
+
+      {/* No courses assigned */}
+      {!loading && courses.length === 0 && (
+        <Alert className="border-amber-200 bg-amber-50 text-amber-800">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertDescription>
+            Aucun cours ne vous est assigné. Veuillez contacter l&apos;administrateur pour qu&apos;il vous attribue des cours avant de pouvoir créer des devoirs.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
