@@ -54,7 +54,7 @@ export async function POST(request: Request) {
         studentId,
         teacherId: teacherId || null,
         trimester,
-        academicYear: academicYear || '2025-2026',
+        academicYear: academicYear || (() => { const now = new Date(); const y = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1; return `${y}-${y + 1}`; })(),
         studentName,
         studentGender,
         studentBirthDate,
@@ -102,15 +102,49 @@ export async function PUT(request: Request) {
         select: { schoolId: true, student: { select: { id: true } } },
       });
       if (report) {
-        await db.notification.create({
-          data: {
-            schoolId: report.schoolId,
-            title: 'Bulletin transmis par un professeur',
-            message: `Un bulletin a été créé et transmis pour validation.`,
-            type: 'report',
-            senderId: teacherId,
-          },
-        });
+        try {
+          await db.notification.create({
+            data: {
+              schoolId: report.schoolId,
+              title: 'Bulletin transmis par un professeur',
+              message: `Un bulletin a été créé et transmis pour validation.`,
+              type: 'report',
+              senderId: teacherId,
+            },
+          });
+        } catch { /* non-blocking */ }
+      }
+    }
+
+    // When published, notify student and parent
+    if (status === 'published') {
+      const report = await db.reportCard.findUnique({
+        where: { id },
+        select: { schoolId: true, trimester: true, studentId: true, student: { select: { id: true, parentId: true } } },
+      });
+      if (report) {
+        try {
+          await db.notification.create({
+            data: {
+              schoolId: report.schoolId,
+              userId: report.studentId,
+              title: 'Bulletin publié',
+              message: `Votre bulletin du trimestre ${report.trimester} est maintenant disponible.`,
+              type: 'report',
+            },
+          });
+          if (report.student?.parentId) {
+            await db.notification.create({
+              data: {
+                schoolId: report.schoolId,
+                userId: report.student.parentId,
+                title: 'Bulletin disponible',
+                message: `Le bulletin de votre enfant pour le trimestre ${report.trimester} est maintenant disponible.`,
+                type: 'report',
+              },
+            });
+          }
+        } catch { /* non-blocking */ }
       }
     }
 

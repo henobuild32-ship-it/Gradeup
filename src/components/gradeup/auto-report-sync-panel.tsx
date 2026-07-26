@@ -190,6 +190,10 @@ export default function AutoReportSyncPanel() {
         label: '✅ Validé',
         className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
       },
+      published: {
+        label: '🟢 Publié',
+        className: 'bg-green-50 text-green-700 border-green-200',
+      },
     };
     const s = map[status] || map['draft'];
     return <Badge className={s.className}>{s.label}</Badge>;
@@ -206,6 +210,7 @@ export default function AutoReportSyncPanel() {
   const autoSyncedCount = reports.filter((r) => r.status === 'auto_draft').length;
   const pendingCount = reports.filter((r) => r.status === 'pending_admin').length;
   const validatedCount = reports.filter((r) => r.status === 'validated').length;
+  const publishedCount = reports.filter((r) => r.status === 'published').length;
   const passCount = reports.filter((r) => r.averageGrade >= 10).length;
 
   // Average of class
@@ -292,6 +297,34 @@ export default function AutoReportSyncPanel() {
             Actualiser
           </Button>
 
+          {selectedClass && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                if (!user?.schoolId || !selectedClass) return;
+                try {
+                  const res = await fetch('/api/cahier/sync-to-report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ schoolId: user.schoolId, classId: selectedClass, trimester: selectedTrimester }),
+                  });
+                  const data = await res.json();
+                  if (res.ok) {
+                    toast.success(data.message || 'Cahier synchronisé');
+                    fetchReports();
+                  } else {
+                    toast.error(data.error || 'Erreur');
+                  }
+                } catch { toast.error('Erreur réseau'); }
+              }}
+              className="gap-1.5"
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              Synchroniser le cahier
+            </Button>
+          )}
+
           {reports.length > 0 && (
             <div className="ml-auto flex items-center gap-1.5 text-sm text-muted-foreground">
               <TrendingUp className="w-4 h-4 text-blue-500" />
@@ -303,7 +336,7 @@ export default function AutoReportSyncPanel() {
       </Card>
 
       {/* ── Stats ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {[
           {
             label: 'Auto-synchronisés',
@@ -322,6 +355,12 @@ export default function AutoReportSyncPanel() {
             value: validatedCount,
             icon: <CheckCircle2 className="w-5 h-5 text-emerald-500" />,
             color: 'text-emerald-600',
+          },
+          {
+            label: 'Publiés',
+            value: publishedCount,
+            icon: <Trophy className="w-5 h-5 text-green-500" />,
+            color: 'text-green-600',
           },
           {
             label: 'Élèves admis (≥ 10)',
@@ -623,6 +662,26 @@ export default function AutoReportSyncPanel() {
             <Button variant="outline" onClick={() => setViewReport(null)}>
               Fermer
             </Button>
+            {viewReport && viewReport.status !== 'published' && (
+              <Button
+                className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+                onClick={async () => {
+                  try {
+                    const res = await fetch('/api/report-cards', {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ id: viewReport.id, status: 'published' }),
+                    });
+                    if (res.ok) {
+                      setViewReport(null);
+                      fetchReports();
+                    }
+                  } catch { /* ignore */ }
+                }}
+              >
+                Publier aux élèves/parents
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

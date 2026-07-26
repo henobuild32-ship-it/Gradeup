@@ -214,7 +214,7 @@ export async function syncStudentReport(
         studentGender: student.gender ?? 'M',
         studentBirthDate: student.birthDate ?? '',
         permanentNumber: student.cardId ?? '',
-        academicYear: '2025-2026',
+        academicYear: getCurrentAcademicYear(),
         trimesterText:
           trimester === '1' ? '1er TRIMESTRE'
           : trimester === '2' ? '2e TRIMESTRE'
@@ -273,7 +273,7 @@ export async function syncStudentReport(
           classId,
           studentId,
           trimester,
-          academicYear: '2025-2026',
+          academicYear: getCurrentAcademicYear(),
           studentName: student.fullName ?? '',
           studentGender: student.gender ?? 'M',
           studentBirthDate: student.birthDate ?? '',
@@ -312,4 +312,10 @@ function getMention(avg: number): string {
   if (avg >= 12) return 'Encouragements';
   if (avg >= 10) return 'Passable';
   return 'Insuffisant';
+}
+
+export function getCurrentAcademicYear(): string {
+  const now = new Date();
+  const y = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+  return `${y}-${y + 1}`;
 }

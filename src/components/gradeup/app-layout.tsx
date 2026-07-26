@@ -77,6 +77,7 @@ import {
   ScrollText,
   Zap,
   Check,
+  Award,
 } from 'lucide-react';
 
 interface NavItem {
@@ -135,6 +136,7 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Cours', page: 'student-courses', icon: BookOpen, emoji: '📚' },
     { label: 'Leçons', page: 'student-lessons', icon: FileText, emoji: '📖' },
     { label: 'Notes', page: 'student-grades', icon: ClipboardList, emoji: '📝' },
+    { label: 'Bulletins', page: 'student-bulletins', icon: Award, emoji: '🏆' },
     { label: 'Devoirs', page: 'student-homework', icon: ClipboardCheck, emoji: '📋' },
     { label: 'Absences', page: 'student-attendance', icon: Calendar, emoji: '📅' },
     { label: 'Étudier avec Grady', page: 'student-ai', icon: Bot, emoji: '🤖' },
@@ -149,6 +151,7 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
   PARENT: [
     { label: 'Tableau de bord', page: 'parent-dashboard', icon: LayoutDashboard, emoji: '📊' },
     { label: 'Suivi scolaire', page: 'parent-grades', icon: BarChart3, emoji: '📊' },
+    { label: 'Bulletins', page: 'parent-bulletins', icon: Award, emoji: '🏆' },
     { label: 'Paiements', page: 'parent-payments', icon: CreditCard, emoji: '💳' },
     { label: 'IA Gradie', page: 'parent-ai', icon: Bot, emoji: '🤖' },
     { label: 'Visioconférences', page: 'meetings', icon: Video, emoji: '🎥' },
@@ -241,6 +244,7 @@ const pageTitles: Record<PageView, string> = {
   'student-courses': 'Cours',
   'student-lessons': 'Leçons',
   'student-grades': 'Notes',
+  'student-bulletins': 'Bulletins',
   'student-attendance': 'Absences',
   'student-payments': 'Paiements',
   'student-ai': 'IA Gradie',
@@ -248,6 +252,7 @@ const pageTitles: Record<PageView, string> = {
   'student-notifications': 'Notifications',
   'parent-dashboard': 'Tableau de bord',
   'parent-grades': 'Suivi scolaire',
+  'parent-bulletins': 'Bulletins',
   'parent-payments': 'Paiements',
   'parent-notifications': 'Notifications',
   'parent-ai': 'IA Gradie',

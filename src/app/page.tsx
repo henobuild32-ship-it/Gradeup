@@ -57,6 +57,7 @@ const StudentDashboard = dynamic(() => import('@/components/gradeup/student-dash
 const StudentCourses = dynamic(() => import('@/components/gradeup/student-courses'), { ssr: false, loading: () => <PageSkeleton /> });
 const StudentLessons = dynamic(() => import('@/components/gradeup/student-lessons'), { ssr: false, loading: () => <PageSkeleton /> });
 const StudentGrades = dynamic(() => import('@/components/gradeup/student-grades'), { ssr: false, loading: () => <PageSkeleton /> });
+const StudentBulletins = dynamic(() => import('@/components/gradeup/student-bulletins'), { ssr: false, loading: () => <PageSkeleton /> });
 const StudentAttendance = dynamic(() => import('@/components/gradeup/student-attendance'), { ssr: false, loading: () => <PageSkeleton /> });
 const StudentPayments = dynamic(() => import('@/components/gradeup/student-payments'), { ssr: false, loading: () => <PageSkeleton /> });
 const StudentAI = dynamic(() => import('@/components/gradeup/student-ai'), { ssr: false, loading: () => <PageSkeleton /> });
@@ -64,6 +65,7 @@ const StudentHomework = dynamic(() => import('@/components/gradeup/student-homew
 const StudentNotifications = dynamic(() => import('@/components/gradeup/student-notifications'), { ssr: false, loading: () => <PageSkeleton /> });
 const ParentDashboard = dynamic(() => import('@/components/gradeup/parent-dashboard'), { ssr: false, loading: () => <PageSkeleton /> });
 const ParentGrades = dynamic(() => import('@/components/gradeup/parent-grades'), { ssr: false, loading: () => <PageSkeleton /> });
+const ParentBulletins = dynamic(() => import('@/components/gradeup/parent-bulletins'), { ssr: false, loading: () => <PageSkeleton /> });
 const ParentPayments = dynamic(() => import('@/components/gradeup/parent-payments'), { ssr: false, loading: () => <PageSkeleton /> });
 const ParentNotifications = dynamic(() => import('@/components/gradeup/parent-notifications'), { ssr: false, loading: () => <PageSkeleton /> });
 const ParentAI = dynamic(() => import('@/components/gradeup/parent-ai'), { ssr: false, loading: () => <PageSkeleton /> });
@@ -108,6 +110,7 @@ function PageRouter({ page }: { page: PageView }) {
   if (page === 'student-courses') return <StudentCourses />;
   if (page === 'student-lessons') return <StudentLessons />;
   if (page === 'student-grades') return <StudentGrades />;
+  if (page === 'student-bulletins') return <StudentBulletins />;
   if (page === 'student-attendance') return <StudentAttendance />;
   if (page === 'student-payments') return <StudentPayments />;
   if (page === 'student-ai') return <StudentAI />;
@@ -115,6 +118,7 @@ function PageRouter({ page }: { page: PageView }) {
   if (page === 'student-notifications') return <StudentNotifications />;
   if (page === 'parent-dashboard') return <ParentDashboard />;
   if (page === 'parent-grades') return <ParentGrades />;
+  if (page === 'parent-bulletins') return <ParentBulletins />;
   if (page === 'parent-payments') return <ParentPayments />;
   if (page === 'parent-notifications') return <ParentNotifications />;
   if (page === 'parent-ai') return <ParentAI />;
