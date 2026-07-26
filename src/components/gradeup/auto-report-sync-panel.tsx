@@ -623,20 +623,6 @@ export default function AutoReportSyncPanel() {
             <Button variant="outline" onClick={() => setViewReport(null)}>
               Fermer
             </Button>
-            {viewReport &&
-              (viewReport.status === 'auto_draft' || viewReport.status === 'draft') && (
-                <Button
-                  className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white gap-2"
-                  onClick={() => {
-                    handleValidate(viewReport);
-                    setViewReport(null);
-                  }}
-                  disabled={validating === viewReport.id}
-                >
-                  <Send className="w-4 h-4" />
-                  Transmettre à l'administration
-                </Button>
-              )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
