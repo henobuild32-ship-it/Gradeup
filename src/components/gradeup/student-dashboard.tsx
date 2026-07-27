@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { TrendingUp, BookOpen, CalendarX, CreditCard, User, Bell, FileText, Clock, Sparkles, Award, Key, Copy, Check, RefreshCw, Users } from 'lucide-react';
+import { TrendingUp, BookOpen, CalendarX, CreditCard, User, Bell, FileText, Clock, Sparkles, Award, Key, Copy, Check, RefreshCw, Users, CalendarDays } from 'lucide-react';
 import { AttendanceTrendChart } from './charts-widget';
 import PresenceWidget from './presence-widget';
 import WeeklyScheduleView from './weekly-schedule-view';
@@ -393,17 +393,15 @@ export default function StudentDashboard() {
 
         <Card 
           className="overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 group cursor-pointer"
-          onClick={() => setCurrentPage('student-payments')}
+          onClick={() => setCurrentPage('student-schedules')}
         >
           <CardContent className="p-4 flex flex-col justify-between h-full min-h-[110px]">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground truncate">Paiement</span>
-              <CreditCard className="h-4 w-4 text-emerald-500 shrink-0" />
+              <span className="text-xs font-semibold text-muted-foreground truncate">Emploi du temps</span>
+              <CalendarDays className="h-4 w-4 text-blue-500 shrink-0" />
             </div>
-            <p className={`text-lg font-bold mt-1 ${pendingPayments > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-              {pendingPayments > 0 ? 'En attente' : 'À jour'}
-            </p>
-            <p className="text-[10px] text-muted-foreground truncate mt-1">{pendingPayments > 0 ? `${pendingPayments} en attente` : 'Frais de scolarité'}</p>
+            <p className="text-lg font-bold text-blue-600 mt-1">Consulter</p>
+            <p className="text-[10px] text-muted-foreground truncate mt-1">Voir les horaires de votre classe</p>
           </CardContent>
         </Card>
 

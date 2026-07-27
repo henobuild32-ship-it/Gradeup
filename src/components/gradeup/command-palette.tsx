@@ -52,6 +52,7 @@ const navItemsByRole: Record<UserRole, PaletteItem[]> = {
   TEACHER: [
     { label: 'Tableau de bord', page: 'teacher-dashboard', icon: LayoutDashboard },
     { label: 'Cours', page: 'teacher-courses', icon: BookOpen },
+    { label: 'Emploi du temps', page: 'teacher-schedules', icon: Calendar },
     { label: 'Leçons', page: 'teacher-lessons', icon: FileText },
     { label: 'Notes', page: 'teacher-grades', icon: ClipboardList },
     { label: 'Devoirs', page: 'teacher-homework', icon: ClipboardCheck },
@@ -65,11 +66,11 @@ const navItemsByRole: Record<UserRole, PaletteItem[]> = {
   STUDENT: [
     { label: 'Tableau de bord', page: 'student-dashboard', icon: LayoutDashboard },
     { label: 'Cours', page: 'student-courses', icon: BookOpen },
+    { label: 'Emploi du temps', page: 'student-schedules', icon: Calendar },
     { label: 'Leçons', page: 'student-lessons', icon: FileText },
     { label: 'Notes', page: 'student-grades', icon: ClipboardList },
     { label: 'Devoirs', page: 'student-homework', icon: ClipboardCheck },
     { label: 'Absences', page: 'student-attendance', icon: Calendar },
-    { label: 'Paiements', page: 'student-payments', icon: CreditCard },
     { label: 'IA Gradie', page: 'student-ai', icon: Bot },
     { label: 'Notifications', page: 'student-notifications', icon: Bell },
     { label: 'Messagerie', page: 'messages', icon: MessageSquare },

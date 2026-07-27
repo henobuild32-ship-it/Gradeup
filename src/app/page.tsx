@@ -52,6 +52,7 @@ const TeacherLessons = dynamic(() => import('@/components/gradeup/teacher-lesson
 const TeacherGrades = dynamic(() => import('@/components/gradeup/teacher-grades'), { ssr: false, loading: () => <PageSkeleton /> });
 const TeacherHomework = dynamic(() => import('@/components/gradeup/teacher-homework'), { ssr: false, loading: () => <PageSkeleton /> });
 const TeacherAttendance = dynamic(() => import('@/components/gradeup/teacher-attendance'), { ssr: false, loading: () => <PageSkeleton /> });
+const TeacherSchedules = dynamic(() => import('@/components/gradeup/schedules-page'), { ssr: false, loading: () => <PageSkeleton /> });
 const TeacherAI = dynamic(() => import('@/components/gradeup/teacher-ai'), { ssr: false, loading: () => <PageSkeleton /> });
 const StudentDashboard = dynamic(() => import('@/components/gradeup/student-dashboard'), { ssr: false, loading: () => <PageSkeleton /> });
 const StudentCourses = dynamic(() => import('@/components/gradeup/student-courses'), { ssr: false, loading: () => <PageSkeleton /> });
@@ -59,8 +60,8 @@ const StudentLessons = dynamic(() => import('@/components/gradeup/student-lesson
 const StudentGrades = dynamic(() => import('@/components/gradeup/student-grades'), { ssr: false, loading: () => <PageSkeleton /> });
 const StudentBulletins = dynamic(() => import('@/components/gradeup/student-bulletins'), { ssr: false, loading: () => <PageSkeleton /> });
 const StudentAttendance = dynamic(() => import('@/components/gradeup/student-attendance'), { ssr: false, loading: () => <PageSkeleton /> });
-const StudentPayments = dynamic(() => import('@/components/gradeup/student-payments'), { ssr: false, loading: () => <PageSkeleton /> });
 const StudentAI = dynamic(() => import('@/components/gradeup/student-ai'), { ssr: false, loading: () => <PageSkeleton /> });
+const StudentSchedules = dynamic(() => import('@/components/gradeup/schedules-page'), { ssr: false, loading: () => <PageSkeleton /> });
 const StudentHomework = dynamic(() => import('@/components/gradeup/student-homework'), { ssr: false, loading: () => <PageSkeleton /> });
 const StudentNotifications = dynamic(() => import('@/components/gradeup/student-notifications'), { ssr: false, loading: () => <PageSkeleton /> });
 const ParentDashboard = dynamic(() => import('@/components/gradeup/parent-dashboard'), { ssr: false, loading: () => <PageSkeleton /> });
@@ -76,6 +77,12 @@ const SchoolCalendar = dynamic(() => import('@/components/gradeup/school-calenda
 const HelpPage = dynamic(() => import('@/components/gradeup/help-page'), { ssr: false, loading: () => <PageSkeleton /> });
 
 function PageRouter({ page }: { page: PageView }) {
+  const { user } = useAppStore();
+
+  if (page === 'student-payments') {
+    return <StudentDashboard />;
+  }
+
   if (page === 'auth' || page === 'register') return <AuthPage />;
   if (page === 'admin-dashboard') return <AdminDashboard />;
   if (page === 'admin-users') return <AdminUsers />;
@@ -104,6 +111,7 @@ function PageRouter({ page }: { page: PageView }) {
   if (page === 'teacher-grades') return <TeacherGrades />;
   if (page === 'teacher-homework') return <TeacherHomework />;
   if (page === 'teacher-attendance') return <TeacherAttendance />;
+  if (page === 'teacher-schedules') return <TeacherSchedules />;
   if (page === 'teacher-ai') return <TeacherAI />;
   if (page === 'teacher-end-of-year') return <EndOfYear />;
   if (page === 'student-dashboard') return <StudentDashboard />;
@@ -112,7 +120,7 @@ function PageRouter({ page }: { page: PageView }) {
   if (page === 'student-grades') return <StudentGrades />;
   if (page === 'student-bulletins') return <StudentBulletins />;
   if (page === 'student-attendance') return <StudentAttendance />;
-  if (page === 'student-payments') return <StudentPayments />;
+  if (page === 'student-schedules') return <StudentSchedules />;
   if (page === 'student-ai') return <StudentAI />;
   if (page === 'student-homework') return <StudentHomework />;
   if (page === 'student-notifications') return <StudentNotifications />;
@@ -157,7 +165,7 @@ function SplashScreen() {
 }
 
 export default function HomePage() {
-  const { currentPage, user, hydrateSession } = useAppStore();
+  const { currentPage, user, setCurrentPage, hydrateSession } = useAppStore();
   const [hydrated, setHydrated] = useState(false);
   const [sessionChecked, setSessionChecked] = useState(false);
 
@@ -171,6 +179,13 @@ export default function HomePage() {
   useEffect(() => {
     hydrateSession().finally(() => setSessionChecked(true));
   }, [hydrateSession]);
+
+  // Reset unauthorized pages for student users after session restoration
+  useEffect(() => {
+    if (user?.role === 'STUDENT' && currentPage === 'student-payments') {
+      setCurrentPage('student-dashboard');
+    }
+  }, [user, currentPage, setCurrentPage]);
 
   // Show splash screen while rehydrating — avoids the flash to auth page
   if (!hydrated || !sessionChecked) {

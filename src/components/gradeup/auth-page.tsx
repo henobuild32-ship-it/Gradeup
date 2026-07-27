@@ -119,6 +119,7 @@ export default function AuthPage() {
   const [joinRole, setJoinRole] = useState<UserRole>('STUDENT');
   const [joinClassIds, setJoinClassIds] = useState<string[]>([]);
   const [joinParentCode, setJoinParentCode] = useState('');
+  const [joinEmail, setJoinEmail] = useState('');
   const [joinLoading, setJoinLoading] = useState(false);
   const [showJoinPassword, setShowJoinPassword] = useState(false);
   const [showJoinConfirmPassword, setShowJoinConfirmPassword] = useState(false);
@@ -176,8 +177,8 @@ export default function AuthPage() {
         return;
       }
     } else {
-      if (!loginInviteCode || !loginFullName || !loginPassword) {
-        toast({ title: 'Erreur', description: 'Veuillez remplir tous les champs.', variant: 'destructive' });
+      if (!loginInviteCode || !loginPassword || (!loginEmail.trim() && !loginFullName.trim())) {
+        toast({ title: 'Erreur', description: 'Veuillez remplir le code école, le mot de passe et au moins votre email ou votre nom complet.', variant: 'destructive' });
         return;
       }
     }
@@ -188,9 +189,9 @@ export default function AuthPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           inviteCode: loginIsAdmin ? undefined : loginInviteCode.toUpperCase().trim(),
-          email: loginIsAdmin ? loginEmail.trim() : undefined,
+          email: loginEmail.trim() || undefined,
           isAdminLogin: loginIsAdmin,
-          fullName: loginFullName.trim(),
+          fullName: loginFullName.trim() || undefined,
           password: loginPassword,
         }),
       });
@@ -284,6 +285,7 @@ export default function AuthPage() {
         body: JSON.stringify({
           mode: 'join-school',
           fullName: joinFullName.trim(),
+          email: joinEmail.trim() || undefined,
           password: joinPassword,
           inviteCode: joinInviteCode.trim().toUpperCase(),
           role: joinRole,
@@ -523,16 +525,29 @@ export default function AuthPage() {
                       </div>
                     )}
                     {!loginIsAdmin && (
-                      <div className="space-y-2">
-                        <Label htmlFor="login-name">Nom complet</Label>
-                        <Input
-                          id="login-name"
-                          placeholder="Jean Dupont"
-                          value={loginFullName}
-                          onChange={(e) => setLoginFullName(e.target.value)}
-                          className="h-11 rounded-xl"
-                        />
-                      </div>
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="login-email">Email (optionnel)</Label>
+                          <Input
+                            id="login-email"
+                            type="email"
+                            placeholder="jean.dupont@example.com"
+                            value={loginEmail}
+                            onChange={(e) => setLoginEmail(e.target.value)}
+                            className="h-11 rounded-xl"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="login-name">Nom complet</Label>
+                          <Input
+                            id="login-name"
+                            placeholder="Jean Dupont"
+                            value={loginFullName}
+                            onChange={(e) => setLoginFullName(e.target.value)}
+                            className="h-11 rounded-xl"
+                          />
+                        </div>
+                      </>
                     )}
                     <div className="space-y-2">
                       <Label htmlFor="login-password">Mot de passe</Label>
@@ -750,6 +765,18 @@ export default function AuthPage() {
                           placeholder="Jean Dupont"
                           value={joinFullName}
                           onChange={(e) => setJoinFullName(e.target.value)}
+                          className="h-11 rounded-xl"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="join-email">Email (optionnel)</Label>
+                        <Input
+                          id="join-email"
+                          type="email"
+                          placeholder="jean.dupont@example.com"
+                          value={joinEmail}
+                          onChange={(e) => setJoinEmail(e.target.value)}
                           className="h-11 rounded-xl"
                         />
                       </div>

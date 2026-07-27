@@ -63,6 +63,9 @@ export default function AdminCards() {
   const [activeTab, setActiveTab] = useState<string>('ALL');
   const [cardRole, setCardRole] = useState<'STUDENT' | 'TEACHER'>('STUDENT');
   const [schoolLogo, setSchoolLogo] = useState('');
+  const [schoolName, setSchoolName] = useState('');
+  const [schoolColor, setSchoolColor] = useState('#2563eb');
+  const [schoolAcademicYear, setSchoolAcademicYear] = useState('');
   const [schoolEmail, setSchoolEmail] = useState('');
   const [schoolAddress, setSchoolAddress] = useState('');
   const printRef = useRef<HTMLDivElement>(null);
@@ -153,10 +156,14 @@ export default function AdminCards() {
       const res = await fetch(`/api/config?schoolId=${user.schoolId}`);
       const data = await res.json();
       if (data.config) {
-        setSchoolLogo(data.config.logoUrl || '');
-        setSchoolEmail(data.config.email || '');
+        const config = data.config;
+        setSchoolLogo(config.logoUrl || user?.school?.logoUrl || '');
+        setSchoolName(config.name || user?.school?.name || '');
+        setSchoolColor(config.color || user?.school?.color || '#2563eb');
+        setSchoolAcademicYear(config.academicYear || user?.school?.academicYear || '');
+        setSchoolEmail(config.email || '');
         // Build address from commune + city + province
-        const parts = [data.config.commune, data.config.city, data.config.province].filter(Boolean);
+        const parts = [config.commune, config.city, config.province].filter(Boolean);
         setSchoolAddress(parts.join(', '));
       }
     } catch {
@@ -386,10 +393,11 @@ export default function AdminCards() {
             ine: student.cardId || student.id.slice(-8),
           }} 
           school={{
-            name: user?.school?.name || 'Établissement GradeUp',
-            logoUrl: schoolLogo,
-            color: user?.school?.color || '#2563eb',
-            academicYear: user?.school?.academicYear || new Date().getFullYear() + '-' + (new Date().getFullYear() + 1),
+            name: schoolName || user?.school?.name || 'Établissement GradeUp',
+            logoUrl: schoolLogo || user?.school?.logoUrl || '',
+            color: schoolColor || user?.school?.color || '#2563eb',
+            academicYear: schoolAcademicYear || user?.school?.academicYear || new Date().getFullYear() + '-' + (new Date().getFullYear() + 1),
+            email: schoolEmail,
           }}
           role={cardRole} 
         />

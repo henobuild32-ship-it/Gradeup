@@ -13,6 +13,44 @@ function generateParentCode(): string {
   return code;
 }
 
+async function syncStudentClassEnrollment(userId: string, schoolId: string, classId?: string, className?: string) {
+  if (!classId && !className) {
+    return null;
+  }
+
+  let assignedClassId = classId;
+
+  if (!assignedClassId && className) {
+    let existingClass = await db.schoolClass.findFirst({
+      where: { schoolId, name: className },
+    });
+
+    if (!existingClass) {
+      existingClass = await db.schoolClass.create({
+        data: {
+          schoolId,
+          name: className,
+          level: 'N/A',
+        },
+      });
+    }
+
+    assignedClassId = existingClass.id;
+  }
+
+  if (assignedClassId) {
+    await db.enrolledClass.deleteMany({ where: { userId } });
+    await db.enrolledClass.create({
+      data: {
+        userId,
+        classId: assignedClassId,
+      },
+    });
+  }
+
+  return assignedClassId;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const auth = authenticateRequest(request);
@@ -82,7 +120,39 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { schoolId, fullName, email, password, role, photoUrl, parentId, classId, className, isTitulaire, titulaireClassIds } = body;
+    const {
+      schoolId,
+      fullName,
+      email,
+      password,
+      role,
+      photoUrl,
+      parentId,
+      classId,
+      className,
+      isTitulaire,
+      titulaireClassIds,
+      postName,
+      gender,
+      birthDate,
+      matricule,
+      phone,
+      parentPhone,
+      parentPhone2,
+      academicYear,
+      section,
+      bloodType,
+      nationality,
+      address,
+      parentEmail,
+      ine,
+      tuteur,
+      contactTuteur,
+      allergies,
+      assurance,
+      cardIssuedDate,
+      cardExpiryDate,
+    } = body;
 
     if (!schoolId || !fullName || !password || !role) {
       return NextResponse.json(
@@ -115,6 +185,26 @@ export async function POST(request: NextRequest) {
         password: await hashPassword(password),
         role,
         photoUrl: photoUrl || '',
+        postName: postName || '',
+        gender: gender || 'M',
+        birthDate: birthDate || '',
+        matricule: matricule || '',
+        phone: phone || '',
+        parentPhone: parentPhone || '',
+        parentPhone2: parentPhone2 || '',
+        academicYear: academicYear || '',
+        section: section || '',
+        bloodType: bloodType || '',
+        nationality: nationality || '',
+        address: address || '',
+        parentEmail: parentEmail || '',
+        ine: ine || '',
+        tuteur: tuteur || '',
+        contactTuteur: contactTuteur || '',
+        allergies: allergies || '',
+        assurance: assurance || '',
+        cardIssuedDate: cardIssuedDate || '',
+        cardExpiryDate: cardExpiryDate || '',
         parentId: parentId || null,
         parentCode: parentCodeVal,
         isTitulaire: !!isTitulaire,
@@ -129,33 +219,7 @@ export async function POST(request: NextRequest) {
     });
 
     if ((classId || className) && role === 'STUDENT') {
-      let assignedClassId = classId;
-      
-      // Auto-create or find by name if className is provided
-      if (!assignedClassId && className) {
-        let existingClass = await db.schoolClass.findFirst({
-          where: { schoolId, name: className }
-        });
-        if (!existingClass) {
-          existingClass = await db.schoolClass.create({
-            data: {
-              schoolId,
-              name: className,
-              level: 'N/A'
-            }
-          });
-        }
-        assignedClassId = existingClass.id;
-      }
-
-      if (assignedClassId) {
-        await db.enrolledClass.create({
-          data: {
-            userId: user.id,
-            classId: assignedClassId,
-          },
-        });
-      }
+      await syncStudentClassEnrollment(user.id, schoolId, classId, className);
     }
 
     const userWithEnrollments = await db.user.findUnique({
@@ -182,13 +246,36 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { 
-      userId, active, fullName, email,
-      postName, gender, birthDate, matricule, 
-      phone, parentPhone, parentPhone2, academicYear, section, photoUrl,
-      bloodType, nationality, address, parentEmail,
-      cardIssuedDate, cardExpiryDate, ine, tuteur, contactTuteur, allergies, assurance,
-      isTitulaire, titulaireClassIds
+    const {
+      userId,
+      active,
+      fullName,
+      email,
+      postName,
+      gender,
+      birthDate,
+      matricule,
+      phone,
+      parentPhone,
+      parentPhone2,
+      academicYear,
+      section,
+      photoUrl,
+      bloodType,
+      nationality,
+      address,
+      parentEmail,
+      cardIssuedDate,
+      cardExpiryDate,
+      ine,
+      tuteur,
+      contactTuteur,
+      allergies,
+      assurance,
+      isTitulaire,
+      titulaireClassIds,
+      classId,
+      className,
     } = body;
 
     if (!userId) {
@@ -232,6 +319,10 @@ export async function PATCH(request: NextRequest) {
         children: true,
       },
     });
+
+    if (user.role === 'STUDENT' && (classId !== undefined || className !== undefined)) {
+      await syncStudentClassEnrollment(user.id, user.schoolId, classId, className);
+    }
 
     // Notify the user in real-time that their profile was updated by admin
     try { await notifyUser({

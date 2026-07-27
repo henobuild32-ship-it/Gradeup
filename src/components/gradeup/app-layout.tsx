@@ -115,6 +115,7 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
   TEACHER: [
     { label: 'Tableau de bord', page: 'teacher-dashboard', icon: LayoutDashboard, emoji: '📊' },
     { label: 'Cours', page: 'teacher-courses', icon: BookOpen, emoji: '📚' },
+    { label: 'Emploi du temps', page: 'teacher-schedules', icon: CalendarDays, emoji: '🗓️' },
     { label: 'Leçons', page: 'teacher-lessons', icon: FileText, emoji: '📖' },
     { label: 'Notes', page: 'teacher-grades', icon: ClipboardList, emoji: '📝' },
     { label: 'Devoirs', page: 'teacher-homework', icon: ClipboardCheck, emoji: '📋' },
@@ -134,6 +135,7 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
   STUDENT: [
     { label: 'Tableau de bord', page: 'student-dashboard', icon: LayoutDashboard, emoji: '📊' },
     { label: 'Cours', page: 'student-courses', icon: BookOpen, emoji: '📚' },
+    { label: 'Emploi du temps', page: 'student-schedules', icon: CalendarDays, emoji: '🗓️' },
     { label: 'Leçons', page: 'student-lessons', icon: FileText, emoji: '📖' },
     { label: 'Notes', page: 'student-grades', icon: ClipboardList, emoji: '📝' },
     { label: 'Bulletins', page: 'student-bulletins', icon: Award, emoji: '🏆' },
@@ -237,6 +239,7 @@ const pageTitles: Record<PageView, string> = {
   'teacher-grades': 'Notes',
   'teacher-homework': 'Devoirs',
   'teacher-attendance': 'Absences',
+  'teacher-schedules': 'Emploi du temps',
   'teacher-ai': 'IA Gradie',
   'teacher-reports': 'Rapports',
   'teacher-end-of-year': 'Fin du cursus',
@@ -246,7 +249,7 @@ const pageTitles: Record<PageView, string> = {
   'student-grades': 'Notes',
   'student-bulletins': 'Bulletins',
   'student-attendance': 'Absences',
-  'student-payments': 'Paiements',
+  'student-schedules': 'Emploi du temps',
   'student-ai': 'IA Gradie',
   'student-homework': 'Devoirs',
   'student-notifications': 'Notifications',
@@ -670,7 +673,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   return (
     // ✅ Container principal: utilise h-dvh pour la hauteur dynamique du viewport
-    <div className="flex h-dvh bg-background">
+    <div className="flex h-dvh overflow-hidden bg-background text-foreground">
       {/* Desktop Sidebar */}
       <aside
         className={`hidden lg:flex shrink-0 transition-all duration-300 ${
@@ -951,7 +954,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
         {/* ✅ Main content: overflow-y-auto pour le scroll, min-h-0 pour flexibilité */}
         <main 
-          className={`flex-1 overflow-y-auto min-h-0 ${isMobile ? 'pb-24' : ''}`}
+          className={`flex-1 overflow-x-hidden overflow-y-auto min-h-0 overscroll-contain ${isMobile ? 'pb-24' : ''}`}
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
@@ -1037,7 +1040,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       {/* Bottom Tab Bar (iOS style) on Mobile */}
       {isMobile && (
         <nav 
-          className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-card/90 backdrop-blur-xl border-t flex items-center justify-around px-2 z-40 shadow-lg"
+          className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-card/90 backdrop-blur-xl border-t flex items-center justify-around px-2 z-40 shadow-lg touch-manipulation"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
           {(() => {

@@ -147,7 +147,7 @@ export default function ParentPayments() {
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground whitespace-nowrap">Enfant :</span>
           <Select value={selectedChildId} onValueChange={setSelectedChildId}>
-            <SelectTrigger className="w-[200px] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
+            <SelectTrigger className="w-full sm:w-[200px] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
               <SelectValue placeholder="Sélectionner un enfant" />
             </SelectTrigger>
             <SelectContent>
@@ -231,37 +231,56 @@ export default function ParentPayments() {
             </CardHeader>
             <CardContent>
               <ScrollArea className="max-h-[500px]">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/30 hover:bg-muted/30">
-                      <TableHead>
-                        <span className="flex items-center gap-1.5"><CalendarDays className="size-3.5" />Mois</span>
-                      </TableHead>
-                      <TableHead className="text-right">
-                        <span className="flex items-center justify-end gap-1.5"><CreditCard className="size-3.5" />Montant</span>
-                      </TableHead>
-                      <TableHead className="text-center">Statut</TableHead>
-                      <TableHead className="hidden sm:table-cell">Méthode</TableHead>
-                      <TableHead className="hidden md:table-cell">Date</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {[...payments].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map(payment => (
-                      <TableRow key={payment.id} className="even:bg-muted/20 hover:bg-blue-50/50 transition-colors">
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            {payment.status === 'overdue' && <AlertTriangle className="size-4 text-red-500 shrink-0" />}
-                            {payment.month}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right font-bold">{formatAmount(payment.amount)} {currency}</TableCell>
-                        <TableCell className="text-center">{getStatusBadge(payment.status)}</TableCell>
-                        <TableCell className="hidden sm:table-cell text-muted-foreground">{payment.method || '—'}</TableCell>
-                        <TableCell className="hidden md:table-cell text-muted-foreground text-xs">{formatDate(payment.createdAt)}</TableCell>
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/30 hover:bg-muted/30">
+                        <TableHead>
+                          <span className="flex items-center gap-1.5"><CalendarDays className="size-3.5" />Mois</span>
+                        </TableHead>
+                        <TableHead className="text-right">
+                          <span className="flex items-center justify-end gap-1.5"><CreditCard className="size-3.5" />Montant</span>
+                        </TableHead>
+                        <TableHead className="text-center">Statut</TableHead>
+                        <TableHead className="hidden sm:table-cell">Méthode</TableHead>
+                        <TableHead className="hidden md:table-cell">Date</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {[...payments].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map(payment => (
+                        <TableRow key={payment.id} className="even:bg-muted/20 hover:bg-blue-50/50 transition-colors">
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              {payment.status === 'overdue' && <AlertTriangle className="size-4 text-red-500 shrink-0" />}
+                              {payment.month}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-bold">{formatAmount(payment.amount)} {currency}</TableCell>
+                          <TableCell className="text-center">{getStatusBadge(payment.status)}</TableCell>
+                          <TableCell className="hidden sm:table-cell text-muted-foreground">{payment.method || '—'}</TableCell>
+                          <TableCell className="hidden md:table-cell text-muted-foreground text-xs">{formatDate(payment.createdAt)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="block md:hidden space-y-3 p-1">
+                  {[...payments].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map(payment => (
+                    <div key={payment.id} className="rounded-xl border border-border bg-background/80 p-3 shadow-sm">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-semibold text-sm">{payment.month}</p>
+                          <p className="text-xs text-muted-foreground">{payment.method || '—'}</p>
+                        </div>
+                        {getStatusBadge(payment.status)}
+                      </div>
+                      <div className="mt-3 flex items-center justify-between gap-2">
+                        <span className="text-sm font-semibold">{formatAmount(payment.amount)} {currency}</span>
+                        <span className="text-xs text-muted-foreground">{formatDate(payment.createdAt)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </ScrollArea>
             </CardContent>
           </Card>

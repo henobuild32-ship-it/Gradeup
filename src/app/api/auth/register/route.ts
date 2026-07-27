@@ -48,7 +48,8 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const existingSchool = await db.school.findUnique({ where: { email } });
+      const normalizedEmail = email.trim().toLowerCase();
+      const existingSchool = await db.school.findUnique({ where: { email: normalizedEmail } });
       if (existingSchool) {
         return NextResponse.json(
           { error: 'Une école avec cet email existe déjà.' },
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
       const school = await db.school.create({
         data: {
           name: schoolName,
-          email,
+          email: normalizedEmail,
           password: await hashPassword(password),
           inviteCode: code,
         },
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
         data: {
           schoolId: school.id,
           fullName,
-          email,
+          email: normalizedEmail,
           password: await hashPassword(password),
           role: 'ADMIN',
           parentCode: parentCodeVal,
@@ -95,11 +96,12 @@ export async function POST(request: NextRequest) {
     // === MODE: join-school (Non-admin joins an existing school) ===
     if (mode === 'join-school') {
       const cleanFullName = (fullName || '').trim();
+      const cleanEmail = (email || '').trim().toLowerCase();
       const cleanInviteCode = (inviteCode || '').trim().toUpperCase();
 
-      if (!cleanFullName || !password || !cleanInviteCode || !role) {
+      if ((!cleanFullName && !cleanEmail) || !password || !cleanInviteCode || !role) {
         return NextResponse.json(
-          { error: 'Veuillez remplir tous les champs obligatoires.' },
+          { error: 'Veuillez remplir tous les champs obligatoires et fournir un email ou un nom complet.' },
           { status: 400 }
         );
       }
@@ -123,14 +125,28 @@ export async function POST(request: NextRequest) {
       const existingUsers = await db.user.findMany({
         where: { schoolId: school.id, role },
       });
-      const nameExists = existingUsers.some(
-        (u) => u.fullName.trim().toLowerCase() === cleanFullName.toLowerCase()
-      );
+      const nameExists = cleanFullName
+        ? existingUsers.some(
+            (u) => u.fullName.trim().toLowerCase() === cleanFullName.toLowerCase()
+          )
+        : false;
       if (nameExists) {
         return NextResponse.json(
           { error: 'Un utilisateur avec ce nom et ce rôle existe déjà dans cette école.' },
           { status: 409 }
         );
+      }
+
+      if (cleanEmail) {
+        const existingEmail = await db.user.findFirst({
+          where: { schoolId: school.id, email: cleanEmail },
+        });
+        if (existingEmail) {
+          return NextResponse.json(
+            { error: 'Un utilisateur avec cet email existe déjà dans cette école.' },
+            { status: 409 }
+          );
+        }
       }
 
       const parentCodeVal = await generateUniqueParentCode();
@@ -142,7 +158,7 @@ export async function POST(request: NextRequest) {
         password: await hashPassword(password),
         role,
         parentCode: parentCodeVal,
-        email: email || '',
+        email: cleanEmail || '',
       };
 
       // Role-specific logic

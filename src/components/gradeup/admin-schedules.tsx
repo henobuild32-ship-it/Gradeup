@@ -487,8 +487,10 @@ export default function AdminSchedules() {
                               </div>
                             ) : (
                               <button
+                                type="button"
                                 onClick={() => handleOpenAdd(day.value, slot.start, slot.end)}
-                                className="opacity-0 group-hover:opacity-100 absolute inset-0 flex items-center justify-center bg-blue-600/10 hover:bg-blue-600/20 text-blue-700 transition-all rounded"
+                                className="absolute inset-0 flex items-center justify-center bg-blue-600/10 hover:bg-blue-600/20 text-blue-700 transition-all rounded opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                                title="Ajouter un créneau"
                               >
                                 <Plus className="w-6 h-6" />
                               </button>

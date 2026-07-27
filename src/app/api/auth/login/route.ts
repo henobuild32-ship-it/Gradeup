@@ -21,7 +21,10 @@ export async function POST(request: NextRequest) {
       }
 
       // Chercher l'école par son email
-      school = await db.school.findUnique({ where: { email } });
+      const normalizedSchoolEmail = email.trim().toLowerCase();
+      school = await db.school.findFirst({
+        where: { email: { equals: normalizedSchoolEmail, mode: 'insensitive' } },
+      });
       if (!school) {
         return NextResponse.json(
           { error: 'Aucune école trouvée avec cet email.' },
@@ -59,9 +62,9 @@ export async function POST(request: NextRequest) {
 
     // ====== USER LOGIN : par code école + nom + mot de passe ======
     } else {
-      if (!inviteCode || !fullName || !password) {
+      if (!inviteCode || !password || (!email && !fullName)) {
         return NextResponse.json(
-          { error: 'Veuillez remplir tous les champs.' },
+          { error: 'Veuillez remplir le code école, le mot de passe et au moins votre email ou votre nom complet.' },
           { status: 400 }
         );
       }
@@ -75,29 +78,45 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Trouver l'utilisateur : nom (insensible à la casse) puis vérifier le mot de passe haché
-      const allUsers = await db.user.findMany({
-        where: {
-          schoolId: school.id,
-        },
-        include: {
-          school: true,
-          classEnrollments: { include: { class: true } },
-          children: true,
-        },
-      });
-
-      // Comparer le nom complet de façon insensible à la casse (trim + lowercase)
-      const normalizedInput = fullName.trim().toLowerCase();
-      const candidates = allUsers.filter(
-        (u) => u.fullName.trim().toLowerCase() === normalizedInput
-      );
-
-      // Vérifier le mot de passe (scrypt) sur les candidats de même nom
-      for (const candidate of candidates) {
-        if (await verifyPassword(password, candidate.password)) {
+      // Chercher un utilisateur par email si fourni
+      if (email) {
+        const normalizedEmail = email.trim().toLowerCase();
+        const candidate = await db.user.findFirst({
+          where: { schoolId: school.id, email: { equals: normalizedEmail, mode: 'insensitive' } },
+          include: {
+            school: true,
+            classEnrollments: { include: { class: true } },
+            children: true,
+          },
+        });
+        if (candidate && (await verifyPassword(password, candidate.password))) {
           user = candidate;
-          break;
+        }
+      }
+
+      // Si l'email n'a pas permis de trouver l'utilisateur, on tente avec le nom complet
+      if (!user && fullName) {
+        const allUsers = await db.user.findMany({
+          where: {
+            schoolId: school.id,
+          },
+          include: {
+            school: true,
+            classEnrollments: { include: { class: true } },
+            children: true,
+          },
+        });
+
+        const normalizedInput = fullName.trim().toLowerCase();
+        const candidates = allUsers.filter(
+          (u) => u.fullName.trim().toLowerCase() === normalizedInput
+        );
+
+        for (const candidate of candidates) {
+          if (await verifyPassword(password, candidate.password)) {
+            user = candidate;
+            break;
+          }
         }
       }
 

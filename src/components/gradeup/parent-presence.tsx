@@ -34,11 +34,12 @@ export default function ParentPresence() {
   const [loading, setLoading] = useState(true);
   const [selectedMapChildId, setSelectedMapChildId] = useState<string | null>(null);
   const schoolId = user?.schoolId || '';
+  const userId = user?.id || '';
 
   const fetchChildren = useCallback(async () => {
-    if (!user?.id || !schoolId) return;
+    if (!userId || !schoolId) return;
     try {
-      const res = await fetch(`/api/users?schoolId=${schoolId}&role=STUDENT&parentId=${user.id}`);
+      const res = await fetch(`/api/users?schoolId=${schoolId}&role=STUDENT&parentId=${userId}`);
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data.users) ? data.users : [];
@@ -47,7 +48,7 @@ export default function ParentPresence() {
       }
     } catch { /* silent */ }
     return [];
-  }, [user?.id, schoolId]);
+  }, [userId, schoolId]);
 
   const fetchPresence = useCallback(async (childId: string) => {
     try {
@@ -88,9 +89,18 @@ export default function ParentPresence() {
   }, [fetchChildren, fetchPresence, fetchLiveLocation]);
 
   useEffect(() => {
-    fetchAllPresences();
-    const interval = setInterval(fetchAllPresences, 30000);
-    return () => clearInterval(interval);
+    let active = true;
+    const loadPresences = async () => {
+      if (!active) return;
+      await fetchAllPresences();
+    };
+
+    loadPresences();
+    const interval = setInterval(loadPresences, 30000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, [fetchAllPresences]);
 
   const getStatusIcon = (statut: string) => {

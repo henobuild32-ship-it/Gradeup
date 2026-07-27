@@ -448,14 +448,14 @@ export default function TeacherGrades() {
 
       {/* Controls / Filter Bar */}
       <Card className="shadow-sm border border-border bg-card">
-        <CardContent className="flex items-center gap-4 flex-wrap py-4">
+       <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4 flex-wrap py-4">
           <Filter className="h-4 w-4 text-muted-foreground" />
           
           {/* iOS native style select menu for Course */}
           <select
             value={filterCourseId}
             onChange={(e) => setFilterCourseId(e.target.value)}
-            className="w-48 h-10 border border-input rounded-lg px-3 bg-background text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer font-medium"
+           className="w-full sm:w-48 h-10 border border-input rounded-lg px-3 bg-background text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer font-medium"
           >
             <option value="">Tous les cours</option>
             {courses.map((c) => (
@@ -467,7 +467,7 @@ export default function TeacherGrades() {
           <select
             value={filterTrimester}
             onChange={(e) => setFilterTrimester(e.target.value)}
-            className="w-40 h-10 border border-input rounded-lg px-3 bg-background text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer font-medium"
+            className="w-full sm:w-40 h-10 border border-input rounded-lg px-3 bg-background text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer font-medium"
           >
             <option value="1">Trimestre 1</option>
             <option value="2">Trimestre 2</option>
@@ -475,7 +475,7 @@ export default function TeacherGrades() {
           </select>
 
           {!filterCourseId && (
-            <div className="ml-auto flex items-center gap-4 text-sm text-muted-foreground">
+            <div className="w-full sm:ml-auto flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <Calculator className="h-4 w-4 text-blue-500" />
                 Moyenne globale: <strong className="text-foreground">{getClassAverage()}</strong>/20
@@ -524,7 +524,7 @@ export default function TeacherGrades() {
               <CardTitle className="text-base flex items-center gap-2">🟢 Grille de notation rapide</CardTitle>
               <CardDescription>Saisissez les notes. La validation s'effectue automatiquement lorsque vous quittez la case (perte de focus).</CardDescription>
             </CardHeader>
-            <div className="overflow-x-auto">
+            <div className="hidden md:block overflow-x-auto">
               <Table className="text-sm min-w-[700px]">
                 <TableHeader>
                   <TableRow className="bg-muted/30">
@@ -539,7 +539,7 @@ export default function TeacherGrades() {
                     const score = gridScores[student.id] || '';
                     const comment = gridComments[student.id] || '';
                     const hasGrade = score !== '';
-                    
+                     
                     return (
                       <TableRow key={student.id} className="hover:bg-muted/10">
                         <TableCell className="pl-6 font-semibold">{student.fullName}</TableCell>
@@ -579,6 +579,49 @@ export default function TeacherGrades() {
                 </TableBody>
               </Table>
             </div>
+            <div className="block md:hidden space-y-3 p-4">
+              {gridStudents.map((student) => {
+                const score = gridScores[student.id] || '';
+                const comment = gridComments[student.id] || '';
+                const hasGrade = score !== '';
+                return (
+                  <div key={student.id} className="rounded-xl border border-border bg-background/80 p-3 shadow-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-semibold text-sm">{student.fullName}</p>
+                        <p className="text-xs text-muted-foreground">Saisie rapide</p>
+                      </div>
+                      {hasGrade ? (
+                        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 gap-1"><Check className="w-3 h-3" /> Validé</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground bg-muted/40">À saisir</Badge>
+                      )}
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.25"
+                        min="0"
+                        max="20"
+                        placeholder="Note /20"
+                        className="text-center font-bold text-sm h-10 rounded-lg"
+                        value={score}
+                        onChange={(e) => setGridScores({ ...gridScores, [student.id]: e.target.value })}
+                        onBlur={() => handleAutoSave(student.id, score, comment)}
+                      />
+                      <Input
+                        placeholder="Appréciation"
+                        className="h-10 rounded-lg text-xs"
+                        value={comment}
+                        onChange={(e) => setGridComments({ ...gridComments, [student.id]: e.target.value })}
+                        onBlur={() => handleAutoSave(student.id, score, comment)}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </Card>
         </div>
       ) : (
@@ -605,7 +648,7 @@ export default function TeacherGrades() {
           ) : (
             <Card className="shadow-sm">
               <ScrollArea className="max-h-[500px]">
-                <div className="overflow-x-auto">
+                <div className="hidden md:block overflow-x-auto">
                   <Table className="min-w-[650px]">
                     <TableHeader>
                       <TableRow className="bg-muted/30 hover:bg-muted/30">
@@ -676,6 +719,44 @@ export default function TeacherGrades() {
                       </TableRow>
                     </TableBody>
                   </Table>
+                </div>
+                <div className="block md:hidden space-y-3 p-4">
+                  {grades.map((grade) => {
+                    const normalizedScore = (grade.score / grade.maxScore) * 20;
+                    return (
+                      <div key={grade.id} className="rounded-xl border border-border bg-background/80 p-3 shadow-sm">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="font-semibold text-sm">{grade.student?.fullName || getStudentName(grade.studentId)}</p>
+                            <p className="text-xs text-muted-foreground">{grade.course?.name || getCourseName(grade.courseId)}</p>
+                          </div>
+                          <Badge variant="outline" className="text-xs border-blue-200 text-blue-600 bg-blue-50">T{grade.trimester}</Badge>
+                        </div>
+                        <div className="mt-3 flex items-center justify-between gap-2">
+                          <span className={`inline-flex items-center justify-center rounded-lg px-2.5 py-1 text-sm font-bold shadow-sm ${
+                            normalizedScore >= 16 ? 'bg-green-50 text-green-700 border border-green-200' :
+                            normalizedScore >= 14 ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                            normalizedScore >= 12 ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' :
+                            normalizedScore >= 10 ? 'bg-orange-50 text-orange-700 border border-orange-200' :
+                            'bg-red-50 text-red-700 border border-red-200'
+                          }`}>
+                            {grade.score}/{grade.maxScore}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-blue-50 hover:text-blue-600 transition-colors" onClick={() => openEditDialog(grade)}>
+                              <Edit className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-red-50 hover:text-red-600 transition-colors" onClick={() => handleDelete(grade.id)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                        {grade.comment && (
+                          <p className="mt-2 text-xs text-muted-foreground">{grade.comment}</p>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </ScrollArea>
             </Card>

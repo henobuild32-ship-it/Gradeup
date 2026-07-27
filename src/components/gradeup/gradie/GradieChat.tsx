@@ -111,7 +111,7 @@ function MessageItem({ msg, idx, total, activeConversation, isStreaming, streami
           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center flex-shrink-0 mb-0.5 self-end shadow-md shadow-blue-500/20">
             <span className="text-white text-[10px] font-bold">G</span>
           </div>
-          <div className="message-bubble bg-[#E9E9EB] dark:bg-white/10 imessage-ai-bubble px-4 py-2.5 sm:px-5 sm:py-3 shadow-sm" style={{ maxWidth: '75%' }}>
+          <div className="message-bubble bg-[#E9E9EB] dark:bg-white/10 imessage-ai-bubble px-4 py-2.5 sm:px-5 sm:py-3 shadow-sm max-w-[92%] sm:max-w-[75%] w-fit">
             <p className="text-[10px] font-semibold text-[#007AFF] dark:text-blue-400 mb-0.5">Gradie</p>
             <div className="message-bubble-text break-words leading-relaxed text-black dark:text-white/90" dangerouslySetInnerHTML={{ __html: renderMessage(streamingContent) }} />
             <span className="inline-block w-[2px] h-[16px] bg-[#007AFF] animate-pulse ml-0.5 align-middle rounded-full" />
@@ -131,8 +131,7 @@ function MessageItem({ msg, idx, total, activeConversation, isStreaming, streami
         )}
 
         <div
-          className={`message-bubble px-4 py-2.5 sm:px-5 sm:py-3 shadow-sm group ${isUser ? 'bg-[#007AFF] text-white imessage-user-bubble' : 'bg-[#E9E9EB] dark:bg-white/10 text-black dark:text-white/90 imessage-ai-bubble'}`}
-          style={{ maxWidth: '75%' }}
+          className={`message-bubble px-4 py-2.5 sm:px-5 sm:py-3 shadow-sm group max-w-[92%] sm:max-w-[75%] w-fit ${isUser ? 'bg-[#007AFF] text-white imessage-user-bubble' : 'bg-[#E9E9EB] dark:bg-white/10 text-black dark:text-white/90 imessage-ai-bubble'}`}
         >
           {!isUser && (
             <p className="text-[10px] font-semibold text-[#007AFF] dark:text-blue-400 mb-0.5">Gradie</p>
@@ -412,11 +411,19 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
   useEffect(() => {
     const check = () => {
       const w = window.innerWidth;
-      setIsMobile(w < 768);
+      const mobile = w < 768;
+      setIsMobile(mobile);
       setIsTablet(w >= 768 && w < 1024);
-      if (w >= 768) { setSidebarOpen(true); setMobileSidebarOpen(false); } else { setSidebarOpen(false); }
+      setSidebarOpen(!mobile);
+      if (!mobile) setMobileSidebarOpen(false);
     };
-    check(); window.addEventListener('resize', check); return () => window.removeEventListener('resize', check);
+    check();
+    window.addEventListener('resize', check);
+    window.addEventListener('orientationchange', check);
+    return () => {
+      window.removeEventListener('resize', check);
+      window.removeEventListener('orientationchange', check);
+    };
   }, []);
 
   // ─── Cleanup ──────────────────────────────────────────────────────────────
@@ -500,10 +507,54 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
 
     try {
       const res = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: msg, schoolId, userId, context: userRole === 'STUDENT' ? 'grades' : userRole === 'TEACHER' ? 'teacher' : userRole === 'ADMIN' ? 'admin' : undefined, conversationId: convId }) });
-      if (!res.ok || !res.body) { let m = 'Erreur du serveur.'; try { const d = await res.json(); m = d.error || m; } catch { const t = await res.text().catch(() => ''); m = t ? t.slice(0, 240) : 'Erreur inconnue.'; } setError(m); setIsStreaming(false); return; }
+      if (!res.ok) {
+        let m = 'Erreur du serveur.';
+        try { const d = await res.json(); m = d.error || m; } catch { const t = await res.text().catch(() => ''); m = t ? t.slice(0, 240) : 'Erreur inconnue.'; }
+        setError(m);
+        setIsStreaming(false);
+        return;
+      }
 
-      const reader = res.body.getReader(); const decoder = new TextDecoder(); let acc = ''; let finalConvId = convId;
-      while (true) { const { done, value } = await reader.read(); if (done) break; const chunk = decoder.decode(value, { stream: true }); const lines = chunk.split('\n').filter(l => l.startsWith('data:')); for (const line of lines) { const json = line.replace(/^data:\s*/, '').trim(); try { const p = JSON.parse(json); if (p.token) { acc += p.token; setStreamingContent(acc); } if (p.conversationId) finalConvId = p.conversationId; if (p.done) { const am: AiMessage = { id: (Date.now() + 1).toString(), role: 'assistant', content: acc, createdAt: new Date().toISOString() }; setActiveConversation(p => p ? { ...p, messages: [...p.messages, am] } : null); setStreamingContent(''); } } catch { } } }
+      if (!res.body || typeof res.body.getReader !== 'function') {
+        const text = await res.text();
+        const parsed = text ? JSON.parse(text) : null;
+        const reply = parsed?.reply || parsed?.message || parsed?.response || text;
+        const am: AiMessage = { id: (Date.now() + 1).toString(), role: 'assistant', content: reply || 'Désolé, je n’ai pas pu générer de réponse.', createdAt: new Date().toISOString() };
+        setActiveConversation(p => p ? { ...p, messages: [...p.messages, am] } : null);
+        setStreamingContent('');
+        await loadConversations();
+        if (convId && convId !== activeConversation?.id) await loadConversation(convId);
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let acc = '';
+      let finalConvId = convId;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n').filter(l => l.startsWith('data:'));
+        for (const line of lines) {
+          const json = line.replace(/^data:\s*/, '').trim();
+          try {
+            const p = JSON.parse(json);
+            if (p.token) {
+              acc += p.token;
+              setStreamingContent(acc);
+            }
+            if (p.conversationId) finalConvId = p.conversationId;
+            if (p.done) {
+              const am: AiMessage = { id: (Date.now() + 1).toString(), role: 'assistant', content: acc, createdAt: new Date().toISOString() };
+              setActiveConversation(p => p ? { ...p, messages: [...p.messages, am] } : null);
+              setStreamingContent('');
+            }
+          } catch {
+            continue;
+          }
+        }
+      }
       await loadConversations();
       if (finalConvId && finalConvId !== activeConversation?.id) await loadConversation(finalConvId);
     } catch { setError('Impossible de contacter Gradie. Vérifiez votre connexion.'); } finally { setIsStreaming(false); }
@@ -528,7 +579,7 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
 
   const virtualizer = useVirtualizer({
     count: activeConversation?.messages?.length ?? 0,
-    getScrollElement: () => parentRef.current,
+    getScrollElement: () => messagesContainerRef.current,
     estimateSize: () => 120,
     overscan: 5,
     horizontal: false,
@@ -581,7 +632,7 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
         <div className="flex-1 flex flex-col min-w-0 h-full relative chat-container mx-auto w-full">
           {/* Header */}
           <header className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 border-b border-white/5 bg-black/20 backdrop-blur-sm flex-shrink-0 z-10">
-            <button onClick={() => isMobile ? setMobileSidebarOpen(true) : setSidebarOpen(!sidebarOpen)} className="text-white/60 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-all flex-shrink-0 min-w-[40px] min-h-[40px] flex items-center justify-center">{isMobile && !mobileSidebarOpen || !isMobile && !sidebarOpen ? <MessageSquare className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5 hidden sm:block" />}</button>
+            <button onClick={() => isMobile ? setMobileSidebarOpen((prev) => !prev) : setSidebarOpen(!sidebarOpen)} className="text-white/60 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-all flex-shrink-0 min-w-[40px] min-h-[40px] flex items-center justify-center">{(isMobile && !mobileSidebarOpen) || (!isMobile && !sidebarOpen) ? <MessageSquare className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}</button>
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-blue-500/20"><span className="text-white text-xs sm:text-sm font-bold">G</span></div>
               <div className="min-w-0"><p className="text-white font-semibold text-sm sm:text-base truncate">{activeConversation ? activeConversation.title : 'Gradie'}</p><div className="flex items-center gap-1.5"><span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" /><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" /></span><p className="text-white/40 text-[10px] sm:text-xs">En ligne</p></div></div>
@@ -604,7 +655,7 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
 
               {/* Virtualized messages */}
               {activeConversation && (
-                <div ref={messagesContainerRef} style={{ height: '100%', width: '100%' }}>
+                <div style={{ height: '100%', width: '100%' }}>
                   <div style={{ height: virtualizer.getTotalSize(), width: '100%', position: 'relative' }}>
                     {virtualizer.getVirtualItems().map((virtualRow) => (
                       <div key={virtualRow.key} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: virtualRow.size, transform: `translateY(${virtualRow.start}px)` }}>
@@ -695,16 +746,6 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
           </div>
         </div>
       </div>
-
-      {/* Mobile Sidebar Overlay close on route change */}
-      {isMobile && mobileSidebarOpen && <div className="fixed inset-0 z-30 md:hidden" onClick={() => setMobileSidebarOpen(false)} />}
-
-      {/* Sidebar Mobile Sheet (legacy) */}
-      {isMobile && mobileSidebarOpen && <div className="fixed inset-y-0 left-0 w-80 max-w-[85vw] z-50 transform transition-transform duration-300 translate-x-0"><Sidebar user={{ fullName: userName || 'Utilisateur', role: userRole || 'STUDENT', photoUrl: undefined }} conversations={conversations} activeConversation={activeConversation} search={search} setSearch={setSearch} loadConversations={loadConversations} loadConversation={loadConversation} createNewConversation={createNewConversation} toggleFavorite={toggleFavorite} togglePin={togglePin} deleteConversation={deleteConversation} deleteAllData={deleteAllData} isMobile={isMobile} mobileSidebarOpen={mobileSidebarOpen} setMobileSidebarOpen={setMobileSidebarOpen} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} formatDate={formatDate} /></div>}
-
-      {/* Legacy Sidebar Desktop */}
-      {!isMobile && <aside className={`${sidebarOpen ? 'w-72 lg:w-80' : 'w-0'} transition-all duration-300 flex-shrink-0 overflow-hidden`}><Sidebar user={{ fullName: userName || 'Utilisateur', role: userRole || 'STUDENT', photoUrl: undefined }} conversations={conversations} activeConversation={activeConversation} search={search} setSearch={setSearch} loadConversations={loadConversations} loadConversation={loadConversation} createNewConversation={createNewConversation} toggleFavorite={toggleFavorite} togglePin={togglePin} deleteConversation={deleteConversation} deleteAllData={deleteAllData} isMobile={isMobile} mobileSidebarOpen={mobileSidebarOpen} setMobileSidebarOpen={setMobileSidebarOpen} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} formatDate={formatDate} /></aside>}
-
     </>
   );
 }
