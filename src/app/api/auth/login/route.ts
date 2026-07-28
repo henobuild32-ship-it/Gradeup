@@ -26,38 +26,72 @@ export async function POST(request: NextRequest) {
         where: { email: { equals: normalizedSchoolEmail, mode: 'insensitive' } },
       });
       if (!school) {
-        return NextResponse.json(
-          { error: 'Aucune école trouvée avec cet email.' },
-          { status: 404 }
-        );
-      }
+        // Fallback : chercher un utilisateur ADMIN par email directement
+        const adminUser = await db.user.findFirst({
+          where: {
+            email: { equals: normalizedSchoolEmail, mode: 'insensitive' },
+            role: 'ADMIN',
+          },
+          include: {
+            school: true,
+            classEnrollments: { include: { class: true } },
+            children: true,
+          },
+        });
+        if (adminUser && (await verifyPassword(password, adminUser.password))) {
+          user = adminUser;
+          school = adminUser.school;
+        } else {
+          return NextResponse.json(
+            { error: 'Aucun compte administrateur trouvé avec cet email.' },
+            { status: 404 }
+          );
+        }
+      } else {
+        // Vérifier le mot de passe de l'école OU du compte admin
+        let passwordMatch = false;
 
-      // Vérifier le mot de passe de l'école
-      if (!(await verifyPassword(password, school.password))) {
-        return NextResponse.json(
-          { error: 'Mot de passe incorrect.' },
-          { status: 401 }
-        );
-      }
+        // 1) Essayer le mot de passe de l'école
+        if (school.password) {
+          passwordMatch = await verifyPassword(password, school.password);
+        }
 
-      // Trouver l'admin de cette école
-      user = await db.user.findFirst({
-        where: {
-          schoolId: school.id,
-          role: 'ADMIN',
-        },
-        include: {
-          school: true,
-          classEnrollments: { include: { class: true } },
-          children: true,
-        },
-      });
+        // 2) Si ça ne marche pas, trouver l'admin et vérifier son mot de passe
+        if (!passwordMatch) {
+          const adminCandidate = await db.user.findFirst({
+            where: { schoolId: school.id, role: 'ADMIN' },
+          });
+          if (adminCandidate) {
+            passwordMatch = await verifyPassword(password, adminCandidate.password);
+          }
+        }
 
-      if (!user) {
-        return NextResponse.json(
-          { error: 'Compte administrateur introuvable pour cette école.' },
-          { status: 404 }
-        );
+        if (!passwordMatch) {
+          return NextResponse.json(
+            { error: 'Mot de passe incorrect.' },
+            { status: 401 }
+          );
+        }
+
+        // Trouver l'admin de cette école
+        user = await db.user.findFirst({
+          where: {
+            schoolId: school.id,
+            role: 'ADMIN',
+          },
+          include: {
+            school: true,
+            classEnrollments: { include: { class: true } },
+            children: true,
+          },
+        });
+
+        if (!user) {
+          return NextResponse.json(
+            { error: 'Compte administrateur introuvable pour cette école.' },
+            { status: 404 }
+          );
+        }
       }
 
     // ====== USER LOGIN : par code école + nom + mot de passe ======
@@ -79,7 +113,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Chercher un utilisateur par email si fourni
-      if (email) {
+      if (email && email.trim()) {
         const normalizedEmail = email.trim().toLowerCase();
         const candidate = await db.user.findFirst({
           where: { schoolId: school.id, email: { equals: normalizedEmail, mode: 'insensitive' } },
@@ -91,14 +125,21 @@ export async function POST(request: NextRequest) {
         });
         if (candidate && (await verifyPassword(password, candidate.password))) {
           user = candidate;
+        } else if (candidate && !await verifyPassword(password, candidate.password)) {
+          // Email trouvé mais mauvais mot de passe
+          return NextResponse.json(
+            { error: 'Mot de passe incorrect.' },
+            { status: 401 }
+          );
         }
       }
 
       // Si l'email n'a pas permis de trouver l'utilisateur, on tente avec le nom complet
-      if (!user && fullName) {
+      if (!user && fullName && fullName.trim()) {
         const allUsers = await db.user.findMany({
           where: {
             schoolId: school.id,
+            active: true,
           },
           include: {
             school: true,
@@ -118,11 +159,19 @@ export async function POST(request: NextRequest) {
             break;
           }
         }
+
+        if (!user && candidates.length > 0) {
+          // Utilisateur trouvé mais mauvais mot de passe
+          return NextResponse.json(
+            { error: 'Mot de passe incorrect.' },
+            { status: 401 }
+          );
+        }
       }
 
       if (!user) {
         return NextResponse.json(
-          { error: 'Nom ou mot de passe incorrect.' },
+          { error: 'Identifiant introuvable. Vérifiez votre nom, email et code école.' },
           { status: 401 }
         );
       }
@@ -136,17 +185,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Vérifier le statut d'abonnement de l'école (sauf pour l'admin, qui doit pouvoir se connecter)
+    // Vérifier le statut d'abonnement de l'école
+    // L'admin peut toujours se connecter même si abonnement expiré
     if (user.role !== 'ADMIN') {
-      const status = school.subscriptionStatus;
-      const expiry = school.subscriptionExpiry;
+      const status = school!.subscriptionStatus;
+      const expiry = school!.subscriptionExpiry;
       if (status === 'suspended') {
         return NextResponse.json(
           { error: 'L\'accès à cet établissement est actuellement suspendu. Contactez votre administrateur.' },
           { status: 403 }
         );
       }
-      if (status === 'expired' || (expiry && new Date(expiry) < new Date())) {
+      // Seulement bloquer si EXPLICITEMENT 'expired', ignorer la date expirée pour les utilisateurs normaux
+      if (status === 'expired') {
         return NextResponse.json(
           { error: 'L\'abonnement de cet établissement a expiré. Contactez votre administrateur.' },
           { status: 403 }
@@ -154,13 +205,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const resolvedSchool = (user as any).school || school!;
     const response = NextResponse.json({
-      user: serializeUser(user, user.school || school),
+      user: serializeUser(user, resolvedSchool),
     });
-    setAuthCookies(response, user, user.school || school);
+    setAuthCookies(response, user, resolvedSchool);
     return response;
   } catch (error: unknown) {
+    console.error('[LOGIN ERROR]', error);
     const message = error instanceof Error ? error.message : 'Erreur interne du serveur.';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: `Erreur serveur: ${message}` }, { status: 500 });
   }
 }

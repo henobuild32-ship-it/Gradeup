@@ -162,6 +162,7 @@ export default function AuthPage() {
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginIsAdmin, setLoginIsAdmin] = useState(false);
   const [loginEmail, setLoginEmail] = useState('');
+  const [loginIdentity, setLoginIdentity] = useState(''); // champ unifié email ou nom
   const [loginRole, setLoginRole] = useState<UserRole>('STUDENT');
 
   // Register school state
@@ -242,16 +243,22 @@ export default function AuthPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loginLoading) return;
+
+    // Résoudre l'identité : email ou nom complet
+    const identityValue = loginIdentity.trim();
+    const resolvedEmail = (!loginIsAdmin && identityValue.includes('@')) ? identityValue : (loginIsAdmin ? loginEmail.trim() : '');
+    const resolvedFullName = (!loginIsAdmin && !identityValue.includes('@')) ? identityValue : '';
+
     if (loginIsAdmin) {
       if (!loginEmail.trim() || !loginPassword) {
         toast({ title: 'Champs requis', description: 'Veuillez remplir votre email et votre mot de passe.', variant: 'destructive' });
         return;
       }
     } else {
-      if (!loginInviteCode.trim() || !loginPassword || (!loginEmail.trim() && !loginFullName.trim())) {
+      if (!loginInviteCode.trim() || !loginPassword || !identityValue) {
         toast({
           title: 'Champs requis',
-          description: 'Veuillez renseigner le code école, le mot de passe et votre email ou nom complet.',
+          description: 'Veuillez renseigner le code école, votre email ou nom complet, et votre mot de passe.',
           variant: 'destructive',
         });
         return;
@@ -259,16 +266,24 @@ export default function AuthPage() {
     }
     setLoginLoading(true);
     try {
+      const payload = loginIsAdmin
+        ? {
+            isAdminLogin: true,
+            email: loginEmail.trim(),
+            password: loginPassword,
+          }
+        : {
+            isAdminLogin: false,
+            inviteCode: loginInviteCode.toUpperCase().trim(),
+            email: resolvedEmail || undefined,
+            fullName: resolvedFullName || undefined,
+            password: loginPassword,
+          };
+
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          inviteCode: loginIsAdmin ? undefined : loginInviteCode.toUpperCase().trim(),
-          email: loginEmail.trim() || undefined,
-          isAdminLogin: loginIsAdmin,
-          fullName: loginFullName.trim() || undefined,
-          password: loginPassword,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -278,7 +293,7 @@ export default function AuthPage() {
       setUser(data.user);
       const dashboardPage = roleDashboardMap[data.user.role as UserRole];
       setCurrentPage(dashboardPage);
-      toast({ title: 'Connexion réussie', description: `Bienvenue sur GradeUp, ${data.user.fullName} !` });
+      toast({ title: '✅ Connexion réussie !', description: `Bienvenue sur GradeUp, ${data.user.fullName} !` });
     } catch (err) {
       const isNetworkError = err instanceof TypeError && err.message.includes('fetch');
       toast({
@@ -887,25 +902,24 @@ export default function AuthPage() {
                   <div className="space-y-1.5">
                     <Label htmlFor="login-identity" className="text-xs font-bold flex items-center gap-1.5">
                       <User className="w-3.5 h-3.5 text-indigo-500" />
-                      Email ou Nom Complet
+                      {loginIdentity.includes('@') ? 'Email' : loginIdentity ? 'Nom Complet' : 'Email ou Nom Complet'}
                     </Label>
                     <Input
                       id="login-identity"
-                      placeholder="Jean Dupont ou jean@exemple.com"
-                      value={loginEmail || loginFullName}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val.includes('@')) {
-                          setLoginEmail(val);
-                          setLoginFullName('');
-                        } else {
-                          setLoginFullName(val);
-                          setLoginEmail('');
-                        }
-                      }}
+                      placeholder="Jean Dupont  ou  jean@exemple.com"
+                      value={loginIdentity}
+                      onChange={(e) => setLoginIdentity(e.target.value)}
+                      autoComplete="username"
                       className="h-11 rounded-xl"
                       required
                     />
+                    <p className="text-[11px] text-muted-foreground">
+                      {loginIdentity.includes('@')
+                        ? '✉️ Connexion par adresse email détectée'
+                        : loginIdentity
+                        ? '👤 Connexion par nom complet détectée'
+                        : 'Entrez votre email ou votre nom complet (exactement comme enregistré).'}
+                    </p>
                   </div>
                 </>
               ) : (
@@ -990,6 +1004,7 @@ export default function AuthPage() {
                       setLoginIsAdmin(true);
                       setLoginEmail('admin@demo.com');
                       setLoginPassword('admin123');
+                      setLoginIdentity('');
                     }}
                     variant="outline"
                     className="cursor-pointer hover:bg-amber-500/10 text-[10px] py-1"
@@ -1000,7 +1015,9 @@ export default function AuthPage() {
                     onClick={() => {
                       setLoginIsAdmin(false);
                       setLoginInviteCode('DEMO2026');
+                      setLoginIdentity('Professeur Démo');
                       setLoginFullName('Professeur Démo');
+                      setLoginEmail('');
                       setLoginPassword('prof123');
                     }}
                     variant="outline"
@@ -1012,7 +1029,9 @@ export default function AuthPage() {
                     onClick={() => {
                       setLoginIsAdmin(false);
                       setLoginInviteCode('DEMO2026');
+                      setLoginIdentity('Élève Démo');
                       setLoginFullName('Élève Démo');
+                      setLoginEmail('');
                       setLoginPassword('eleve123');
                     }}
                     variant="outline"
