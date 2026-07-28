@@ -256,6 +256,7 @@ const pageTitles: Record<PageView, string> = {
   'student-ai': 'IA Gradie',
   'student-homework': 'Devoirs',
   'student-notifications': 'Notifications',
+  'student-payments': 'Paiements élève',
   'parent-dashboard': 'Tableau de bord',
   'parent-grades': 'Suivi scolaire',
   'parent-bulletins': 'Bulletins',
