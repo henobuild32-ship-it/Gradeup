@@ -17,8 +17,7 @@ export async function hashPassword(password: string): Promise<string> {
 
 /**
  * Vérifie un mot de passe contre la valeur stockée.
- * Rétro-compatible : si la valeur stockée n'est pas au format scrypt (données
- * existantes en clair), compare directement (fallback legacy).
+ * Rétro-compatible avec le format scrypt (scrypt$salt:hash), scrypt$salt$hash et legacy en clair.
  */
 export async function verifyPassword(
   password: string,
@@ -26,15 +25,28 @@ export async function verifyPassword(
 ): Promise<boolean> {
   if (!stored) return false;
 
+  // Mot de passe en clair (legacy / dev)
   if (!stored.startsWith(PREFIX)) {
     return stored === password;
   }
 
-  const [, salt, hash] = stored.split(':');
+  // Extraire la partie après 'scrypt$'
+  const rest = stored.slice(PREFIX.length);
+  // Séparer par ':' ou par '$' pour une compatibilité maximale
+  const parts = rest.includes(':') ? rest.split(':') : rest.split('$');
+  
+  if (parts.length < 2) return false;
+
+  const [salt, hash] = parts;
   if (!salt || !hash) return false;
 
-  const derived = (await scryptAsync(password, salt, 64)) as Buffer;
-  const hashBuf = Buffer.from(hash, 'hex');
-  if (derived.length !== hashBuf.length) return false;
-  return timingSafeEqual(derived, hashBuf);
+  try {
+    const derived = (await scryptAsync(password, salt, 64)) as Buffer;
+    const hashBuf = Buffer.from(hash, 'hex');
+    if (derived.length !== hashBuf.length) return false;
+    return timingSafeEqual(derived, hashBuf);
+  } catch (error) {
+    console.error('[PasswordVerify] Scrypt error:', error);
+    return false;
+  }
 }
