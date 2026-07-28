@@ -171,14 +171,15 @@ export default function AuthPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loginLoading) return; // Prevent double-submit
     if (loginIsAdmin) {
-      if (!loginEmail || !loginPassword) {
-        toast({ title: 'Erreur', description: 'Veuillez remplir votre email et mot de passe.', variant: 'destructive' });
+      if (!loginEmail.trim() || !loginPassword) {
+        toast({ title: 'Champs manquants', description: 'Veuillez remplir votre email et mot de passe.', variant: 'destructive' });
         return;
       }
     } else {
-      if (!loginInviteCode || !loginPassword || (!loginEmail.trim() && !loginFullName.trim())) {
-        toast({ title: 'Erreur', description: 'Veuillez remplir le code école, le mot de passe et au moins votre email ou votre nom complet.', variant: 'destructive' });
+      if (!loginInviteCode.trim() || !loginPassword || (!loginEmail.trim() && !loginFullName.trim())) {
+        toast({ title: 'Champs manquants', description: 'Veuillez remplir le code école, le mot de passe et au moins votre email ou votre nom complet.', variant: 'destructive' });
         return;
       }
     }
@@ -197,16 +198,22 @@ export default function AuthPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast({ title: 'Erreur de connexion', description: data.error || 'Identifiants incorrects.', variant: 'destructive' });
+        toast({ title: 'Échec de la connexion', description: data.error || 'Identifiants incorrects. Vérifiez vos informations.', variant: 'destructive' });
         return;
       }
-      // Set user first, then set page
       setUser(data.user);
       const dashboardPage = roleDashboardMap[data.user.role as UserRole];
       setCurrentPage(dashboardPage);
-      toast({ title: 'Connexion réussie', description: `Bienvenue, ${data.user.fullName} !` });
-    } catch {
-      toast({ title: 'Erreur', description: 'Impossible de se connecter au serveur.', variant: 'destructive' });
+      toast({ title: '✅ Connexion réussie', description: `Bienvenue, ${data.user.fullName} !` });
+    } catch (err) {
+      const isNetworkError = err instanceof TypeError && err.message.includes('fetch');
+      toast({
+        title: 'Erreur de connexion',
+        description: isNetworkError
+          ? 'Impossible de joindre le serveur. Vérifiez votre connexion internet.'
+          : 'Une erreur inattendue s\'est produite. Réessayez.',
+        variant: 'destructive',
+      });
     } finally {
       setLoginLoading(false);
     }
@@ -214,16 +221,22 @@ export default function AuthPage() {
 
   const handleCreateSchool = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!regAdminName || !regSchoolName || !regEmail || !regPassword || !regConfirmPassword) {
-      toast({ title: 'Erreur', description: 'Veuillez remplir tous les champs.', variant: 'destructive' });
+    if (regLoading) return; // Prevent double-submit
+    if (!regAdminName.trim() || !regSchoolName.trim() || !regEmail.trim() || !regPassword || !regConfirmPassword) {
+      toast({ title: 'Champs manquants', description: 'Veuillez remplir tous les champs obligatoires.', variant: 'destructive' });
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(regEmail.trim())) {
+      toast({ title: 'Email invalide', description: 'Veuillez entrer une adresse email valide.', variant: 'destructive' });
       return;
     }
     if (regPassword !== regConfirmPassword) {
-      toast({ title: 'Erreur', description: 'Les mots de passe ne correspondent pas.', variant: 'destructive' });
+      toast({ title: 'Mots de passe différents', description: 'Les mots de passe ne correspondent pas.', variant: 'destructive' });
       return;
     }
     if (regPassword.length < 4) {
-      toast({ title: 'Erreur', description: 'Le mot de passe doit contenir au moins 4 caractères.', variant: 'destructive' });
+      toast({ title: 'Mot de passe trop court', description: 'Le mot de passe doit contenir au moins 4 caractères.', variant: 'destructive' });
       return;
     }
     setRegLoading(true);
@@ -233,9 +246,9 @@ export default function AuthPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: 'create-school',
-          fullName: regAdminName,
-          schoolName: regSchoolName,
-          email: regEmail,
+          fullName: regAdminName.trim(),
+          schoolName: regSchoolName.trim(),
+          email: regEmail.trim(),
           password: regPassword,
         }),
       });
@@ -247,9 +260,16 @@ export default function AuthPage() {
       setCreatedInviteCode(data.inviteCode);
       setUser(data.user);
       setCurrentPage('admin-dashboard');
-      toast({ title: 'École créée !', description: `Votre code école: ${data.inviteCode}`, duration: 8000 });
-    } catch {
-      toast({ title: 'Erreur', description: 'Impossible de se connecter au serveur.', variant: 'destructive' });
+      toast({ title: '🏫 École créée avec succès !', description: `Votre code école: ${data.inviteCode}`, duration: 10000 });
+    } catch (err) {
+      const isNetworkError = err instanceof TypeError;
+      toast({
+        title: 'Erreur',
+        description: isNetworkError
+          ? 'Impossible de joindre le serveur. Vérifiez votre connexion.'
+          : 'Impossible de créer l\'école. Réessayez.',
+        variant: 'destructive',
+      });
     } finally {
       setRegLoading(false);
     }
@@ -257,24 +277,29 @@ export default function AuthPage() {
 
   const handleJoinSchool = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!joinInviteCode || !joinFullName || !joinPassword || !joinConfirmPassword || !joinRole) {
-      toast({ title: 'Erreur', description: 'Veuillez remplir tous les champs obligatoires.', variant: 'destructive' });
+    if (joinLoading) return; // Prevent double-submit
+    if (!joinInviteCode.trim() || !joinFullName.trim() || !joinPassword || !joinConfirmPassword || !joinRole) {
+      toast({ title: 'Champs manquants', description: 'Veuillez remplir tous les champs obligatoires.', variant: 'destructive' });
+      return;
+    }
+    if (!codeVerified) {
+      toast({ title: 'Code école invalide', description: 'Vérifiez votre code école avec votre administrateur.', variant: 'destructive' });
       return;
     }
     if (joinPassword !== joinConfirmPassword) {
-      toast({ title: 'Erreur', description: 'Les mots de passe ne correspondent pas.', variant: 'destructive' });
+      toast({ title: 'Mots de passe différents', description: 'Les mots de passe ne correspondent pas.', variant: 'destructive' });
       return;
     }
     if (joinPassword.length < 4) {
-      toast({ title: 'Erreur', description: 'Le mot de passe doit contenir au moins 4 caractères.', variant: 'destructive' });
+      toast({ title: 'Mot de passe trop court', description: 'Le mot de passe doit contenir au moins 4 caractères.', variant: 'destructive' });
       return;
     }
     if (joinRole === 'STUDENT' && joinClassIds.length === 0) {
-      toast({ title: 'Erreur', description: 'Veuillez sélectionner au moins une classe.', variant: 'destructive' });
+      toast({ title: 'Classe requise', description: 'Veuillez sélectionner votre classe.', variant: 'destructive' });
       return;
     }
-    if (joinRole === 'PARENT' && !joinParentCode) {
-      toast({ title: 'Erreur', description: 'Le code parent est obligatoire.', variant: 'destructive' });
+    if (joinRole === 'PARENT' && !joinParentCode.trim()) {
+      toast({ title: 'Code parent requis', description: 'Le code parent est obligatoire. Demandez-le à votre enfant.', variant: 'destructive' });
       return;
     }
     setJoinLoading(true);
@@ -295,14 +320,21 @@ export default function AuthPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast({ title: "Erreur d'inscription", description: data.error || "Une erreur s'est produite.", variant: 'destructive' });
+        toast({ title: "Erreur d'inscription", description: data.error || "Une erreur s'est produite. Vérifiez vos informations.", variant: 'destructive' });
         return;
       }
       setUser(data.user);
       setCurrentPage(roleDashboardMap[joinRole]);
-      toast({ title: 'Bienvenue !', description: `Compte créé avec succès.` });
-    } catch {
-      toast({ title: 'Erreur', description: 'Impossible de se connecter au serveur.', variant: 'destructive' });
+      toast({ title: `✅ Bienvenue, ${data.user.fullName} !`, description: 'Votre compte a été créé avec succès.' });
+    } catch (err) {
+      const isNetworkError = err instanceof TypeError;
+      toast({
+        title: 'Erreur réseau',
+        description: isNetworkError
+          ? 'Impossible de joindre le serveur. Vérifiez votre connexion.'
+          : 'Une erreur inattendue s\'est produite. Réessayez.',
+        variant: 'destructive',
+      });
     } finally {
       setJoinLoading(false);
     }
@@ -315,7 +347,7 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row relative overflow-hidden">
+    <div className="min-h-screen flex flex-col lg:flex-row relative overflow-hidden" style={{ minHeight: '100dvh' }}>
       {/* Animated background */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-[10%] left-[60%] w-64 h-64 rounded-full bg-blue-100/40 animate-[pulse_4s_ease-in-out_infinite]" />

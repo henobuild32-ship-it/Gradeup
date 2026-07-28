@@ -81,9 +81,44 @@ export async function POST(request: NextRequest) {
         method: method || 'cash',
       },
       include: {
-        student: { select: { id: true, fullName: true, role: true } },
+        student: { select: { id: true, fullName: true, parentId: true } },
       },
     });
+
+    // Notify student and parent
+    try {
+      const { notifyUser } = await import('@/services/notifications/notificationEngine');
+      const amountStr = `${payment.amount} FCFA`;
+      const monthStr = payment.month ? ` (${payment.month})` : '';
+
+      // Student
+      notifyUser({
+        schoolId,
+        userId: studentId,
+        senderId: auth.userId,
+        title: `💳 Reçu de paiement : ${amountStr}`,
+        message: `Paiement enregistré pour la scolarité${monthStr}. Statut : ${payment.status}`,
+        type: 'PAYMENT',
+        priority: 'NORMAL',
+        metadata: { paymentId: payment.id, amount: payment.amount },
+      }).catch((e) => console.error('[Payment] Student notification error:', e));
+
+      // Parent
+      if (payment.student?.parentId) {
+        notifyUser({
+          schoolId,
+          userId: payment.student.parentId,
+          senderId: auth.userId,
+          title: `💳 Paiement scolarité (${payment.student.fullName})`,
+          message: `Paiement de ${amountStr}${monthStr} enregistré (${payment.status}).`,
+          type: 'PAYMENT',
+          priority: 'NORMAL',
+          metadata: { paymentId: payment.id, amount: payment.amount },
+        }).catch((e) => console.error('[Payment] Parent notification error:', e));
+      }
+    } catch (e) {
+      console.error('[Payment] Notification setup error:', e);
+    }
 
     return NextResponse.json({ payment }, { status: 201 });
   } catch (err: unknown) {

@@ -6,7 +6,13 @@ export type NotificationType =
   | 'GRADE'
   | 'CLASS'
   | 'MESSAGE'
-  | 'PROFILE';
+  | 'PROFILE'
+  | 'LESSON'
+  | 'HOMEWORK'
+  | 'HOMEWORK_SUBMISSION'
+  | 'ATTENDANCE'
+  | 'PAYMENT'
+  | 'REPORT_CARD';
 
 export type NotificationPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
 

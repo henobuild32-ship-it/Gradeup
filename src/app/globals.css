@@ -115,9 +115,44 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    box-sizing: border-box;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    overflow-x: hidden;
   }
   body {
     @apply bg-background text-foreground;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Prevent horizontal scroll globally */
+    max-width: 100vw;
+  }
+  /* Mobile: prevent text from being too small in inputs */
+  input, textarea, select {
+    font-size: 16px !important; /* Prevents iOS zoom on focus */
+  }
+  @media (min-width: 640px) {
+    input, textarea, select {
+      font-size: inherit !important;
+    }
+  }
+  /* Smooth scrolling on mobile */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+  /* Better tap targets on mobile */
+  button, [role="button"] {
+    touch-action: manipulation;
+    cursor: pointer;
+  }
+  /* Prevent images from overflowing */
+  img {
+    max-width: 100%;
+    height: auto;
   }
 }
 
@@ -270,3 +305,55 @@
 .stagger-children > *:nth-child(6) { animation-delay: 300ms; }
 .stagger-children > *:nth-child(7) { animation-delay: 360ms; }
 .stagger-children > *:nth-child(8) { animation-delay: 420ms; }
+
+/* ===== Mobile-specific utilities ===== */
+
+/* Prevent content from being clipped on mobile */
+@media (max-width: 640px) {
+  /* Make tables horizontally scrollable */
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* Reduce padding in cards on mobile */
+  .mobile-compact {
+    padding: 0.75rem;
+  }
+}
+
+/* Safe area paddings for notched phones */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+/* AI streaming cursor blink */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.animate-blink {
+  animation: blink 1s step-end infinite;
+}
+
+/* No horizontal overflow anywhere */
+.no-overflow-x {
+  overflow-x: hidden !important;
+  max-width: 100vw;
+}
+
+/* Touch-friendly minimum target size */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Scrollable content areas on mobile */
+.scroll-area-mobile {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+

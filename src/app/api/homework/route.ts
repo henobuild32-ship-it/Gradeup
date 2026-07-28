@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
+import { notifyUser } from '@/services/notifications/notificationEngine';
 
 export async function GET(request: NextRequest) {
   try {
@@ -92,6 +93,25 @@ export async function POST(request: NextRequest) {
         },
       },
     });
+
+    const courseObj = await db.course.findUnique({
+      where: { id: courseId },
+      select: { classId: true, name: true },
+    });
+
+    if (courseObj?.classId) {
+      notifyUser({
+        schoolId,
+        targetRole: 'STUDENT',
+        targetClassId: courseObj.classId,
+        senderId: teacherId,
+        title: `📝 Nouveau devoir : ${title}`,
+        message: `Devoir en ${courseObj.name}${dueDate ? ' à rendre pour le ' + dueDate : ''}.`,
+        type: 'HOMEWORK',
+        priority: 'HIGH',
+        metadata: { homeworkId: homework.id, courseId },
+      }).catch((err) => console.error('[Homework] Notification trigger error:', err));
+    }
 
     return NextResponse.json({ homework }, { status: 201 });
   } catch (error: unknown) {

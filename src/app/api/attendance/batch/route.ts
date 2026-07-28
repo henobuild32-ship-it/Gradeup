@@ -48,6 +48,58 @@ export async function POST(request: NextRequest) {
       )
     );
 
+    // Trigger background notifications for absent or late students
+    (async () => {
+      try {
+        const { notifyUser } = await import('@/services/notifications/notificationEngine');
+        const absentOrLateRecords = records.filter(
+          (r: any) => r.status === 'absent' || r.status === 'late'
+        );
+
+        if (absentOrLateRecords.length === 0) return;
+
+        const studentIds = absentOrLateRecords.map((r: any) => r.studentId);
+        const students = await db.user.findMany({
+          where: { id: { in: studentIds } },
+          select: { id: true, fullName: true, parentId: true },
+        });
+        const studentMap = new Map(students.map((s) => [s.id, s]));
+
+        for (const record of absentOrLateRecords) {
+          const student = studentMap.get(record.studentId);
+          const label = record.status === 'absent' ? 'Absence' : 'Retard';
+
+          // Student
+          notifyUser({
+            schoolId,
+            userId: record.studentId,
+            senderId: teacherId,
+            title: `⚠️ Notification : ${label}`,
+            message: `Vous avez été marqué(e) ${record.status} le ${date}.`,
+            type: 'ATTENDANCE',
+            priority: 'HIGH',
+            metadata: { date },
+          }).catch(() => {});
+
+          // Parent
+          if (student?.parentId) {
+            notifyUser({
+              schoolId,
+              userId: student.parentId,
+              senderId: teacherId,
+              title: `⚠️ ${label} de ${student.fullName}`,
+              message: `${student.fullName} a été marqué(e) ${record.status} le ${date}.`,
+              type: 'ATTENDANCE',
+              priority: 'HIGH',
+              metadata: { date },
+            }).catch(() => {});
+          }
+        }
+      } catch (e) {
+        console.error('[AttendanceBatch] Notification error:', e);
+      }
+    })();
+
     return NextResponse.json({ success: true, count: results.length }, { status: 200 });
   } catch (err: unknown) {
     if (err instanceof AuthError) {

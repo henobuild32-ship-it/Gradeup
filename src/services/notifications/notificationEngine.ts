@@ -65,11 +65,24 @@ export async function notifyUser(input: CreateNotificationInput) {
 function getRouteForNotificationType(type: string): string {
   switch (type) {
     case 'CONFERENCE':
-      return '/conferences';
+      return '/meetings';
     case 'MESSAGE':
       return '/messages';
     case 'CARD':
       return '/admin-cards';
+    case 'LESSON':
+      return '/lessons';
+    case 'HOMEWORK':
+    case 'HOMEWORK_SUBMISSION':
+      return '/homework';
+    case 'GRADE':
+      return '/grades';
+    case 'ATTENDANCE':
+      return '/attendance';
+    case 'PAYMENT':
+      return '/payments';
+    case 'REPORT_CARD':
+      return '/bulletins';
     default:
       return '/';
   }

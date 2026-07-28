@@ -99,18 +99,20 @@ export async function PUT(request: Request) {
     if (status === 'pending_admin' && teacherId) {
       const report = await db.reportCard.findUnique({
         where: { id },
-        select: { schoolId: true, student: { select: { id: true } } },
+        select: { schoolId: true, student: { select: { id: true, fullName: true } } },
       });
       if (report) {
         try {
-          await db.notification.create({
-            data: {
-              schoolId: report.schoolId,
-              title: 'Bulletin transmis par un professeur',
-              message: `Un bulletin a été créé et transmis pour validation.`,
-              type: 'report',
-              senderId: teacherId,
-            },
+          const { notifyUser } = await import('@/services/notifications/notificationEngine');
+          await notifyUser({
+            schoolId: report.schoolId,
+            targetRole: 'ADMIN',
+            title: '📄 Bulletin transmis par un professeur',
+            message: `Un bulletin pour ${report.student.fullName} a été créé et transmis pour validation.`,
+            type: 'REPORT_CARD',
+            priority: 'HIGH',
+            senderId: teacherId,
+            metadata: { reportCardId: id },
           });
         } catch { /* non-blocking */ }
       }
@@ -120,28 +122,34 @@ export async function PUT(request: Request) {
     if (status === 'published') {
       const report = await db.reportCard.findUnique({
         where: { id },
-        select: { schoolId: true, trimester: true, studentId: true, student: { select: { id: true, parentId: true } } },
+        select: { schoolId: true, trimester: true, studentId: true, averageGrade: true, mention: true, student: { select: { id: true, fullName: true, parentId: true } } },
       });
       if (report) {
         try {
-          await db.notification.create({
-            data: {
-              schoolId: report.schoolId,
-              userId: report.studentId,
-              title: 'Bulletin publié',
-              message: `Votre bulletin du trimestre ${report.trimester} est maintenant disponible.`,
-              type: 'report',
-            },
+          const { notifyUser } = await import('@/services/notifications/notificationEngine');
+          const avgStr = report.averageGrade ? ` (Moyenne : ${report.averageGrade}/20)` : '';
+
+          // Student
+          await notifyUser({
+            schoolId: report.schoolId,
+            userId: report.studentId,
+            title: `📑 Bulletin publié (Trimestre ${report.trimester})`,
+            message: `Votre bulletin du trimestre ${report.trimester} est maintenant disponible${avgStr}.`,
+            type: 'REPORT_CARD',
+            priority: 'HIGH',
+            metadata: { reportCardId: id },
           });
+
+          // Parent
           if (report.student?.parentId) {
-            await db.notification.create({
-              data: {
-                schoolId: report.schoolId,
-                userId: report.student.parentId,
-                title: 'Bulletin disponible',
-                message: `Le bulletin de votre enfant pour le trimestre ${report.trimester} est maintenant disponible.`,
-                type: 'report',
-              },
+            await notifyUser({
+              schoolId: report.schoolId,
+              userId: report.student.parentId,
+              title: `📑 Bulletin de ${report.student.fullName} (Trimestre ${report.trimester})`,
+              message: `Le bulletin de votre enfant pour le trimestre ${report.trimester} est disponible${avgStr}.`,
+              type: 'REPORT_CARD',
+              priority: 'HIGH',
+              metadata: { reportCardId: id },
             });
           }
         } catch { /* non-blocking */ }

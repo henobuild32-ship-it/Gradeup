@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
+import { notifyUser } from '@/services/notifications/notificationEngine';
 
 export async function GET(request: NextRequest) {
   try {
@@ -121,6 +122,20 @@ export async function POST(request: NextRequest) {
         },
       },
     });
+
+    if (lesson.course?.classId) {
+      notifyUser({
+        schoolId,
+        targetRole: 'STUDENT',
+        targetClassId: lesson.course.classId,
+        senderId: teacherId,
+        title: `📚 Nouveau cours : ${title}`,
+        message: `${lesson.teacher?.fullName || 'Votre professeur'} a publié la leçon "${title}" pour le cours de ${lesson.course.name}.`,
+        type: 'LESSON',
+        priority: 'NORMAL',
+        metadata: { lessonId: lesson.id, courseId },
+      }).catch((err) => console.error('[Lessons] Notification trigger error:', err));
+    }
 
     return NextResponse.json({ lesson }, { status: 201 });
   } catch (error: unknown) {

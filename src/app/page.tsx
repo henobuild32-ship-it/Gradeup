@@ -54,6 +54,7 @@ const TeacherHomework = dynamic(() => import('@/components/gradeup/teacher-homew
 const TeacherAttendance = dynamic(() => import('@/components/gradeup/teacher-attendance'), { ssr: false, loading: () => <PageSkeleton /> });
 const TeacherSchedules = dynamic(() => import('@/components/gradeup/schedules-page'), { ssr: false, loading: () => <PageSkeleton /> });
 const TeacherAI = dynamic(() => import('@/components/gradeup/teacher-ai'), { ssr: false, loading: () => <PageSkeleton /> });
+const TeacherNotifications = dynamic(() => import('@/components/gradeup/teacher-notifications'), { ssr: false, loading: () => <PageSkeleton /> });
 const StudentDashboard = dynamic(() => import('@/components/gradeup/student-dashboard'), { ssr: false, loading: () => <PageSkeleton /> });
 const StudentCourses = dynamic(() => import('@/components/gradeup/student-courses'), { ssr: false, loading: () => <PageSkeleton /> });
 const StudentLessons = dynamic(() => import('@/components/gradeup/student-lessons'), { ssr: false, loading: () => <PageSkeleton /> });
@@ -113,6 +114,7 @@ function PageRouter({ page }: { page: PageView }) {
   if (page === 'teacher-attendance') return <TeacherAttendance />;
   if (page === 'teacher-schedules') return <TeacherSchedules />;
   if (page === 'teacher-ai') return <TeacherAI />;
+  if (page === 'teacher-notifications') return <TeacherNotifications />;
   if (page === 'teacher-end-of-year') return <EndOfYear />;
   if (page === 'student-dashboard') return <StudentDashboard />;
   if (page === 'student-courses') return <StudentCourses />;

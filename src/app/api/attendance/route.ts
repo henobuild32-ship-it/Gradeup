@@ -94,9 +94,42 @@ export async function POST(request: NextRequest) {
         reason: reason || '',
       },
       include: {
-        student: { select: { id: true, fullName: true, role: true } },
+        student: { select: { id: true, fullName: true, parentId: true } },
       },
     });
+
+    if (attendance.status === 'absent' || attendance.status === 'late') {
+      try {
+        const { notifyUser } = await import('@/services/notifications/notificationEngine');
+        const label = attendance.status === 'absent' ? 'Absence' : 'Retard';
+        
+        // Student
+        notifyUser({
+          schoolId,
+          userId: studentId,
+          senderId: teacherId,
+          title: `⚠️ Notification : ${label}`,
+          message: `Vous avez été marqué(e) ${attendance.status} le ${date}.`,
+          type: 'ATTENDANCE',
+          priority: 'HIGH',
+          metadata: { attendanceId: attendance.id, date },
+        }).catch((e) => console.error('[Attendance] Student notification error:', e));
+
+        // Parent
+        if (attendance.student?.parentId) {
+          notifyUser({
+            schoolId,
+            userId: attendance.student.parentId,
+            senderId: teacherId,
+            title: `⚠️ ${label} de ${attendance.student.fullName}`,
+            message: `${attendance.student.fullName} a été marqué(e) ${attendance.status} le ${date}.`,
+            type: 'ATTENDANCE',
+            priority: 'HIGH',
+            metadata: { attendanceId: attendance.id, date },
+          }).catch((e) => console.error('[Attendance] Parent notification error:', e));
+        }
+      } catch (e) { console.error('[Attendance] Notification setup error:', e); }
+    }
 
     return NextResponse.json({ attendance }, { status: 201 });
   } catch (err: unknown) {

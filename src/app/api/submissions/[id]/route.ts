@@ -27,9 +27,42 @@ export async function PUT(
         status: 'graded',
       },
       include: {
-        student: { select: { id: true, fullName: true, photoUrl: true } },
+        student: { select: { id: true, fullName: true, parentId: true } },
+        homework: { select: { title: true } },
       },
     });
+
+    if (submission.studentId) {
+      const { notifyUser } = await import('@/services/notifications/notificationEngine');
+      const scoreText = `${submission.score !== null ? submission.score : '-'}/${submission.maxScore || 20}`;
+      const hwTitle = submission.homework?.title || 'Devoir';
+
+      // Notify Student
+      notifyUser({
+        schoolId: submission.schoolId,
+        userId: submission.studentId,
+        senderId: auth.userId,
+        title: `✅ Devoir corrigé : ${hwTitle}`,
+        message: `Votre devoir a été corrigé. Note : ${scoreText}`,
+        type: 'GRADE',
+        priority: 'HIGH',
+        metadata: { submissionId: submission.id },
+      }).catch((e) => console.error('[Grading] Student notification error:', e));
+
+      // Notify Parent
+      if (submission.student?.parentId) {
+        notifyUser({
+          schoolId: submission.schoolId,
+          userId: submission.student.parentId,
+          senderId: auth.userId,
+          title: `✅ Devoir corrigé (${submission.student.fullName})`,
+          message: `${hwTitle} : Note ${scoreText}`,
+          type: 'GRADE',
+          priority: 'HIGH',
+          metadata: { submissionId: submission.id },
+        }).catch((e) => console.error('[Grading] Parent notification error:', e));
+      }
+    }
 
     return NextResponse.json({ submission });
   } catch (err: unknown) {

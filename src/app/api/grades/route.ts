@@ -89,12 +89,45 @@ export async function POST(request: NextRequest) {
       },
       include: {
         course: { select: { id: true, name: true } },
-        student: { select: { id: true, fullName: true, role: true } },
+        student: { select: { id: true, fullName: true, parentId: true } },
         teacher: { select: { id: true, fullName: true, role: true } },
       },
     });
 
     syncStudentReport(schoolId, studentId, trimester || '1').catch(() => {});
+
+    // Trigger real-time and push notifications for student & parent
+    try {
+      const { notifyUser } = await import('@/services/notifications/notificationEngine');
+      const courseName = grade.course?.name || 'Matière';
+      const scoreStr = `${grade.score}/${grade.maxScore}`;
+
+      // Notify Student
+      notifyUser({
+        schoolId,
+        userId: studentId,
+        senderId: teacherId,
+        title: `📊 Nouvelle note : ${courseName}`,
+        message: `Note obtenue : ${scoreStr} (Trimestre ${grade.trimester})${grade.comment ? ' — ' + grade.comment : ''}`,
+        type: 'GRADE',
+        priority: 'HIGH',
+        metadata: { gradeId: grade.id, courseId },
+      }).catch((e) => console.error('[Grade] Student notification error:', e));
+
+      // Notify Parent
+      if (grade.student?.parentId) {
+        notifyUser({
+          schoolId,
+          userId: grade.student.parentId,
+          senderId: teacherId,
+          title: `📊 Note pour ${grade.student.fullName} (${courseName})`,
+          message: `Note : ${scoreStr} (Trimestre ${grade.trimester})`,
+          type: 'GRADE',
+          priority: 'HIGH',
+          metadata: { gradeId: grade.id, courseId },
+        }).catch((e) => console.error('[Grade] Parent notification error:', e));
+      }
+    } catch (e) { console.error('[Grade] Notification setup error:', e); }
 
     return NextResponse.json({ grade }, { status: 201 });
   } catch (err: unknown) {

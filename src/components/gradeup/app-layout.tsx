@@ -43,6 +43,7 @@ import CommandPalette from './command-palette';
 import { toast } from 'sonner';
 import { subscribeToNotifications } from '@/services/notifications/notificationListener';
 import { registerPushNotifications } from '@/services/notifications/pushRegistration';
+import NotificationPermissionBanner from './notification-permission-banner';
 import {
   LayoutDashboard,
   Users,
@@ -124,6 +125,7 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Visioconférences', page: 'meetings', icon: Video, emoji: '🎥' },
     { label: 'Bibliothèque', page: 'library', icon: Library, emoji: '📚' },
     { label: 'Rapports', page: 'teacher-reports', icon: ScrollText, emoji: '📄' },
+    { label: 'Notifications', page: 'teacher-notifications', icon: Bell, emoji: '🔔' },
     { label: 'Bulletins Sync', page: 'auto-report-sync', icon: Zap, emoji: '⚡' },
     { label: 'Cahier de Cotation', page: 'cahier-cotation', icon: ClipboardList, emoji: '📖' },
     { label: 'Fin du cursus', page: 'teacher-end-of-year', icon: GraduationCap, emoji: '🎓' },
@@ -242,6 +244,7 @@ const pageTitles: Record<PageView, string> = {
   'teacher-schedules': 'Emploi du temps',
   'teacher-ai': 'IA Gradie',
   'teacher-reports': 'Rapports',
+  'teacher-notifications': 'Notifications',
   'teacher-end-of-year': 'Fin du cursus',
   'student-dashboard': 'Tableau de bord',
   'student-courses': 'Cours',
@@ -693,16 +696,18 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
       {/* Mobile Sidebar */}
       <Sheet open={sidebarOpen && isMobile} onOpenChange={setSidebarOpen}>
-        <SheetContent side="left" className="w-72 p-0 bg-sidebar border-sidebar-border">
+        <SheetContent side="left" className="w-[min(85vw,300px)] p-0 bg-sidebar border-sidebar-border flex flex-col overflow-hidden">
           <SheetHeader className="sr-only">
             <SheetTitle>Menu de navigation</SheetTitle>
           </SheetHeader>
-          <SidebarContent
-            user={user}
-            currentPage={currentPage}
-            onNavigate={handleNavigate}
-            onLogout={handleLogout}
-          />
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <SidebarContent
+              user={user}
+              currentPage={currentPage}
+              onNavigate={handleNavigate}
+              onLogout={handleLogout}
+            />
+          </div>
         </SheetContent>
       </Sheet>
 
@@ -815,12 +820,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
                       size="icon"
                       className="relative hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 hover:brightness-110 active:scale-[0.97]"
                       onClick={() => {
-                        if (user.role === 'TEACHER') {
-                          toast.info('Pas de volet de notifications pour les professeurs pour le moment.');
-                        } else {
-                          const notifPage = `${user.role.toLowerCase()}-notifications` as PageView;
-                          setCurrentPage(notifPage);
-                        }
+                        const notifPage = `${user.role.toLowerCase()}-notifications` as PageView;
+                        setCurrentPage(notifPage);
                       }}
                     >
                       <Bell className="w-4 h-4" />
@@ -954,13 +955,15 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
         {/* ✅ Main content: overflow-y-auto pour le scroll, min-h-0 pour flexibilité */}
         <main 
-          className={`flex-1 overflow-x-hidden overflow-y-auto min-h-0 overscroll-contain ${isMobile ? 'pb-24' : ''}`}
+          className={`flex-1 overflow-x-hidden overflow-y-auto min-h-0 overscroll-contain ${isMobile ? 'pb-[calc(4.5rem+env(safe-area-inset-bottom))]' : ''}`}
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
+          style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
         >
           {/* ✅ Conteneur de page: flex-1 min-h-0 pour que les enfants puissent scroller */}
-          <div className="p-4 lg:p-6 animate-fade-in flex flex-col flex-1 min-h-0" key={currentPage}>
+          <div className="p-3 sm:p-4 lg:p-6 animate-fade-in" key={currentPage}>
+            <NotificationPermissionBanner />
             {children}
           </div>
         </main>
@@ -1040,8 +1043,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
       {/* Bottom Tab Bar (iOS style) on Mobile */}
       {isMobile && (
         <nav 
-          className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-card/90 backdrop-blur-xl border-t flex items-center justify-around px-2 z-40 shadow-lg touch-manipulation"
-          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+          className="lg:hidden fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-xl border-t border-border flex items-stretch justify-around z-40 shadow-lg"
+          style={{ 
+            paddingBottom: 'env(safe-area-inset-bottom)',
+            minHeight: '3.5rem',
+          }}
         >
           {(() => {
             if (!user) return null;
@@ -1053,33 +1059,31 @@ export default function AppLayout({ children }: AppLayoutProps) {
           })()?.map((tab) => {
             const isActive = currentPage === tab.page;
             const Icon = tab.icon;
-            
-            // Show badge count if it's the notification or message tab
             const isNotifTab = tab.page.includes('notification');
             const isMsgTab = tab.page === 'messages';
-            
             return (
               <button
                 key={tab.page}
                 onClick={() => handleNavigate(tab.page)}
-                className={`flex flex-col items-center justify-center flex-1 h-full py-1 transition-all duration-200 ${
-                  isActive ? 'text-primary scale-105 font-semibold animate-scale-in' : 'text-muted-foreground hover:text-foreground'
+                className={`flex flex-col items-center justify-center flex-1 py-2 px-1 min-h-[3.5rem] gap-0.5 transition-all duration-200 touch-manipulation select-none active:opacity-70 ${
+                  isActive ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground'
                 }`}
               >
                 <div className="relative">
-                  <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5px] text-blue-600 dark:text-blue-400' : 'stroke-[1.8px]'}`} />
+                  <Icon className={`w-5 h-5 transition-transform duration-200 ${isActive ? 'stroke-[2.5px] scale-110' : 'stroke-[1.8px]'}`} />
                   {isNotifTab && unreadNotificationsCount > 0 && (
-                    <span className="absolute -top-1 -right-2 min-w-[14px] h-3.5 flex items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white px-0.5 animate-scale-in">
-                      {unreadNotificationsCount}
+                    <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white px-1 shadow-sm">
+                      {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
                     </span>
                   )}
                   {isMsgTab && unreadMessages > 0 && (
-                    <span className="absolute -top-1 -right-2 min-w-[14px] h-3.5 flex items-center justify-center rounded-full bg-blue-500 text-[8px] font-bold text-white px-0.5 animate-scale-in">
-                      {unreadMessages}
+                    <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-blue-500 text-[9px] font-bold text-white px-1 shadow-sm">
+                      {unreadMessages > 9 ? '9+' : unreadMessages}
                     </span>
                   )}
                 </div>
-                <span className="text-[10px] mt-1 tracking-tight truncate max-w-full">{tab.label}</span>
+                <span className={`text-[10px] leading-tight font-medium tracking-tight truncate max-w-[60px] ${isActive ? 'font-semibold' : ''}`}>{tab.label}</span>
+                {isActive && <span className="absolute bottom-0 h-0.5 w-8 rounded-full bg-blue-500" />}
               </button>
             );
           })}

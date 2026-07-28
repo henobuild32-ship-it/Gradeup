@@ -16,15 +16,6 @@ export async function GET(request: NextRequest) {
 
     const where: Record<string, unknown> = { schoolId };
 
-    if (targetRole) {
-      // Parent can only see PARENT-targeted notifications
-      if (auth.role === 'PARENT' && targetRole !== 'PARENT') {
-        return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
-      }
-      where.targetRole = targetRole;
-    }
-
-    // STUDENT can only see notifications addressed to them or their class
     if (auth.role === 'STUDENT') {
       const enrollments = await db.enrolledClass.findMany({
         where: { userId: auth.userId },
@@ -33,8 +24,24 @@ export async function GET(request: NextRequest) {
       const classIds = enrollments.map(e => e.classId);
       where.OR = [
         { userId: auth.userId },
+        { targetRole: 'STUDENT' },
+        { targetRole: 'ALL' },
         { targetClassId: { in: classIds } },
       ];
+    } else if (auth.role === 'TEACHER') {
+      where.OR = [
+        { userId: auth.userId },
+        { targetRole: 'TEACHER' },
+        { targetRole: 'ALL' },
+      ];
+    } else if (auth.role === 'PARENT') {
+      where.OR = [
+        { userId: auth.userId },
+        { targetRole: 'PARENT' },
+        { targetRole: 'ALL' },
+      ];
+    } else if (targetRole) {
+      where.targetRole = targetRole;
     }
 
     const notifications = await db.notification.findMany({
@@ -42,9 +49,7 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
-    // Elegant backward-compatibility fallback
-    // Student, parent, and dashboard views expect a flat array, while admin view expects { notifications }
-    if (targetRole === 'STUDENT' || targetRole === 'PARENT') {
+    if (targetRole === 'STUDENT' || targetRole === 'PARENT' || targetRole === 'TEACHER') {
       return NextResponse.json(notifications);
     }
 

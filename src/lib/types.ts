@@ -280,6 +280,7 @@ export type PageView =
   | 'teacher-attendance'
   | 'teacher-schedules'
   | 'teacher-ai'
+  | 'teacher-notifications'
   | 'student-dashboard'
   | 'student-courses'
   | 'student-lessons'
