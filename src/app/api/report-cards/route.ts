@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     authenticateRequest(request);
     const body = await request.json();
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
   }
 }
 
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
   try {
     authenticateRequest(request);
     const body = await request.json();
@@ -166,7 +166,7 @@ export async function PUT(request: Request) {
   }
 }
 
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
   try {
     authenticateRequest(request);
     const { searchParams } = new URL(request.url);

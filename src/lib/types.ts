@@ -14,6 +14,8 @@ export interface SchoolInfo {
   subscriptionExpiry?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  color?: string;
+  academicYear?: string;
 }
 
 export interface UserInfo {
@@ -291,6 +293,7 @@ export type PageView =
   | 'student-ai'
   | 'student-homework'
   | 'student-notifications'
+  | 'student-payments'
   | 'parent-dashboard'
   | 'parent-grades'
   | 'parent-bulletins'

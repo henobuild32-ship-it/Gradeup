@@ -49,7 +49,7 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
     const { score, maxScore, trimester, comment, reason } = body;
-    const modifiedBy = auth.fullName || auth.userId;
+    const modifiedBy = (auth as { fullName?: string; userId: string }).fullName || auth.userId;
 
     const existing = await db.grade.findUnique({ where: { id } });
     if (!existing) {

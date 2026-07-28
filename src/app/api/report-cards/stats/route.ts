@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     authenticateRequest(request);
     const { searchParams } = new URL(request.url);
