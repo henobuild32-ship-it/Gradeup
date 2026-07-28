@@ -818,7 +818,6 @@ export default function AuthPage() {
       </div>
     );
   }
-  }
 
   // ---------------------------------------------------------------------------
   // 2. CONNEXION (LOGIN SCREEN)
