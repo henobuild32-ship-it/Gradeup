@@ -458,10 +458,10 @@ export default function AdminSchedules() {
 
       {/* ── Class Selector + Time Slot Manager ───────────────────────────── */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-        <div className="flex items-center gap-2 bg-muted/40 px-3 py-2 rounded-xl border flex-1 max-w-sm">
+        <div className="flex items-center gap-2 flex-1 max-w-sm">
           <School className="w-4 h-4 text-muted-foreground shrink-0" />
           <Select value={selectedClassId} onValueChange={setSelectedClassId}>
-            <SelectTrigger className="bg-transparent border-0 shadow-none h-8 text-sm p-0 focus:ring-0">
+            <SelectTrigger className="w-full h-10 rounded-xl bg-card">
               <SelectValue placeholder="Sélectionnez une classe..." />
             </SelectTrigger>
             <SelectContent>
