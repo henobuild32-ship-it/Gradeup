@@ -27,19 +27,34 @@ const serwist = new Serwist({
 
 serwist.addEventListeners();
 
-// --- Native Web Push Notification Listeners ---
+// --- Native Web Push Notification Listeners (Même navigateur / PWA fermé) ---
 
 self.addEventListener("push", (event: any) => {
   try {
-    const data = event.data ? event.data.json() : {};
-    const title = data.title || "GradeUp";
+    let data: any = {};
+    if (event.data) {
+      try {
+        data = event.data.json();
+      } catch {
+        data = { body: event.data.text() };
+      }
+    }
+
+    const title = data.title || "GradeUp 🚀";
     const options = {
-      body: data.body || "",
+      body: data.body || "Mbote Il'y a une nouvelle mise à jour de GradeUp.",
       icon: data.icon || "/icons/icon-192x192.png",
       badge: data.badge || "/icons/icon-72x72.png",
-      data: data.data || {},
-      vibrate: [100, 50, 100],
+      vibrate: [300, 100, 300, 100, 300], // Vibreur / Bip puissant natif
+      renotify: true,
+      tag: "gradeup-broadcast-update",
+      requireInteraction: true, // Reste visible jusqu'à interaction
+      data: data.data || { url: "/" },
+      actions: [
+        { action: "open", title: "Ouvrir GradeUp" }
+      ]
     };
+
     event.waitUntil(self.registration.showNotification(title, options));
   } catch (error) {
     console.error("[ServiceWorker] Error receiving push notification:", error);
