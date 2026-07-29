@@ -199,25 +199,28 @@ export default function CahierCotation() {
       .catch(() => {});
   }, [user?.schoolId]);
 
-  // Fetch courses for the selected class
+  // Fetch courses for the selected class (scoped to school and optionally teacher)
   useEffect(() => {
-    if (!selectedClassId) {
+    if (!selectedClassId || !user?.schoolId) {
       setCourses([]);
+      setSelectedCourseId('');
       return;
     }
-    fetch(`/api/courses?classId=${selectedClassId}`)
+    const teacherParam = user.role === 'TEACHER' ? `&teacherId=${user.id}` : '';
+    fetch(`/api/courses?schoolId=${user.schoolId}&classId=${selectedClassId}${teacherParam}`)
       .then((r) => r.json())
       .then((d) => {
-        setCourses(d.courses || []);
-        if (d.courses && d.courses.length > 0) {
-          // Auto select first course
-          setSelectedCourseId(d.courses[0].id);
+        const list = Array.isArray(d.courses) ? d.courses : Array.isArray(d) ? d : [];
+        setCourses(list);
+        if (list.length > 0) {
+          // Auto select first course (prefer teacher's own course if available)
+          setSelectedCourseId(list[0].id);
         } else {
           setSelectedCourseId('');
         }
       })
       .catch(() => {});
-  }, [selectedClassId]);
+  }, [selectedClassId, user?.schoolId, user?.id, user?.role]);
 
   // Load students, evaluations & marks
   const fetchData = useCallback(async () => {

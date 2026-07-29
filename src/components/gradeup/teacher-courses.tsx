@@ -584,7 +584,12 @@ export default function TeacherCourses() {
             </Button>
             <Button
               onClick={handlePublishLesson}
-              disabled={publishing || !lessonTitle.trim() || (lessonType === 'pdf' && !lessonFile)}
+              disabled={
+                publishing ||
+                !lessonTitle.trim() ||
+                (lessonType === 'pdf' && !lessonFile) ||
+                ((lessonType === 'link' || lessonType === 'video') && !lessonUrl.trim())
+              }
               className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md"
             >
               {publishing ? (

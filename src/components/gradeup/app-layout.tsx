@@ -116,8 +116,8 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
   TEACHER: [
     { label: 'Tableau de bord', page: 'teacher-dashboard', icon: LayoutDashboard, emoji: '📊' },
     { label: 'Cours', page: 'teacher-courses', icon: BookOpen, emoji: '📚' },
+    { label: 'Mes Classes', page: 'teacher-classes', icon: School, emoji: '🏫' },
     { label: 'Emploi du temps', page: 'teacher-schedules', icon: CalendarDays, emoji: '🗓️' },
-    { label: 'Leçons', page: 'teacher-lessons', icon: FileText, emoji: '📖' },
     { label: 'Notes', page: 'teacher-grades', icon: ClipboardList, emoji: '📝' },
     { label: 'Devoirs', page: 'teacher-homework', icon: ClipboardCheck, emoji: '📋' },
     { label: 'Absences', page: 'teacher-attendance', icon: Calendar, emoji: '📅' },
@@ -237,6 +237,7 @@ const pageTitles: Record<PageView, string> = {
   'admin-end-of-year': 'Fin du cursus',
   'teacher-dashboard': 'Tableau de bord',
   'teacher-courses': 'Cours',
+  'teacher-classes': 'Mes Classes',
   'teacher-lessons': 'Leçons',
   'teacher-grades': 'Notes',
   'teacher-homework': 'Devoirs',

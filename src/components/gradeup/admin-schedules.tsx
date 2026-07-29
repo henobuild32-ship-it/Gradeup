@@ -27,6 +27,8 @@ import {
   RefreshCw,
   Coffee,
   PlusCircle,
+  Send,
+  CheckCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -141,6 +143,46 @@ export default function AdminSchedules() {
   const [showDuplicate, setShowDuplicate] = useState(false);
   const [targetClassId, setTargetClassId] = useState<string>('');
   const [duplicating, setDuplicating] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+
+  // ── Publish schedule to teachers ─────────────────────────────────────
+  const handlePublishSchedule = async () => {
+    if (!selectedClassId || !user?.schoolId) {
+      toast.error('Sélectionnez une classe avant de publier');
+      return;
+    }
+    if (schedules.length === 0) {
+      toast.error('L\'emploi du temps est vide. Ajoutez des cours d\'abord.');
+      return;
+    }
+    setPublishing(true);
+    try {
+      const selectedClass = classes.find((c) => c.id === selectedClassId);
+      const className = selectedClass?.name || 'votre classe';
+
+      const res = await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          schoolId: user.schoolId,
+          title: `📅 Emploi du temps publié — ${className}`,
+          message: `L'administrateur a publié l'emploi du temps de la classe ${className}. Consultez-le dans votre onglet "Emploi du temps"`,
+          type: 'SYSTEM',
+          targetRole: 'TEACHER',
+        }),
+      });
+
+      if (res.ok) {
+        toast.success(`Emploi du temps de ${className} publié ! Une notification a été envoyée aux professeurs.`);
+      } else {
+        toast.error('Erreur lors de la publication');
+      }
+    } catch {
+      toast.error('Erreur réseau lors de la publication');
+    } finally {
+      setPublishing(false);
+    }
+  };
 
   // ── Load time slots from localStorage ───────────────────────────────────────
   useEffect(() => {
@@ -426,6 +468,19 @@ export default function AdminSchedules() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={handlePublishSchedule}
+              variant="outline"
+              size="sm"
+              disabled={publishing || schedules.length === 0}
+              className="bg-emerald-500/20 hover:bg-emerald-500/30 border-emerald-300/40 text-white text-xs font-semibold"
+            >
+              {publishing ? (
+                <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Publication...</>
+              ) : (
+                <><CheckCircle className="w-3.5 h-3.5 mr-1.5" />Publier & Notifier</>               
+              )}
+            </Button>
             <Button
               onClick={handleAddTimeSlot}
               variant="outline"

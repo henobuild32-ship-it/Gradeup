@@ -48,6 +48,7 @@ const AutoReportSyncPanel = dynamic(() => import('@/components/gradeup/auto-repo
 const CahierCotation = dynamic(() => import('@/components/gradeup/cahier-cotation'), { ssr: false, loading: () => <PageSkeleton /> });
 const TeacherDashboard = dynamic(() => import('@/components/gradeup/teacher-dashboard'), { ssr: false, loading: () => <PageSkeleton /> });
 const TeacherCourses = dynamic(() => import('@/components/gradeup/teacher-courses'), { ssr: false, loading: () => <PageSkeleton /> });
+const TeacherClasses = dynamic(() => import('@/components/gradeup/teacher-classes'), { ssr: false, loading: () => <PageSkeleton /> });
 const TeacherLessons = dynamic(() => import('@/components/gradeup/teacher-lessons'), { ssr: false, loading: () => <PageSkeleton /> });
 const TeacherGrades = dynamic(() => import('@/components/gradeup/teacher-grades'), { ssr: false, loading: () => <PageSkeleton /> });
 const TeacherHomework = dynamic(() => import('@/components/gradeup/teacher-homework'), { ssr: false, loading: () => <PageSkeleton /> });
@@ -108,6 +109,7 @@ function PageRouter({ page }: { page: PageView }) {
   if (page === 'teacher-dashboard') return <TeacherDashboard />;
   if (page === 'teacher-reports') return <TeacherReports />;
   if (page === 'teacher-courses') return <TeacherCourses />;
+  if (page === 'teacher-classes') return <TeacherClasses />;
   if (page === 'teacher-lessons') return <TeacherLessons />;
   if (page === 'teacher-grades') return <TeacherGrades />;
   if (page === 'teacher-homework') return <TeacherHomework />;

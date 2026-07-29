@@ -276,6 +276,7 @@ export type PageView =
   | 'teacher-end-of-year'
   | 'teacher-dashboard'
   | 'teacher-courses'
+  | 'teacher-classes'
   | 'teacher-lessons'
   | 'teacher-grades'
   | 'teacher-homework'
