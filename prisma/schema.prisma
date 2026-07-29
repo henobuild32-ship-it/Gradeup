@@ -142,6 +142,8 @@ model User {
   presences               Presence[]
   liveLocation            LiveLocation?
   submissions             Submission[]        @relation("SubmissionStudent")
+  presence                UserPresence?
+  messageReactions        MessageReaction[]
 
   @@unique([schoolId, fullName, role])
   @@index([schoolId, role, active])
@@ -360,22 +362,55 @@ model Payment {
 }
 
 model Message {
-  id          String   @id @default(cuid())
-  schoolId    String
-  senderId    String
-  recipientId String
-  content     String
-  read        Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  deletedAt   DateTime?
+  id              String   @id @default(cuid())
+  schoolId        String
+  senderId        String
+  recipientId     String
+  content         String
+  messageType     String   @default("text")
+  attachmentUrl   String   @default("")
+  attachmentName  String   @default("")
+  attachmentType  String   @default("")
+  replyToId       String?
+  editedAt        DateTime?
+  read            Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  deletedAt       DateTime?
 
-  recipient   User     @relation("ReceivedMessages", fields: [recipientId], references: [id], onDelete: Cascade)
-  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  sender      User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient       User     @relation("ReceivedMessages", fields: [recipientId], references: [id], onDelete: Cascade)
+  school          School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  sender          User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  replyTo         Message? @relation("RepliedMessages", fields: [replyToId], references: [id])
+  replies         Message[] @relation("RepliedMessages")
+  reactions       MessageReaction[]
 
   @@index([schoolId, recipientId, read])
   @@index([senderId, createdAt])
   @@index([recipientId, createdAt])
+}
+
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+}
+
+model UserPresence {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  isOnline   Boolean  @default(false)
+  lastSeen   DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Notification {
@@ -487,6 +522,7 @@ model AiConversation {
   favorite       Boolean      @default(false)
   pinned         Boolean      @default(false)
   pinnedAt       DateTime?
+  model          String       @default("glm")
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @default(now())
   deletedAt      DateTime?
@@ -500,16 +536,18 @@ model AiConversation {
 }
 
 model AiMemory {
-  id        String   @id @default(cuid())
-  userId    String
-  schoolId  String
-  content   String
-  category  String   @default("fact")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt DateTime?
+  id         String   @id @default(cuid())
+  userId     String
+  schoolId   String
+  content    String
+  category   String   @default("fact")
+  tags       String   @default("")
+  importance Int      @default(5)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  deletedAt  DateTime?
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([schoolId, userId])

@@ -323,10 +323,17 @@ export interface MessageInfo {
   senderId: string;
   recipientId: string;
   content: string;
+  messageType: string;
+  attachmentUrl: string;
+  attachmentName: string;
+  attachmentType: string;
+  replyToId: string | null;
+  editedAt: string | null;
   read: boolean;
   createdAt: string;
-  sender?: { id: string; fullName: string; role: string };
-  recipient?: { id: string; fullName: string; role: string };
+  sender?: { id: string; fullName: string; role: string; photoUrl?: string };
+  recipient?: { id: string; fullName: string; role: string; photoUrl?: string };
+  replyTo?: MessageInfo;
 }
 
 export interface ConversationInfo {

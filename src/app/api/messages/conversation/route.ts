@@ -41,10 +41,15 @@ export async function GET(request: NextRequest) {
       },
       include: {
         sender: {
-          select: { id: true, fullName: true, role: true },
+          select: { id: true, fullName: true, role: true, photoUrl: true },
         },
         recipient: {
-          select: { id: true, fullName: true, role: true },
+          select: { id: true, fullName: true, role: true, photoUrl: true },
+        },
+        replyTo: {
+          include: {
+            sender: { select: { id: true, fullName: true } },
+          },
         },
       },
       orderBy: { createdAt: 'asc' },

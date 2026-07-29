@@ -1,9 +1,17 @@
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { generateGLMResponse } from '@/lib/ai/glm-provider';
+import { generateOpenRouterResponse } from '@/lib/ai/openrouter-provider';
 
 export const runtime = 'nodejs';
 export const maxDuration = 55; // Vercel Pro : 60s max, on laisse 5s de marge
+
+const AI_MODELS: Record<string, string> = {
+  glm: 'GLM 4.5 Flash (Zhipu AI)',
+  deepseek: 'DeepSeek Chat V3 (OpenRouter)',
+  gemma: 'Gemma 3 12B (OpenRouter)',
+  llama: 'Llama 3.1 8B (OpenRouter)',
+};
 
 // ─── Helpers préférences (stockées en DB, pas en filesystem) ─────────────────
 
@@ -37,10 +45,13 @@ async function loadMemories(userId: string): Promise<string[]> {
   try {
     const memories = await db.aiMemory.findMany({
       where: { userId },
-      orderBy: { updatedAt: 'desc' },
-      take: 15,
+      orderBy: [{ importance: 'desc' }, { updatedAt: 'desc' }],
+      take: 20,
     });
-    return memories.map((m) => `- ${m.content}`);
+    return memories.map((m) => {
+      const tagStr = m.tags ? ` [${m.tags}]` : '';
+      return `- ${m.content}${tagStr}`;
+    });
   } catch {
     return [];
   }
@@ -48,8 +59,16 @@ async function loadMemories(userId: string): Promise<string[]> {
 
 async function saveMemory(userId: string, schoolId: string, content: string): Promise<void> {
   try {
+    // Parse tags from content: [TAG: tag1, tag2] prefix
+    let tags = '';
+    let cleanContent = content;
+    const tagMatch = content.match(/^\[TAG:\s*([^\]]+)\]\s*/i);
+    if (tagMatch) {
+      tags = tagMatch[1].trim();
+      cleanContent = content.slice(tagMatch[0].length).trim();
+    }
     await db.aiMemory.create({
-      data: { userId, schoolId, content: content.trim(), category: 'fact' },
+      data: { userId, schoolId, content: cleanContent.trim(), category: 'fact', tags },
     });
   } catch (err) {
     console.error('[AI] Erreur sauvegarde mémoire:', err);
@@ -350,9 +369,7 @@ ${classes.map(c => `  - ${c.name} (${c.level}) : ${c._count.enrollments} élève
 // ─── Route POST principale ────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
-  // GLM est le seul provider — aucune vérification d'autres clés requise
-
-  let body: { message?: string; schoolId?: string; userId?: string; context?: string; conversationId?: string };
+  let body: { message?: string; schoolId?: string; userId?: string; context?: string; conversationId?: string; model?: string };
   try {
     body = await request.json();
   } catch {
@@ -362,7 +379,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { message, schoolId, userId, conversationId } = body;
+  const { message, schoolId, userId, conversationId, model: requestedModel } = body;
 
   if (!message || !schoolId || !userId) {
     return new Response(
@@ -387,10 +404,13 @@ export async function POST(request: NextRequest) {
   }
   if (!conversation) {
     conversation = await db.aiConversation.create({
-      data: { userId, title: 'Nouvelle conversation', salutationDone: false },
+      data: { userId, title: 'Nouvelle conversation', salutationDone: false, model: requestedModel || 'glm' },
       include: { messages: true, documents: true },
     });
   }
+
+  // Use conversation's stored model if no new model requested
+  const activeModel = requestedModel || conversation.model || 'glm';
 
   // ─── Charger l'utilisateur et ses préférences (depuis DB, pas filesystem) ───
   const [user, prefs] = await Promise.all([
@@ -429,12 +449,11 @@ export async function POST(request: NextRequest) {
   // ─── Mémoire long terme de l'utilisateur ─────────────────────────────────────
   const memories = await loadMemories(userId);
   if (memories.length > 0) {
-    systemPrompt += `
-
-MÉMOIRE À LONG TERME (informtions clés à garder en mémoire sur l'utilisateur et son contexte) :
+    systemPrompt += `\n\nMÉMOIRE À LONG TERME (informations clés à garder en mémoire sur l'utilisateur et son contexte) :
 ${memories.join('\n')}
 
-Si l'utilisateur partage une information durable et importante à retenir, tu peux la sauvegarder en finissant ta réponse par la balise : \`[MEM: texte à mémoriser]\`.`;
+Si l'utilisateur partage une information durable et importante à retenir, tu peux la sauvegarder en finissant ta réponse par la balise : \`[MEM: texte à mémoriser]\`.
+Tu peux ajouter des tags optionnels : \`[MEM: [TAG: categorie1, categorie2] texte à mémoriser]\`.`;
   }
 
   // ─── Enregistrer le message utilisateur ─────────────────────────────────────
@@ -457,28 +476,54 @@ Si l'utilisateur partage une information durable et importante à retenir, tu pe
   conversationIdFinal = conversation.id;
   encoder = new TextEncoder();
 
-  // ─── Appel GLM (provider unique) ─────────────────────────────────────────────
+  // ─── Appel IA (multi-provider) ─────────────────────────────────────────────
   try {
-    aiResponse = await generateGLMResponse({
+    const aiInput = {
       message,
       schoolContext: fullContext,
       userName,
       userRole: role,
       historyMessages,
       systemPrompt,
-    });
+    };
+
+    if (activeModel === 'glm') {
+      aiResponse = await generateGLMResponse(aiInput);
+    } else {
+      // OpenRouter models: deepseek, gemma, llama
+      const orModelMap: Record<string, string> = {
+        deepseek: 'deepseek/deepseek-chat-v3-0324:free',
+        gemma: 'google/gemma-3-12b-it:free',
+        llama: 'meta-llama/llama-3.1-8b-instruct:free',
+      };
+      // Override OpenRouter env model for this request
+      const originalModel = process.env.OR_MODEL;
+      if (orModelMap[activeModel]) {
+        process.env.OR_MODEL = orModelMap[activeModel];
+      }
+      try {
+        aiResponse = await generateOpenRouterResponse(aiInput);
+      } finally {
+        // Restore original model
+        if (originalModel !== undefined) {
+          process.env.OR_MODEL = originalModel;
+        } else {
+          delete process.env.OR_MODEL;
+        }
+      }
+    }
   } catch (err) {
-    console.error('[AI] Échec de l\'appel GLM:', err);
+    console.error('[AI] Échec de l\'appel IA:', err);
     const errMsg = err instanceof Error ? err.message : 'Erreur inconnue';
     return new Response(
-      JSON.stringify({ error: `L'IA est temporairement indisponible. Détails : ${errMsg}` }),
+      JSON.stringify({ error: `L'IA est temporairement indisponible (${activeModel}). Détails : ${errMsg}` }),
       { status: 503, headers: { 'Content-Type': 'application/json' } },
     );
   }
 
   if (!aiResponse.ok) {
     const errorText = await aiResponse.text().catch(() => '');
-    console.error('[AI] Réponse erreur GLM:', aiResponse.status, errorText.slice(0, 300));
+    console.error('[AI] Réponse erreur IA:', aiResponse.status, errorText.slice(0, 300));
     return new Response(
       JSON.stringify({ error: 'Le service IA est temporairement indisponible. Réessayez dans quelques instants.' }),
       { status: 503, headers: { 'Content-Type': 'application/json' } },

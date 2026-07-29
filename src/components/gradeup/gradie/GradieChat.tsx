@@ -395,6 +395,9 @@ interface MenuSheetProps {
   onExport: () => void;
   onDeleteCurrent: () => void;
   activeTitle?: string;
+  selectedModel?: string;
+  onModelChange?: (model: string) => void;
+  onOpenMemory?: () => void;
 }
 
 function ThreeDotsMenuSheet({
@@ -406,23 +409,76 @@ function ThreeDotsMenuSheet({
   onExport,
   onDeleteCurrent,
   activeTitle,
+  selectedModel = 'glm',
+  onModelChange,
+  onOpenMemory,
 }: MenuSheetProps) {
+  const [showModels, setShowModels] = useState(false);
+
+  const models = [
+    { id: 'glm', name: 'GLM 4.5 Flash', desc: 'Rapide & precis (Zhipu AI)', emoji: '⚡' },
+    { id: 'deepseek', name: 'DeepSeek V3', desc: 'Puissant & gratuit (OpenRouter)', emoji: '🧠' },
+    { id: 'gemma', name: 'Gemma 3 12B', desc: 'Leger & gratuit (Google)', emoji: '💎' },
+    { id: 'llama', name: 'Llama 3.1 8B', desc: 'Rapide & gratuit (Meta)', emoji: '🦙' },
+  ];
+
   const menuItems = [
     { label: 'Nouveau chat', icon: Plus, action: onNewChat, color: 'text-indigo-400' },
     { label: 'Historique', icon: MessageSquare, action: onOpenHistory, color: 'text-blue-400' },
     { label: 'Conversations épinglées', icon: Pin, action: onOpenHistory, color: 'text-amber-400' },
     { label: 'Conversations archivées', icon: Archive, action: onOpenHistory, color: 'text-purple-400' },
     { label: 'Rechercher dans les conversations', icon: Search, action: onOpenSearch, color: 'text-emerald-400' },
-    { label: 'Pièces jointes', icon: Paperclip, action: () => {}, color: 'text-cyan-400' },
     { label: 'Favoris', icon: Star, action: onOpenHistory, color: 'text-yellow-400' },
-    { label: 'Paramètres', icon: Settings, action: () => {}, color: 'text-slate-300' },
-    { label: 'Langue (Français)', icon: Globe, action: () => {}, color: 'text-indigo-300' },
-    { label: 'Thème (Sombre)', icon: Sparkles, action: () => {}, color: 'text-pink-400' },
+    { label: `Modèle IA : ${models.find(m => m.id === selectedModel)?.name || 'GLM'}`, icon: Bot, action: () => setShowModels(true), color: 'text-cyan-400' },
+    { label: 'Mémoire de Gradie', icon: Sparkles, action: () => { onOpenMemory?.(); onClose(); }, color: 'text-pink-400' },
     { label: 'Exporter la conversation', icon: Download, action: onExport, color: 'text-emerald-300' },
     { label: 'Supprimer cette conversation', icon: Trash2, action: onDeleteCurrent, color: 'text-rose-400' },
     { label: 'Vider tout l\'historique', icon: Trash2, action: onClearAll, color: 'text-red-500' },
     { label: 'Informations sur l\'IA', icon: Bot, action: () => {}, color: 'text-indigo-400' },
   ];
+
+  if (showModels) {
+    return (
+      <>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 animate-gradi-fadein" onClick={onClose} />
+        <div className="fixed bottom-0 left-1/2 -translate-x-1/2 z-50 animate-gradi-sheet-up w-[90vw] max-w-lg">
+          <div className="bg-[#18181F] rounded-t-[24px] border border-white/10 max-h-[85vh] overflow-y-auto shadow-2xl pb-safe">
+            <div className="pt-3 pb-2 flex justify-center sticky top-0 bg-[#18181F] border-b border-white/5 z-10">
+              <div className="w-12 h-1.5 rounded-full bg-white/20" />
+            </div>
+            <div className="p-3 border-b border-white/5 flex items-center gap-2">
+              <button onClick={() => setShowModels(false)} className="text-white/60 hover:text-white">
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <p className="font-bold text-white text-base">Choisir le modèle IA</p>
+            </div>
+            <div className="p-3 space-y-2">
+              {models.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => { onModelChange?.(m.id); onClose(); }}
+                  className={`w-full p-4 rounded-xl border transition-all text-left ${
+                    selectedModel === m.id
+                      ? 'bg-indigo-500/20 border-indigo-500/50 shadow-lg shadow-indigo-500/10'
+                      : 'bg-white/5 border-white/10 hover:bg-white/8'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{m.emoji}</span>
+                    <div className="flex-1">
+                      <p className="font-semibold text-white">{m.name}</p>
+                      <p className="text-xs text-white/50">{m.desc}</p>
+                    </div>
+                    {selectedModel === m.id && <CheckCircle2 className="w-5 h-5 text-indigo-400" />}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -599,6 +655,11 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
   const [stopRequested, setStopRequested] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState('glm');
+  const [showModelSelector, setShowModelSelector] = useState(false);
+  const [showMemoryPanel, setShowMemoryPanel] = useState(false);
+  const [memories, setMemories] = useState<Array<{ id: string; content: string; category: string; tags: string; importance: number; createdAt: string }>>([]);
+  const [memorySearch, setMemorySearch] = useState('');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -629,6 +690,32 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
   }, [userId]);
 
   useEffect(() => { loadConversations(search); }, [loadConversations, search]);
+
+  // ── Load memories ──────────────────────────────────────────────────────────
+  const loadMemories = useCallback(async (q?: string) => {
+    try {
+      const params = new URLSearchParams({ userId });
+      if (q?.trim()) params.set('search', q.trim());
+      const res = await fetch(`/api/ai/memory?${params}`);
+      if (res.ok) {
+        const data = await res.json();
+        setMemories(data.memories || []);
+      }
+    } catch { /* silent */ }
+  }, [userId]);
+
+  useEffect(() => { if (showMemoryPanel) loadMemories(memorySearch); }, [showMemoryPanel, memorySearch, loadMemories]);
+
+  const deleteMemory = async (id: string) => {
+    await fetch(`/api/ai/memory?id=${id}&userId=${userId}`, { method: 'DELETE' });
+    setMemories((prev) => prev.filter((m) => m.id !== id));
+  };
+
+  const deleteAllMemories = async () => {
+    if (!confirm('Supprimer toute la mémoire de Gradie ?')) return;
+    await fetch(`/api/ai/memory?userId=${userId}&deleteAll=true`, { method: 'DELETE' });
+    setMemories([]);
+  };
 
   // ── Load single conversation ────────────────────────────────────────────────
   const loadConversation = useCallback(async (id: string) => {
@@ -700,6 +787,7 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
           schoolId,
           userId,
           conversationId: convId,
+          model: selectedModel,
         }),
       });
 
@@ -817,8 +905,11 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
             <h1 className="text-[20px] font-semibold tracking-tight truncate leading-none text-white">
               Gradie IA
             </h1>
-            <p className="text-[13px] text-emerald-400 font-medium leading-tight mt-0.5">
+            <p className="text-[13px] text-emerald-400 font-medium leading-tight mt-0.5 flex items-center gap-1.5">
               {isStreaming ? 'En train d\'écrire...' : 'En ligne'}
+              <span className="text-[10px] bg-white/10 text-white/50 px-1.5 py-0.5 rounded-full font-normal">
+                {selectedModel === 'glm' ? 'GLM' : selectedModel === 'deepseek' ? 'DeepSeek' : selectedModel === 'gemma' ? 'Gemma' : 'Llama'}
+              </span>
             </p>
           </div>
         </div>
@@ -868,7 +959,26 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
           onClearAll={() => {
             if (confirm('Vider tout l\'historique ?')) setConversations([]);
           }}
-          onExport={() => {}}
+          onExport={() => {
+            if (!activeConversation) return;
+            const data = {
+              title: activeConversation.title,
+              model: selectedModel,
+              exportedAt: new Date().toISOString(),
+              messages: activeConversation.messages.map(m => ({
+                role: m.role,
+                content: m.content,
+                createdAt: m.createdAt,
+              })),
+            };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `gradie-${activeConversation.title.replace(/[^a-z0-9]/gi, '_')}-${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
           onDeleteCurrent={() => {
             if (activeConversation) {
               setConversations(p => p.filter(c => c.id !== activeConversation.id));
@@ -876,6 +986,9 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
             }
           }}
           activeTitle={activeConversation?.title}
+          selectedModel={selectedModel}
+          onModelChange={setSelectedModel}
+          onOpenMemory={() => setShowMemoryPanel(true)}
         />
       )}
 
@@ -1046,6 +1159,64 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
           </div>
         </div>
       </footer>
+
+      {/* ── MEMORY PANEL ─────────────────────────────────────────────── */}
+      {showMemoryPanel && (
+        <>
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 animate-gradi-fadein" onClick={() => setShowMemoryPanel(false)} />
+          <div className="fixed inset-x-0 bottom-0 z-50 animate-gradi-sheet-up max-h-[85vh]">
+            <div className="bg-[#18181F] rounded-t-[24px] border border-white/10 flex flex-col h-full max-h-[85vh] shadow-2xl">
+              <div className="pt-3 pb-2 flex justify-center sticky top-0 bg-[#18181F] border-b border-white/5 z-10">
+                <div className="w-12 h-1.5 rounded-full bg-white/20" />
+              </div>
+              <div className="p-4 border-b border-white/5 flex items-center justify-between">
+                <div>
+                  <h2 className="font-bold text-white text-lg">Mémoire de Gradie</h2>
+                  <p className="text-white/40 text-xs">{memories.length} souvenir{memories.length !== 1 ? 's' : ''} stocké{memories.length !== 1 ? 's' : ''}</p>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={deleteAllMemories} className="text-xs text-red-400 hover:text-red-300 px-3 py-1.5 rounded-lg bg-red-500/10">Tout supprimer</button>
+                  <button onClick={() => setShowMemoryPanel(false)} className="text-white/60 hover:text-white p-1"><X className="w-5 h-5" /></button>
+                </div>
+              </div>
+              <div className="p-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+                  <input
+                    type="text"
+                    placeholder="Rechercher dans la mémoire..."
+                    value={memorySearch}
+                    onChange={(e) => setMemorySearch(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-white/30 outline-none focus:border-indigo-500/50"
+                  />
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {memories.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Sparkles className="w-12 h-12 text-white/10 mx-auto mb-3" />
+                    <p className="text-white/40 text-sm">Aucune mémoire enregistrée</p>
+                    <p className="text-white/20 text-xs mt-1">Gradie se souviendra des informations importantes que vous partagez</p>
+                  </div>
+                ) : memories.map((mem) => (
+                  <div key={mem.id} className="bg-white/5 border border-white/10 rounded-xl p-3 group hover:bg-white/8 transition-colors">
+                    <p className="text-sm text-white/80 leading-relaxed">{mem.content}</p>
+                    <div className="flex items-center justify-between mt-2">
+                      <div className="flex items-center gap-2">
+                        {mem.tags && <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full">{mem.tags}</span>}
+                        <span className="text-[10px] text-white/30">{new Date(mem.createdAt).toLocaleDateString('fr-FR')}</span>
+                      </div>
+                      <button onClick={() => deleteMemory(mem.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-opacity">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
