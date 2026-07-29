@@ -830,6 +830,40 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
           try {
             const p = JSON.parse(json);
             if (p.token) { acc += p.token; setStreamingContent(acc); }
+            // Handle action results — append summary to response
+            if (p.actions && Array.isArray(p.actions)) {
+              for (const act of p.actions) {
+                const r = act.result as any;
+                let summary = '';
+                if (act.error) {
+                  summary = `\n\n❌ **Erreur** : ${act.error}`;
+                } else if (act.action === 'create_classes') {
+                  const created = r?.created || [];
+                  const errors = r?.errors || [];
+                  summary = `\n\n---\n✅ **${created.length} classe(s) créée(s)** : ${created.map((c: any) => `${c.name} (${c.level})`).join(', ')}`;
+                  if (errors.length > 0) summary += `\n⚠️ ${errors.map((e: any) => `${e.name}: ${e.error}`).join(', ')}`;
+                } else if (act.action === 'list_classes') {
+                  const classes = r?.classes || [];
+                  summary = `\n\n---\n📋 **${classes.length} classe(s)** dans l'établissement :\n${classes.map((c: any) => `• ${c.name} (${c.level}) — ${c._count?.enrollments || 0} élèves, ${c._count?.courses || 0} cours`).join('\n')}`;
+                } else if (act.action === 'list_courses') {
+                  const courses = r?.courses || [];
+                  summary = `\n\n---\n📚 **${courses.length} cours** trouvés :\n${courses.map((c: any) => `• ${c.name} — ${c.class?.name || '?'} — Prof: ${c.teacher?.fullName || '?'}`).join('\n')}`;
+                } else if (act.action === 'bulk_create_schedule') {
+                  const created = r?.created || [];
+                  const errors = r?.errors || [];
+                  summary = `\n\n---\n✅ **${created.length} créneau(x) ajouté(s)** à l'emploi du temps`;
+                  if (errors.length > 0) summary += `\n⚠️ ${errors.map((e: any) => e.error).join(', ')}`;
+                } else if (act.action === 'delete_schedule') {
+                  summary = `\n\n---\n🗑️ Créneau supprimé`;
+                } else if (act.action === 'update_schedule') {
+                  summary = `\n\n---\n✏️ Créneau modifié`;
+                }
+                if (summary) {
+                  acc += summary;
+                  setStreamingContent(acc);
+                }
+              }
+            }
             if (p.done) {
               const am: AiMessage = {
                 id: (Date.now() + 1).toString(),

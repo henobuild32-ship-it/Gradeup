@@ -120,7 +120,60 @@ Tu es le conseiller de direction et l'analyste stratégique de l'administration 
 - Cartographier la vie scolaire (profils de classes, professeurs absents, derniers inscrits).
 - Gérer la conformité et les droits.
 - Simuler des scénarios décisionnels.
-- Superviser les processus de fin de cycle.`
+- Superviser les processus de fin de cycle.
+
+ACTIONNALITÉ — Tu peux EXÉCUTER des actions directement sur la base de données. Quand l'administrateur te demande de créer/modifier/supprimer quelque chose, tu dois RÉPONDRE avec l'action ET le résultat sera exécuté automatiquement.
+
+FORMAT D'ACTION (à inclure dans ta réponse quand tu dois effectuer une action) :
+[ACTION: action_name]
+[PARAMS: { json des paramètres }]
+[/ACTION]
+
+ACTIONS DISPONIBLES :
+
+1. CREATE_CLASSES — Créer une ou plusieurs classes
+   [ACTION: create_classes]
+   [PARAMS: {"classes": [{"name": "6ème A", "level": "6ème", "fees": 0}, {"name": "5ème A", "level": "5ème", "fees": 0}]}]
+   [/ACTION]
+
+2. LIST_CLASSES — Lister les classes existantes
+   [ACTION: list_classes]
+   [PARAMS: {}]
+   [/ACTION]
+
+3. DELETE_CLASS — Supprimer une classe
+   [ACTION: delete_class]
+   [PARAMS: {"classId": "xxx"}]
+   [/ACTION]
+
+4. LIST_COURSES — Lister les cours
+   [ACTION: list_courses]
+   [PARAMS: {"classId": "xxx"}]
+   [/ACTION]
+
+5. CREATE_SCHEDULE — Créer un créneau d'emploi du temps
+   [ACTION: create_schedule]
+   [PARAMS: {"courseId": "xxx", "dayOfWeek": 1, "startTime": "08:00", "endTime": "09:00", "room": "Salle 1"}]
+   [/ACTION]
+
+6. BULK_CREATE_SCHEDULE — Créer plusieurs créneaux
+   [ACTION: bulk_create_schedule]
+   [PARAMS: {"slots": [{"courseId": "xxx", "dayOfWeek": 1, "startTime": "08:00", "endTime": "09:00", "room": "Salle 1"}]}]
+   [/ACTION]
+
+7. UPDATE_SCHEDULE — Modifier un créneau
+   [ACTION: update_schedule]
+   [PARAMS: {"scheduleId": "xxx", "startTime": "09:00", "endTime": "10:00"}]
+   [/ACTION]
+
+8. DELETE_SCHEDULE — Supprimer un créneau
+   [ACTION: delete_schedule]
+   [PARAMS: {"scheduleId": "xxx"}]
+   [/ACTION]
+
+IMPORTANT : Tu peux combiner texte ET action dans ta réponse. L'utilisateur voit d'abord ton texte, puis le résultat de l'action est ajouté automatiquement.
+Quand l'administrateur te donne un emploi du temps en image/PDF, analyse-le et crée les créneaux correspondants avec BULK_CREATE_SCHEDULE.
+Quand l'administrateur dit "crée X classes de niveau Y", utilise CREATE_CLASSES avec la liste générée.`
   };
 
   const guidance = roleGuidance[userRole] || roleGuidance.STUDENT;
@@ -344,9 +397,31 @@ ${difficultyRadar.join('\n') || 'Aucun élève en difficulté.'}`;
       const totalRevenue = paymentStats._sum?.amount || 0;
       const classes = await db.schoolClass.findMany({
         where: { schoolId },
-        include: { _count: { select: { enrollments: true } } },
-        take: 10,
+        include: { _count: { select: { enrollments: true, courses: true } } },
+        orderBy: { name: 'asc' },
       });
+
+      const courses = await db.course.findMany({
+        where: { schoolId },
+        include: {
+          class: { select: { id: true, name: true } },
+          teacher: { select: { id: true, fullName: true } },
+          _count: { select: { lessons: true, grades: true } },
+        },
+        orderBy: { name: 'asc' },
+      });
+
+      const schedules = await db.courseSchedule.findMany({
+        where: { schoolId },
+        include: {
+          course: {
+            select: { name: true, class: { select: { name: true } }, teacher: { select: { fullName: true } } },
+          },
+        },
+        orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
+      });
+
+      const DAYS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
 
       return `Administrateur : ${userName}
 📊 Écosystème : ${studentCount} élèves | ${teacherCount} profs | ${parentCount} parents | ${classCount} classes | ${courseCount} cours
@@ -357,8 +432,14 @@ Ratio : ${(studentCount / (teacherCount || 1)).toFixed(1)} élèves/prof
   - Factures en attente : ${pendingPayments}
   - Factures en retard : ${overduePayments}
 
-🏫 Classes :
-${classes.map(c => `  - ${c.name} (${c.level}) : ${c._count.enrollments} élèves`).join('\n')}`;
+🏫 Classes (${classes.length}) :
+${classes.map(c => `  - ${c.name} (${c.level}) : ${c._count.enrollments} élèves, ${c._count.courses} cours`).join('\n') || '  Aucune classe'}
+
+📚 Cours (${courses.length}) :
+${courses.map(c => `  - ${c.name} → ${c.class?.name || '?'} — Prof: ${c.teacher?.fullName || 'Non assigné'}`).join('\n') || '  Aucun cours'}
+
+🗓️ Emploi du temps (${schedules.length} créneaux) :
+${schedules.map(s => `  - ${DAYS[s.dayOfWeek] || '?'} ${s.startTime}-${s.endTime} : ${s.course?.name || '?'} (${s.course?.class?.name || '?'}) — ${s.course?.teacher?.fullName || '?'} — Salle: ${s.room || 'N/A'}`).join('\n') || '  Aucun créneau'}`;
     }
   } catch (err) {
     console.error('[AI] Erreur construction contexte DB:', err);
@@ -602,9 +683,41 @@ Tu peux ajouter des tags optionnels : \`[MEM: [TAG: categorie1, categorie2] text
             await saveMemory(userId, schoolId, mem);
           }
 
+          // ─── Détecter et exécuter les actions IA ──────────────────────────
+          const actionRegex = /\[ACTION:\s*(\w+)\]\s*\[PARAMS:\s*(\{[^}]+\})\]\s*\[\/ACTION\]/gi;
+          let actionMatch;
+          const actionResults: Array<{ action: string; result: unknown; error?: string }> = [];
+          while ((actionMatch = actionRegex.exec(fullReply)) !== null) {
+            const actionName = actionMatch[1];
+            try {
+              const actionParams = JSON.parse(actionMatch[2]);
+              try {
+                const actionRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/ai/actions`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ action: actionName, params: actionParams, userId, schoolId }),
+                });
+                const actionData = await actionRes.json();
+                actionResults.push({ action: actionName, result: actionData.result, error: actionData.error });
+              } catch (err) {
+                actionResults.push({ action: actionName, result: null, error: err instanceof Error ? err.message : 'Erreur exécution' });
+              }
+            } catch {
+              actionResults.push({ action: actionName, result: null, error: 'JSON invalide dans les paramètres' });
+            }
+          }
+
+          // Send action results as SSE events
+          if (actionResults.length > 0) {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ actions: actionResults, conversationId: conversationIdFinal })}\n\n`),
+            );
+          }
+
           const cleanReply = fullReply
             .replace(/\[PREF:\s*[^\]]+\]/gi, '')
             .replace(/\[MEM:\s*[^\]]+\]/gi, '')
+            .replace(/\[ACTION:\s*\w+\]\s*\[PARAMS:\s*\{[^}]*\}\]\s*\[\/ACTION\]/gi, '')
             .trim();
           await db.aiMessage.create({ data: { conversationId: conversationIdFinal, role: 'assistant', content: cleanReply } });
           await db.aiConversation.update({ where: { id: conversationIdFinal }, data: { updatedAt: new Date() } });
