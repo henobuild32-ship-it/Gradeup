@@ -4,15 +4,18 @@ import { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import type { UserInfo } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import {
-  Award, TrendingUp, FileText, Calendar, Users,
+  Award, TrendingUp, FileText, Calendar, Users, Eye,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import BulletinPrint from '@/components/gradeup/bulletin-print';
 
 interface ReportCardInfo {
   id: string;
@@ -28,6 +31,7 @@ interface ReportCardInfo {
   mention: string;
   status: string;
   createdAt: string;
+  gradesData?: Record<string, unknown> | null;
   student?: { id: string; fullName: string; photoUrl: string };
   class?: { id: string; name: string; level: string };
 }
@@ -40,6 +44,7 @@ export default function ParentBulletins() {
   const [reportCards, setReportCards] = useState<ReportCardInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingChildren, setLoadingChildren] = useState(true);
+  const [viewBulletin, setViewBulletin] = useState<ReportCardInfo | null>(null);
   const schoolId = user?.schoolId || '';
 
   useEffect(() => { fetchChildren(); }, [user]);
@@ -294,12 +299,58 @@ export default function ParentBulletins() {
                       Classe : {rc.class.name} ({rc.class.level})
                     </div>
                   )}
+
+                  <Button
+                    size="sm"
+                    className="w-full mt-4 gap-1.5 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700"
+                    onClick={() => setViewBulletin(rc)}
+                  >
+                    <Eye className="h-4 w-4" />
+                    Voir le bulletin
+                  </Button>
                 </CardContent>
               </Card>
             );
           })}
         </div>
       )}
+
+      {/* Bulletin detail + print */}
+      <Dialog open={!!viewBulletin} onOpenChange={(o) => !o && setViewBulletin(null)}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-violet-600" />
+              Bulletin — {viewBulletin?.reportNumber}
+            </DialogTitle>
+            <DialogDescription>
+              Consultez et imprimez le bulletin officiel de votre enfant.
+            </DialogDescription>
+          </DialogHeader>
+          {viewBulletin && (
+            <BulletinPrint
+              report={{
+                reportNumber: viewBulletin.reportNumber,
+                trimester: viewBulletin.trimester,
+                academicYear: viewBulletin.academicYear,
+                studentName: viewBulletin.studentName || viewBulletin.student?.fullName || '',
+                studentGender: (viewBulletin.gradesData as any)?.metadata?.studentGender,
+                studentBirthDate: (viewBulletin.gradesData as any)?.metadata?.studentBirthDate,
+                permanentNumber: (viewBulletin.gradesData as any)?.metadata?.permanentNumber,
+                class: viewBulletin.class,
+                averageGrade: viewBulletin.averageGrade,
+                mention: viewBulletin.mention,
+                classRank: viewBulletin.classRank,
+                totalPointsObtained: viewBulletin.totalPointsObtained,
+                totalPointsPossible: viewBulletin.totalPointsPossible,
+                overallPercentage: viewBulletin.overallPercentage,
+                gradesData: viewBulletin.gradesData,
+              }}
+              schoolName={user?.school?.name}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

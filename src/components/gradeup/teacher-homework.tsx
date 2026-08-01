@@ -11,10 +11,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Edit, Trash2, BookOpen, Calendar, Clock, AlertTriangle, ClipboardList, Upload, Download, Eye } from 'lucide-react';
+import { Plus, Edit, Trash2, BookOpen, Calendar, Clock, AlertTriangle, ClipboardList, Upload, Download, Eye, Library } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { CourseInfo, HomeworkInfo, SubmissionInfo } from '@/lib/types';
+import { publishToLibrary } from '@/lib/publishToLibrary';
 
 export default function TeacherHomework() {
   const { user } = useAppStore();
@@ -34,6 +35,7 @@ export default function TeacherHomework() {
   const [formFileUrl, setFormFileUrl] = useState('');
   const formFileRef = useRef<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [addToLibrary, setAddToLibrary] = useState(true);
 
   const [submissions, setSubmissions] = useState<SubmissionInfo[]>([]);
   const [submissionsOpen, setSubmissionsOpen] = useState(false);
@@ -165,6 +167,27 @@ export default function TeacherHomework() {
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (!res.ok) { const err = await res.json(); toast.error(err.error || "Erreur lors de l'enregistrement"); return; }
       toast.success(editingHomework ? 'Devoir modifié avec succès' : 'Devoir créé avec succès');
+
+      // Publish to the digital library on creation
+      if (!editingHomework && addToLibrary) {
+        const course = courses.find((c) => c.id === formCourseId);
+        const libOk = await publishToLibrary({
+          schoolId: user.schoolId,
+          createdById: user.id,
+          title: formTitle.trim(),
+          description: formDescription.trim() || `Devoir du cours ${course?.name || ''}`,
+          matiere: course?.name || '',
+          niveau: course?.class?.level || '',
+          author: user.fullName,
+          url: '',
+          fileUrl: fileUrl || '',
+          type: fileUrl?.toLowerCase().endsWith('.pdf') ? 'PDF' : fileUrl ? 'FICHIER' : 'LIEN',
+          category: 'Devoirs',
+          targetClassId: course?.classId || '',
+        });
+        if (!libOk) toast.warning('Le devoir est créé mais l\'ajout à la bibliothèque a échoué.');
+      }
+
       setDialogOpen(false); resetForm(); fetchData();
     } catch { toast.error("Erreur lors de l'enregistrement"); } finally { setSubmitting(false); }
   };
@@ -242,6 +265,26 @@ export default function TeacherHomework() {
                       <CardTitle className="text-base">{hw.title}</CardTitle>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-emerald-50 hover:text-emerald-600 transition-colors" title="Ajouter à la bibliothèque numérique"
+                        onClick={() => {
+                          const course = courses.find((c) => c.id === hw.courseId);
+                          publishToLibrary({
+                            schoolId: user.schoolId,
+                            createdById: user.id,
+                            title: hw.title,
+                            description: hw.description || `Devoir du cours ${course?.name || ''}`,
+                            matiere: course?.name || '',
+                            niveau: course?.class?.level || '',
+                            author: user.fullName,
+                            url: '',
+                            fileUrl: hw.fileUrl || '',
+                            type: hw.fileUrl?.toLowerCase().endsWith('.pdf') ? 'PDF' : hw.fileUrl ? 'FICHIER' : 'LIEN',
+                            category: 'Devoirs',
+                            targetClassId: course?.classId || '',
+                          }).then((ok) => ok ? toast.success('Devoir ajouté à la bibliothèque numérique.') : toast.error('Échec de l\'ajout à la bibliothèque.'));
+                        }}>
+                        <Library className="h-3.5 w-3.5" />
+                      </Button>
                       <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-purple-50 hover:text-purple-600 transition-colors" onClick={() => viewSubmissions(hw)} title="Voir les soumissions"><Eye className="h-3.5 w-3.5" /></Button>
                       <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-blue-50 hover:text-blue-600 transition-colors" onClick={() => openEditDialog(hw)}><Edit className="h-3.5 w-3.5" /></Button>
                       <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-red-50 hover:text-red-600 transition-colors" onClick={() => handleDelete(hw.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
@@ -354,6 +397,23 @@ export default function TeacherHomework() {
                 )}
               </div>
             </div>
+            <label className="flex items-center gap-2.5 p-3 rounded-xl border border-blue-100 bg-blue-50/40 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={addToLibrary}
+                onChange={(e) => setAddToLibrary(e.target.checked)}
+                className="w-4 h-4 accent-blue-600"
+              />
+              <div>
+                <span className="text-sm font-semibold text-blue-800 flex items-center gap-1.5">
+                  <Library className="w-4 h-4" />
+                  Publier aussi dans la bibliothèque numérique
+                </span>
+                <span className="text-xs text-blue-600/70">
+                  Les élèves pourront retrouver ce devoir dans la Bibliothèque.
+                </span>
+              </div>
+            </label>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }} className="hover:scale-[1.02] active:scale-[0.98] transition-all">Annuler</Button>

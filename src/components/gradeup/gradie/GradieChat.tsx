@@ -53,6 +53,8 @@ import {
   Play,
   Pause,
   ChevronUp,
+  History,
+  CornerDownLeft,
 } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import GradieWelcome from './GradieWelcome';
@@ -391,6 +393,7 @@ interface MenuSheetProps {
   onNewChat: () => void;
   onOpenHistory: () => void;
   onOpenSearch: () => void;
+  onOpenSearchHistory: () => void;
   onClearAll: () => void;
   onExport: () => void;
   onDeleteCurrent: () => void;
@@ -405,6 +408,7 @@ function ThreeDotsMenuSheet({
   onNewChat,
   onOpenHistory,
   onOpenSearch,
+  onOpenSearchHistory,
   onClearAll,
   onExport,
   onDeleteCurrent,
@@ -428,6 +432,7 @@ function ThreeDotsMenuSheet({
     { label: 'Conversations épinglées', icon: Pin, action: onOpenHistory, color: 'text-amber-400' },
     { label: 'Conversations archivées', icon: Archive, action: onOpenHistory, color: 'text-purple-400' },
     { label: 'Rechercher dans les conversations', icon: Search, action: onOpenSearch, color: 'text-emerald-400' },
+    { label: 'Historique de recherche', icon: History, action: onOpenSearchHistory, color: 'text-teal-400' },
     { label: 'Favoris', icon: Star, action: onOpenHistory, color: 'text-yellow-400' },
     { label: `Modèle IA : ${models.find(m => m.id === selectedModel)?.name || 'GLM'}`, icon: Bot, action: () => setShowModels(true), color: 'text-cyan-400' },
     { label: 'Mémoire de Gradie', icon: Sparkles, action: () => { onOpenMemory?.(); onClose(); }, color: 'text-pink-400' },
@@ -660,6 +665,9 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
   const [showMemoryPanel, setShowMemoryPanel] = useState(false);
   const [memories, setMemories] = useState<Array<{ id: string; content: string; category: string; tags: string; importance: number; createdAt: string }>>([]);
   const [memorySearch, setMemorySearch] = useState('');
+  const [showSearchHistory, setShowSearchHistory] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<Array<{ id: string; query: string; resultSummary: string; createdAt: string }>>([]);
+  const [searchHistoryLoading, setSearchHistoryLoading] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -717,6 +725,45 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
     setMemories([]);
   };
 
+  // ── Search history (historique de recherche consultable) ───────────────
+  const loadSearchHistory = useCallback(async () => {
+    setSearchHistoryLoading(true);
+    try {
+      const res = await fetch(`/api/ai/search-history?userId=${userId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSearchHistory(data.history || []);
+      }
+    } catch { /* silent */ } finally { setSearchHistoryLoading(false); }
+  }, [userId]);
+
+  useEffect(() => { if (showSearchHistory) loadSearchHistory(); }, [showSearchHistory, loadSearchHistory]);
+
+  const recordSearch = (query: string) => {
+    fetch('/api/ai/search-history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, schoolId, query }),
+    }).catch(() => {});
+  };
+
+  const deleteSearchHistory = async (id: string) => {
+    await fetch(`/api/ai/search-history?id=${id}&userId=${userId}`, { method: 'DELETE' });
+    setSearchHistory((prev) => prev.filter((h) => h.id !== id));
+  };
+
+  const deleteAllSearchHistory = async () => {
+    if (!confirm('Vider tout l\'historique de recherche ?')) return;
+    await fetch(`/api/ai/search-history?userId=${userId}&deleteAll=true`, { method: 'DELETE' });
+    setSearchHistory([]);
+  };
+
+  const reuseSearch = (query: string) => {
+    setShowSearchHistory(false);
+    setInput(query);
+    setTimeout(() => textareaRef.current?.focus(), 100);
+  };
+
   // ── Load single conversation ────────────────────────────────────────────────
   const loadConversation = useCallback(async (id: string) => {
     setIsLoading(true);
@@ -753,6 +800,7 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
     setInput('');
     setError(null);
     setStopRequested(false);
+    recordSearch(msg);
 
     let convId = activeConversation?.id;
     if (!convId) {
@@ -990,6 +1038,7 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
           onNewChat={createNewConversation}
           onOpenHistory={() => {}}
           onOpenSearch={() => setShowSearch(true)}
+          onOpenSearchHistory={() => setShowSearchHistory(true)}
           onClearAll={() => {
             if (confirm('Vider tout l\'historique ?')) setConversations([]);
           }}
@@ -1243,6 +1292,68 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
                       <button onClick={() => deleteMemory(mem.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-opacity">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── SEARCH HISTORY PANEL ─────────────────────────────────────── */}
+      {showSearchHistory && (
+        <>
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 animate-gradi-fadein" onClick={() => setShowSearchHistory(false)} />
+          <div className="fixed inset-x-0 bottom-0 z-50 animate-gradi-sheet-up max-h-[85vh]">
+            <div className="bg-[#18181F] rounded-t-[24px] border border-white/10 flex flex-col h-full max-h-[85vh] shadow-2xl">
+              <div className="pt-3 pb-2 flex justify-center sticky top-0 bg-[#18181F] border-b border-white/5 z-10">
+                <div className="w-12 h-1.5 rounded-full bg-white/20" />
+              </div>
+              <div className="p-4 border-b border-white/5 flex items-center justify-between">
+                <div>
+                  <h2 className="font-bold text-white text-lg flex items-center gap-2">
+                    <History className="w-5 h-5 text-teal-400" />
+                    Historique de recherche
+                  </h2>
+                  <p className="text-white/40 text-xs mt-0.5">{searchHistory.length} recherche{searchHistory.length !== 1 ? 's' : ''} effectuée{searchHistory.length !== 1 ? 's' : ''}</p>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={deleteAllSearchHistory} className="text-xs text-red-400 hover:text-red-300 px-3 py-1.5 rounded-lg bg-red-500/10">Tout supprimer</button>
+                  <button onClick={() => setShowSearchHistory(false)} className="text-white/60 hover:text-white p-1"><X className="w-5 h-5" /></button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {searchHistoryLoading ? (
+                  <div className="space-y-2">
+                    {[...Array(4)].map((_, i) => (
+                      <div key={i} className="h-14 bg-white/5 rounded-xl animate-pulse" />
+                    ))}
+                  </div>
+                ) : searchHistory.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Search className="w-12 h-12 text-white/10 mx-auto mb-3" />
+                    <p className="text-white/40 text-sm">Aucune recherche enregistrée</p>
+                    <p className="text-white/20 text-xs mt-1">Vos questions posées à Gradie apparaîtront ici</p>
+                  </div>
+                ) : searchHistory.map((h) => (
+                  <div key={h.id} className="bg-white/5 border border-white/10 rounded-xl p-3 group hover:bg-white/8 transition-colors">
+                    <div className="flex items-start gap-2">
+                      <Search className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-white/85 leading-relaxed line-clamp-2">{h.query}</p>
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <span className="text-[10px] text-white/30">{new Date(h.createdAt).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={() => reuseSearch(h.query)} className="p-2 text-teal-400 hover:bg-teal-500/10 rounded-lg transition-colors" title="Répéter cette recherche">
+                          <CornerDownLeft className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => deleteSearchHistory(h.id)} className="opacity-0 group-hover:opacity-100 p-2 text-red-400 hover:text-red-300 transition-all" title="Supprimer">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}

@@ -130,6 +130,7 @@ model User {
   payments                Payment[]
   pushSubscriptions       PushSubscription[]
   memories                AiMemory[]
+  searchHistory           AiSearchHistory[]
   favoris                 Favori[]
   reportCards             ReportCard[]
   cahierMarks             CahierMark[]
@@ -551,6 +552,20 @@ model AiMemory {
 
   @@index([userId])
   @@index([schoolId, userId])
+}
+
+model AiSearchHistory {
+  id            String   @id @default(cuid())
+  userId        String
+  schoolId      String
+  query         String
+  resultSummary String   @default("")
+  createdAt     DateTime @default(now())
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([schoolId, userId, createdAt])
 }
 
 model Ressource {

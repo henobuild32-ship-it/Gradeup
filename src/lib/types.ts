@@ -72,6 +72,7 @@ export interface CourseInfo {
   name: string;
   description: string;
   status?: string;
+  coefficient?: number;
   class?: ClassInfo;
   teacher?: UserInfo;
   _count?: {

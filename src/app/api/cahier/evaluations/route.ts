@@ -1,6 +1,88 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
+import { syncStudentReport } from '@/lib/grade-sync';
+
+// Map a cahier period (P1, P2, EX1, P3, P4, EX2) to its academic trimester.
+function periodToTrimester(period: string): string {
+  if (period === 'P1' || period === 'P2' || period === 'EX1') return '1';
+  if (period === 'P3' || period === 'P4' || period === 'EX2') return '2';
+  return period;
+}
+
+/**
+ * Recomputes the period Grade for every student of an evaluation and syncs the
+ * corresponding bulletins. Used by PUT (mark changes) and PATCH (meta edits).
+ */
+async function recomputeEvaluationGrades(evaluation: {
+  id: string;
+  schoolId: string;
+  courseId: string;
+  trimester: string;
+}) {
+  const { schoolId, courseId, trimester } = evaluation;
+
+  const course = await db.course.findUnique({
+    where: { id: courseId },
+    select: { teacherId: true },
+  });
+  const teacherId = course?.teacherId ?? '';
+
+  const studentMarks = await db.cahierMark.findMany({
+    where: { evaluation: { courseId, trimester } },
+    include: { evaluation: true },
+  });
+
+  const byStudent: Record<string, typeof studentMarks> = {};
+  for (const m of studentMarks) {
+    (byStudent[m.studentId] ||= []).push(m);
+  }
+
+  const mappedTrimester = periodToTrimester(trimester);
+
+  for (const [studentId, marks] of Object.entries(byStudent)) {
+    let totalNormalizedScore = 0;
+    let count = 0;
+    for (const m of marks) {
+      const max = m.evaluation.maxScore > 0 ? m.evaluation.maxScore : 20;
+      totalNormalizedScore += (m.score / max) * 20;
+      count++;
+    }
+    const averagePeriodScore = count > 0 ? totalNormalizedScore / count : 0;
+
+    const existingGrade = await db.grade.findFirst({
+      where: { schoolId, courseId, studentId, trimester },
+    });
+
+    if (existingGrade) {
+      await db.grade.update({
+        where: { id: existingGrade.id },
+        data: {
+          score: Math.round(averagePeriodScore * 10) / 10,
+          maxScore: 20,
+          teacherId,
+        },
+      });
+    } else {
+      await db.grade.create({
+        data: {
+          schoolId,
+          courseId,
+          studentId,
+          teacherId,
+          score: Math.round(averagePeriodScore * 10) / 10,
+          maxScore: 20,
+          trimester,
+          comment: `Moyenne automatique - ${trimester}`,
+        },
+      });
+    }
+
+    syncStudentReport(schoolId, studentId, mappedTrimester).catch((e) =>
+      console.error('[Cahier] syncStudentReport error:', e)
+    );
+  }
+}
 
 /**
  * GET /api/cahier/evaluations
@@ -248,7 +330,7 @@ trimester: trimester,
               teacherId,
               score: Math.round(averagePeriodScore * 10) / 10,
               maxScore: 20,
-trimester: trimester,
+              trimester: trimester,
               comment: `Moyenne automatique - ${trimester}`,
             },
           });
@@ -256,7 +338,89 @@ trimester: trimester,
       }
     }
 
+    // ── Real-time bulletin sync ──
+    // Recompute the auto-draft ReportCard for each affected student so the
+    // cahier marks are reflected instantly in the student's points & bulletin.
+    const mappedTrimester = periodToTrimester(trimester);
+    for (const studentId of studentIds) {
+      syncStudentReport(schoolId, studentId, mappedTrimester).catch((e) =>
+        console.error('[Cahier] syncStudentReport error:', e)
+      );
+    }
+
     return NextResponse.json({ success: true });
+  } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    const msg = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
+/**
+ * PATCH /api/cahier/evaluations
+ * Body: { evaluationId, title?, maxScore?, date? }
+ * Edits the metadata of an evaluation column (title, max score, date) and
+ * recomputes the affected grades + bulletins in real time.
+ */
+export async function PATCH(request: NextRequest) {
+  try {
+    const auth = authenticateRequest(request);
+    const body = await request.json();
+    const { evaluationId, title, maxScore, date } = body;
+
+    if (!evaluationId) {
+      return NextResponse.json(
+        { error: 'Missing required field: evaluationId' },
+        { status: 400 }
+      );
+    }
+
+    const evaluation = await db.cahierEvaluation.findUnique({
+      where: { id: evaluationId },
+    });
+    if (!evaluation) {
+      return NextResponse.json({ error: 'Evaluation not found' }, { status: 404 });
+    }
+
+    // Only the course teacher or an admin may edit the evaluation.
+    if (auth.role !== 'ADMIN') {
+      const course = await db.course.findUnique({
+        where: { id: evaluation.courseId },
+        select: { teacherId: true },
+      });
+      if (!course || course.teacherId !== auth.userId) {
+        return NextResponse.json(
+          { error: 'Vous n\'êtes pas autorisé à modifier cette évaluation' },
+          { status: 403 }
+        );
+      }
+    }
+
+    const data: Record<string, unknown> = {};
+    if (typeof title === 'string' && title.trim()) data.title = title.trim();
+    if (maxScore !== undefined && maxScore !== '') {
+      const parsed = parseFloat(maxScore);
+      if (isNaN(parsed) || parsed <= 0) {
+        return NextResponse.json({ error: 'Note maximale invalide' }, { status: 400 });
+      }
+      data.maxScore = parsed;
+    }
+    if (date) {
+      const parsedDate = new Date(date);
+      if (!isNaN(parsedDate.getTime())) data.date = parsedDate;
+    }
+
+    const updated = await db.cahierEvaluation.update({
+      where: { id: evaluationId },
+      data,
+    });
+
+    // Recompute grades & bulletins since maxScore / period may have changed.
+    await recomputeEvaluationGrades(updated);
+
+    return NextResponse.json({ evaluation: updated });
   } catch (error: unknown) {
     if (error instanceof AuthError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
@@ -281,9 +445,19 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'evaluationId is required' }, { status: 400 });
     }
 
+    const evaluation = await db.cahierEvaluation.findUnique({
+      where: { id: evaluationId },
+    });
+    if (!evaluation) {
+      return NextResponse.json({ error: 'Evaluation not found' }, { status: 404 });
+    }
+
     await db.cahierEvaluation.delete({
       where: { id: evaluationId },
     });
+
+    // Recompute grades & bulletins so deleted marks are reflected instantly.
+    await recomputeEvaluationGrades(evaluation);
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {

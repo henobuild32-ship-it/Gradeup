@@ -56,6 +56,7 @@ import {
   Send,
   AlertCircle,
   Clock,
+  Pencil,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -110,6 +111,14 @@ export default function CahierCotation() {
   const [colTitle, setColTitle] = useState('');
   const [colMaxScore, setColMaxScore] = useState('20');
   const [addingCol, setAddingCol] = useState(false);
+
+  // Column editing dialog
+  const [editColOpen, setEditColOpen] = useState(false);
+  const [editingEval, setEditingEval] = useState<Evaluation | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editMaxScore, setEditMaxScore] = useState('20');
+  const [editDate, setEditDate] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // Offline status & unsaved changes
   const [isOnline, setIsOnline] = useState(true);
@@ -372,6 +381,55 @@ export default function CahierCotation() {
       }
     } catch {
       toast.error('Erreur lors de la suppression de la colonne');
+    }
+  };
+
+  // Open the edit dialog for an evaluation column
+  const openEditColumn = (evaluation: Evaluation) => {
+    setEditingEval(evaluation);
+    setEditTitle(evaluation.title);
+    setEditMaxScore(String(evaluation.maxScore));
+    setEditDate(evaluation.date ? evaluation.date.slice(0, 10) : '');
+    setEditColOpen(true);
+  };
+
+  // Save edited evaluation metadata (title, max score, date)
+  const handleEditColumn = async () => {
+    if (!editingEval) return;
+    if (!editTitle.trim()) {
+      toast.error('Le titre de l\'évaluation est requis');
+      return;
+    }
+    const parsedMax = parseFloat(editMaxScore);
+    if (isNaN(parsedMax) || parsedMax <= 0) {
+      toast.error('Veuillez saisir une note maximale valide');
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const res = await fetch('/api/cahier/evaluations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          evaluationId: editingEval.id,
+          title: editTitle.trim(),
+          maxScore: parsedMax,
+          date: editDate || undefined,
+        }),
+      });
+      if (res.ok) {
+        toast.success(`Colonne "${editTitle.trim()}" modifiée`);
+        setEditColOpen(false);
+        setEditingEval(null);
+        fetchData();
+      } else {
+        const err = await res.json();
+        toast.error(err.error || 'Erreur lors de la modification de la colonne');
+      }
+    } catch {
+      toast.error('Erreur lors de la modification de la colonne');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -643,12 +701,21 @@ export default function CahierCotation() {
                             /{e.maxScore}
                           </span>
                           {canEdit && (
-                            <button
-                              onClick={() => handleDeleteColumn(e.id, e.title)}
-                              className="text-red-500 hover:text-red-700 mt-1 print:hidden"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
+                            <div className="flex items-center gap-1.5 mt-1 print:hidden">
+                              <button
+                                onClick={() => openEditColumn(e)}
+                                className="text-blue-500 hover:text-blue-700"
+                                title="Modifier la colonne"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteColumn(e.id, e.title)}
+                                className="text-red-500 hover:text-red-700"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
                           )}
                         </div>
                       </TableHead>
@@ -782,6 +849,74 @@ export default function CahierCotation() {
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
             >
               {addingCol ? 'Création...' : 'Créer la colonne'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Column editing Dialog ── */}
+      <Dialog open={editColOpen} onOpenChange={setEditColOpen}>
+        <DialogContent className="sm:max-w-md">
+          <div className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-t-lg -mx-6 -mt-6 mb-0" />
+          <DialogHeader className="pt-2">
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-blue-600" />
+              Modifier l'évaluation
+            </DialogTitle>
+            <DialogDescription>
+              Modifiez les informations de la colonne. Les notes et bulletins seront
+              recalculés automatiquement.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-title">Titre de l'évaluation</Label>
+              <Input
+                id="edit-title"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="Ex: Interrogation 1, TP 2"
+                className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-max">Note maximale</Label>
+                <Input
+                  id="edit-max"
+                  type="number"
+                  min="1"
+                  value={editMaxScore}
+                  onChange={(e) => setEditMaxScore(e.target.value)}
+                  placeholder="20"
+                  className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-date">Date</Label>
+                <Input
+                  id="edit-date"
+                  type="date"
+                  value={editDate}
+                  onChange={(e) => setEditDate(e.target.value)}
+                  className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditColOpen(false)}>
+              Annuler
+            </Button>
+            <Button
+              onClick={handleEditColumn}
+              disabled={savingEdit || !editTitle.trim()}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {savingEdit ? 'Enregistrement...' : 'Enregistrer'}
             </Button>
           </DialogFooter>
         </DialogContent>

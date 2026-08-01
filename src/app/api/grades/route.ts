@@ -36,17 +36,26 @@ export async function GET(request: NextRequest) {
       where.studentId = auth.userId;
     }
     if (courseId) where.courseId = courseId;
-    if (trimester) where.trimester = trimester;
     if (teacherId) where.teacherId = teacherId;
+    if (trimester) {
+      // A trimester includes its monthly periods (P1/P2/EX1, P3/P4/EX2), so a
+      // student sees ALL their points for the selected trimester.
+      where.trimester =
+        trimester === '1'
+          ? { in: ['1', 'P1', 'P2', 'EX1'] }
+          : trimester === '2'
+          ? { in: ['2', 'P3', 'P4', 'EX2'] }
+          : trimester;
+    }
 
     const grades = await db.grade.findMany({
       where,
       include: {
-        course: { select: { id: true, name: true } },
+        course: { select: { id: true, name: true, classId: true, coefficient: true } },
         student: { select: { id: true, fullName: true, role: true } },
         teacher: { select: { id: true, fullName: true, role: true } },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ courseId: 'asc' }, { createdAt: 'asc' }],
     });
 
     return NextResponse.json({ grades });

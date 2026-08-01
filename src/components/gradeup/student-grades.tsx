@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '@/lib/store';
 import type { GradeInfo } from '@/lib/types';
 import { Card, CardContent, CardDescription } from '@/components/ui/card';
@@ -46,9 +46,38 @@ export default function StudentGrades() {
     setRefreshing(false);
   };
 
-  const average = grades.length > 0
-    ? grades.reduce((sum, g) => sum + (g.score / g.maxScore) * 20, 0) / grades.length
-    : 0;
+  const trimesterLabels: Record<string, string> = {
+    '1': '1er Trimestre', '2': '2e Trimestre', '3': '3e Trimestre',
+    P1: 'P1', P2: 'P2', EX1: 'Examen 1', P3: 'P3', P4: 'P4', EX2: 'Examen 2',
+  };
+
+  // Group grades by course so each course shows its period breakdown + average.
+  const groupedByCourse = useMemo(() => {
+    const map = new Map<string, GradeInfo[]>();
+    for (const g of grades) {
+      const list = map.get(g.courseId) || [];
+      list.push(g);
+      map.set(g.courseId, list);
+    }
+    return Array.from(map.entries()).map(([courseId, list]) => {
+      const course = list[0].course;
+      const normalized = list.map((g) => (g.score / g.maxScore) * 20);
+      const avg = normalized.reduce((a, b) => a + b, 0) / normalized.length;
+      return {
+        courseId,
+        courseName: course?.name || '—',
+        coeff: course?.coefficient ?? 1,
+        grades: list,
+        average: Math.round(avg * 100) / 100,
+      };
+    });
+  }, [grades]);
+
+  // Weighted general average by course (coefficient-aware), matching the bulletin.
+  const average = groupedByCourse.length > 0
+      ? groupedByCourse.reduce((sum, e) => sum + e.average * e.coeff, 0) /
+        groupedByCourse.reduce((sum, e) => sum + e.coeff, 0)
+      : 0;
 
   const getGradeColor = (score: number, maxScore: number) => {
     const val = (score / maxScore) * 20;
@@ -207,27 +236,41 @@ export default function StudentGrades() {
                       </TableRow>
                     </TableHeader>
                     <TableBody className="[&>tr:nth-child(even)]:bg-muted/30">
-                      {grades.map((grade) => {
-                        const pct = Math.round((grade.score / grade.maxScore) * 100);
-                        const normalized = (grade.score / grade.maxScore) * 20;
+                      {groupedByCourse.map((entry) => {
+                        const pct = Math.round((entry.average / 20) * 100);
                         return (
-                          <TableRow key={grade.id} className="hover:bg-blue-50/50 dark:hover:bg-blue-950/20 transition-colors">
-                            <TableCell className="pl-6 font-medium">{grade.course?.name || '—'}</TableCell>
-                            <TableCell className="text-center">
-                              <span className={`inline-flex items-center justify-center rounded-lg px-2.5 py-1 text-sm font-bold ${getGradeBg(grade.score, grade.maxScore)}`}>
-                                {grade.score}
+                          <TableRow key={entry.courseId} className="hover:bg-blue-50/50 dark:hover:bg-blue-950/20 transition-colors">
+                            <TableCell className="pl-6 font-medium">
+                              {entry.courseName}
+                              <span className="block text-[10px] text-muted-foreground font-normal mt-0.5">
+                                Coef. {entry.coeff} · {entry.grades.length} note(s)
                               </span>
                             </TableCell>
-                            <TableCell className="text-center text-muted-foreground">{grade.maxScore}</TableCell>
+                            <TableCell className="text-center">
+                              <div className="flex flex-wrap justify-center gap-1">
+                                {entry.grades.map((g) => (
+                                  <span
+                                    key={g.id}
+                                    title={`${trimesterLabels[g.trimester] || g.trimester} : ${g.score}/${g.maxScore}`}
+                                    className={`inline-flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold ${getGradeBg(g.score, g.maxScore)}`}
+                                  >
+                                    {g.score}
+                                  </span>
+                                ))}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center text-muted-foreground">/20</TableCell>
                             <TableCell className="text-center">
                               <div className="flex flex-col items-center gap-1.5">
                                 <div className="w-24 h-2 rounded-full bg-muted overflow-hidden">
-                                  <div className={`h-full rounded-full transition-all ${getProgressColor(grade.score, grade.maxScore)}`} style={{ width: `${pct}%` }} />
+                                  <div className={`h-full rounded-full transition-all ${getProgressColor(entry.average, 20)}`} style={{ width: `${pct}%` }} />
                                 </div>
-                                <span className="text-xs text-muted-foreground">{normalized.toFixed(1)}/20 ({pct}%)</span>
+                                <span className="text-xs text-muted-foreground">{entry.average.toFixed(1)}/20 ({pct}%)</span>
                               </div>
                             </TableCell>
-                            <TableCell className="hidden sm:table-cell max-w-[200px] truncate text-muted-foreground text-sm">{grade.comment || '—'}</TableCell>
+                            <TableCell className="hidden sm:table-cell max-w-[200px] truncate text-muted-foreground text-sm">
+                              {entry.grades.map((g) => g.comment).filter(Boolean).join(' · ') || '—'}
+                            </TableCell>
                           </TableRow>
                         );
                       })}

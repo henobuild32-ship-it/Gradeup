@@ -27,9 +27,11 @@ import {
   ExternalLink,
   Loader2,
   Upload,
+  Library,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { CourseInfo, UserInfo, GradeInfo } from '@/lib/types';
+import { publishToLibrary, lessonResourceType } from '@/lib/publishToLibrary';
 
 interface LessonInfo {
   id: string;
@@ -61,6 +63,7 @@ export default function TeacherCourses() {
   const [lessonFile, setLessonFile] = useState<File | null>(null);
   const [lessonUrl, setLessonUrl] = useState(''); // for external link or video embed
   const [publishing, setPublishing] = useState(false);
+  const [addToLibrary, setAddToLibrary] = useState(true);
 
   // Preview PDF state
   const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
@@ -164,6 +167,26 @@ export default function TeacherCourses() {
 
       if (res.ok) {
         toast.success('Ressource pédagogique publiée avec succès !');
+
+        // Also publish to the digital library (optional)
+        if (addToLibrary) {
+          const libOk = await publishToLibrary({
+            schoolId: user.schoolId,
+            createdById: user.id,
+            title: lessonTitle.trim(),
+            description: lessonContent.trim() || `Leçon du cours ${selectedCourse.name}`,
+            matiere: selectedCourse.name,
+            niveau: selectedCourse.class?.level || '',
+            author: user.fullName,
+            url: lessonType === 'link' || lessonType === 'video' ? finalFileUrl : '',
+            fileUrl: lessonType === 'pdf' ? finalFileUrl : '',
+            type: lessonResourceType(finalFileUrl, finalFileName),
+            category: 'Cours',
+            targetClassId: selectedCourse.classId,
+          });
+          if (!libOk) toast.warning('La leçon est publiée mais l\'ajout à la bibliothèque a échoué.');
+        }
+
         setLessonTitle('');
         setLessonContent('');
         setLessonFile(null);
@@ -187,8 +210,32 @@ export default function TeacherCourses() {
     }
   };
 
-  const getAverageForStudent = (studentId: string) => {
-    const studentGrades = grades.filter((g) => g.studentId === studentId);
+  // Publish an existing lesson to the digital library
+  const publishExistingLesson = async (lesson: LessonInfo) => {
+    if (!selectedCourse || !user) return;
+    try {
+      const libOk = await publishToLibrary({
+        schoolId: user.schoolId,
+        createdById: user.id,
+        title: lesson.title,
+        description: lesson.content || `Leçon du cours ${selectedCourse.name}`,
+        matiere: selectedCourse.name,
+        niveau: selectedCourse.class?.level || '',
+        author: user.fullName,
+        url: /^https?:\/\//.test(lesson.fileUrl || '') && !lesson.fileUrl?.endsWith('.pdf') ? lesson.fileUrl : '',
+        fileUrl: lesson.fileUrl?.endsWith('.pdf') ? lesson.fileUrl : '',
+        type: lessonResourceType(lesson.fileUrl || '', lesson.fileName || ''),
+        category: 'Cours',
+        targetClassId: selectedCourse.classId,
+      });
+      if (libOk) toast.success('Leçon ajoutée à la bibliothèque numérique.');
+      else toast.error('Échec de l\'ajout à la bibliothèque.');
+    } catch {
+      toast.error('Erreur lors de l\'ajout à la bibliothèque.');
+    }
+  };
+
+  const getAverageForStudent = (studentId: string) => {    const studentGrades = grades.filter((g) => g.studentId === studentId);
     if (studentGrades.length === 0) return null;
     const total = studentGrades.reduce((sum, g) => {
       return sum + (g.score / g.maxScore) * 20;
@@ -368,6 +415,16 @@ export default function TeacherCourses() {
                           </div>
 
                           <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => publishExistingLesson(lesson)}
+                              className="h-8 text-xs border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                              title="Ajouter à la bibliothèque numérique"
+                            >
+                              <Library className="w-3.5 h-3.5 mr-1" />
+                              Bibliothèque
+                            </Button>
                             {isPDF && (
                               <Button
                                 size="sm"
@@ -576,6 +633,24 @@ export default function TeacherCourses() {
                 />
               </div>
             )}
+
+            <label className="flex items-center gap-2.5 p-3 rounded-xl border border-blue-100 bg-blue-50/40 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={addToLibrary}
+                onChange={(e) => setAddToLibrary(e.target.checked)}
+                className="w-4 h-4 accent-blue-600"
+              />
+              <div>
+                <span className="text-sm font-semibold text-blue-800 flex items-center gap-1.5">
+                  <Library className="w-4 h-4" />
+                  Publier aussi dans la bibliothèque numérique
+                </span>
+                <span className="text-xs text-blue-600/70">
+                  Les élèves pourront retrouver ce contenu dans la Bibliothèque.
+                </span>
+              </div>
+            </label>
           </div>
 
           <DialogFooter>

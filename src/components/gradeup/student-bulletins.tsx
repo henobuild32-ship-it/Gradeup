@@ -7,8 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Award, TrendingUp, FileText, Calendar, RefreshCw } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Award, TrendingUp, FileText, Calendar, RefreshCw, Eye } from 'lucide-react';
 import { toast } from 'sonner';
+import BulletinPrint from '@/components/gradeup/bulletin-print';
 
 interface Bulletin {
   id: string;
@@ -36,6 +38,7 @@ export default function StudentBulletins() {
   const [loading, setLoading] = useState(true);
   const [trimester, setTrimester] = useState('1');
   const [refreshing, setRefreshing] = useState(false);
+  const [viewBulletin, setViewBulletin] = useState<Bulletin | null>(null);
 
   const fetchBulletins = async (showLoading = true) => {
     if (!user?.schoolId || !user?.id) return;
@@ -240,6 +243,15 @@ export default function StudentBulletins() {
                         </div>
                       </div>
                     </div>
+
+                    <Button
+                      size="sm"
+                      className="w-full mt-4 gap-1.5 bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700"
+                      onClick={() => setViewBulletin(bulletin)}
+                    >
+                      <Eye className="h-4 w-4" />
+                      Voir le bulletin
+                    </Button>
                   </CardContent>
                 </Card>
               ))}
@@ -247,6 +259,43 @@ export default function StudentBulletins() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Bulletin detail + print */}
+      <Dialog open={!!viewBulletin} onOpenChange={(o) => !o && setViewBulletin(null)}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-purple-600" />
+              Bulletin — {viewBulletin?.reportNumber}
+            </DialogTitle>
+            <DialogDescription>
+              Consultez et imprimez votre bulletin officiel.
+            </DialogDescription>
+          </DialogHeader>
+          {viewBulletin && (
+            <BulletinPrint
+              report={{
+                reportNumber: viewBulletin.reportNumber,
+                trimester: viewBulletin.trimester,
+                academicYear: viewBulletin.academicYear,
+                studentName: viewBulletin.studentName || viewBulletin.student?.fullName || '',
+                studentGender: (viewBulletin.gradesData as any)?.metadata?.studentGender,
+                studentBirthDate: (viewBulletin.gradesData as any)?.metadata?.studentBirthDate,
+                permanentNumber: (viewBulletin.gradesData as any)?.metadata?.permanentNumber,
+                class: viewBulletin.class,
+                averageGrade: viewBulletin.averageGrade,
+                mention: viewBulletin.mention,
+                classRank: viewBulletin.classRank,
+                totalPointsObtained: viewBulletin.totalPointsObtained,
+                totalPointsPossible: viewBulletin.totalPointsPossible,
+                overallPercentage: viewBulletin.overallPercentage,
+                gradesData: viewBulletin.gradesData,
+              }}
+              schoolName={user?.school?.name}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
