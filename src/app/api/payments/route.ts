@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     const studentId = searchParams.get('studentId');
     const status = searchParams.get('status');
     const month = searchParams.get('month');
+    const classId = searchParams.get('classId');
 
     if (!schoolId || schoolId !== auth.schoolId) {
       return NextResponse.json({ error: 'schoolId invalide' }, { status: 400 });
@@ -35,6 +36,10 @@ export async function GET(request: NextRequest) {
     }
     if (status) where.status = status;
     if (month) where.month = month;
+    if (classId && auth.role === 'ADMIN') {
+      // Filtrer aux paiements des élèves inscrits dans cette classe
+      where.student = { classEnrollments: { some: { classId } } };
+    }
 
     const payments = await db.payment.findMany({
       where,

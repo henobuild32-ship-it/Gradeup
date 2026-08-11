@@ -60,7 +60,7 @@ export default function MessageCenter() {
         // Fetch messages/notifications
         const notifsRes = await fetch(`/api/notifications?${params}`);
         const notifsData = await notifsRes.json();
-        const allNotifs: NotificationInfo[] = Array.isArray(notifsData) ? notifsData : [];
+        const allNotifs: NotificationInfo[] = Array.isArray(notifsData) ? notifsData : notifsData?.notifications || [];
         // Sort by date descending
         allNotifs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         setMessages(allNotifs);
@@ -69,7 +69,7 @@ export default function MessageCenter() {
         if (isAdmin) {
           const classesRes = await fetch(`/api/classes?${params}`);
           const classesData = await classesRes.json();
-          setClasses(Array.isArray(classesData) ? classesData : []);
+          setClasses(Array.isArray(classesData) ? classesData : classesData?.classes || []);
         }
       } catch {
         // silencieux

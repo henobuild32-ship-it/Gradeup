@@ -107,15 +107,42 @@ export async function PUT(
         ...(photoUrl !== undefined && { photoUrl }),
         ...(parentId !== undefined && { parentId: parentId || null }),
         ...(isTitulaire !== undefined && { isTitulaire }),
-        ...(titulaireClassIds !== undefined && { titulaireClassIds: Array.isArray(titulaireClassIds) ? titulaireClassIds : [] }),
       },
       include: {
         school: true,
         classEnrollments: {
           include: { class: true },
         },
+        titulaireClasses: true,
       },
     });
+
+    // Synchroniser le titulariat : un professeur peut être titulaire de plusieurs classes
+    // (relie SchoolClass.titulaireId à cet utilisateur)
+    if (titulaireClassIds !== undefined) {
+      const targetClasses = Array.isArray(titulaireClassIds) ? titulaireClassIds.filter(Boolean) : [];
+      if (targetClasses.length > 0) {
+        // Vérifier que toutes les classes appartiennent à la même école
+        const classes = await db.schoolClass.findMany({
+          where: { id: { in: targetClasses }, schoolId: user.schoolId },
+          select: { id: true },
+        });
+        const validIds = classes.map((c) => c.id);
+        await db.schoolClass.updateMany({
+          where: { titulaireId: user.id },
+          data: { titulaireId: null },
+        });
+        await db.schoolClass.updateMany({
+          where: { id: { in: validIds } },
+          data: { titulaireId: user.id },
+        });
+      } else {
+        await db.schoolClass.updateMany({
+          where: { titulaireId: user.id },
+          data: { titulaireId: null },
+        });
+      }
+    }
 
     // Notify the user in real-time that their profile was updated
     try { await notifyUser({

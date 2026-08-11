@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createNotification } from '@/services/notifications/createNotification';
+import { sendOneSignalBroadcast } from '@/services/onesignal/sender';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 import webpush from 'web-push';
 
 const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
@@ -18,9 +20,12 @@ if (publicKey && privateKey) {
   }
 }
 
-// Route pour envoyer la notification globale de mise à jour GradeUp
+// Route pour envoyer la notification globale de mise à jour GradeUp (ADMIN uniquement)
 export async function POST(request: NextRequest) {
   try {
+    // Sécurité : seul un administrateur peut déclencher une diffusion globale
+    authenticateRequest(request);
+
     const schools = await db.school.findMany({
       select: { id: true },
     });
@@ -85,6 +90,14 @@ export async function POST(request: NextRequest) {
       await Promise.all(pushPromises);
     }
 
+    // 3. Broadcast OneSignal à tous les appareils (mobile + web)
+    await sendOneSignalBroadcast({
+      title,
+      message,
+      url: '/',
+      data: { updateVersion: '0.2.1' },
+    });
+
     return NextResponse.json({
       success: true,
       message: 'Notification de mise à jour Mbote diffusée avec succès.',
@@ -92,13 +105,20 @@ export async function POST(request: NextRequest) {
       pushSentCount,
     });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error('[BROADCAST NOTIFICATION ERROR]', error);
     const msg = error instanceof Error ? error.message : 'Erreur inconnue';
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 
-// GET déclenche également la diffusion
+// GET est un raccourci (mêmes droits qu'un POST) — l'authentification est exigée
 export async function GET(request: NextRequest) {
-  return POST(request);
+  // Sécurité: lecture seule, n'autorise pas le déclenchement non authentifié
+  return NextResponse.json(
+    { error: 'Méthode non autorisée. Utilisez POST (ADMIN requis).' },
+    { status: 405 }
+  );
 }

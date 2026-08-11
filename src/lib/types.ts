@@ -247,6 +247,34 @@ export interface RessourceInfo {
   isFavorite?: boolean;
 }
 
+export interface TeacherDocumentVersionInfo {
+  id: string;
+  updatedAt: string;
+  summary: string;
+  content: string;
+  fileUrl: string;
+  fileName: string;
+}
+
+export interface TeacherDocumentInfo {
+  id: string;
+  schoolId: string;
+  teacherId: string;
+  title: string;
+  description: string;
+  category: string;
+  subject: string;
+  level: string;
+  period: string;
+  content: string;
+  fileUrl: string;
+  fileName: string;
+  published: boolean;
+  createdAt: string;
+  updatedAt: string;
+  versions: TeacherDocumentVersionInfo[];
+}
+
 export interface FavoriteInfo {
   id: string;
   userId: string;
@@ -281,6 +309,7 @@ export type PageView =
   | 'teacher-lessons'
   | 'teacher-grades'
   | 'teacher-homework'
+  | 'teacher-documents'
   | 'teacher-attendance'
   | 'teacher-schedules'
   | 'teacher-ai'

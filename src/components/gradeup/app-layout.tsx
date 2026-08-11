@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import { usePWAInstall } from '@/hooks/use-pwa-install';
+import OneSignalInit from '@/components/gradeup/onesignal-init';
 import type { PageView, UserRole } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -120,6 +121,7 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Emploi du temps', page: 'teacher-schedules', icon: CalendarDays, emoji: '🗓️' },
     { label: 'Notes', page: 'teacher-grades', icon: ClipboardList, emoji: '📝' },
     { label: 'Devoirs', page: 'teacher-homework', icon: ClipboardCheck, emoji: '📋' },
+    { label: 'Documents', page: 'teacher-documents', icon: FileText, emoji: '📄' },
     { label: 'Absences', page: 'teacher-attendance', icon: Calendar, emoji: '📅' },
     { label: 'IA Gradie', page: 'teacher-ai', icon: Bot, emoji: '🤖' },
     { label: 'Visioconférences', page: 'meetings', icon: Video, emoji: '🎥' },
@@ -241,6 +243,7 @@ const pageTitles: Record<PageView, string> = {
   'teacher-lessons': 'Leçons',
   'teacher-grades': 'Notes',
   'teacher-homework': 'Devoirs',
+  'teacher-documents': 'Documents pédagogiques',
   'teacher-attendance': 'Absences',
   'teacher-schedules': 'Emploi du temps',
   'teacher-ai': 'IA Gradie',
@@ -561,7 +564,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
       const res = await fetch(`/api/notifications?schoolId=${user.schoolId}${roleParam}`);
       if (res.ok) {
         const data = await res.json();
-        const notifs = Array.isArray(data.notifications) ? data.notifications : [];
+        const notifs = Array.isArray(data)
+          ? data
+          : (Array.isArray(data.notifications) ? data.notifications : []);
         const unread = notifs.filter((n: any) => !n.read).length;
         setUnreadNotificationsCount(unread);
       }
@@ -679,6 +684,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   return (
     // ✅ Container principal: utilise h-dvh pour la hauteur dynamique du viewport
     <div className="flex h-dvh overflow-hidden bg-background text-foreground">
+      {user && <OneSignalInit userId={user.id} />}
       {/* Desktop Sidebar */}
       <aside
         className={`hidden lg:flex shrink-0 transition-all duration-300 ${

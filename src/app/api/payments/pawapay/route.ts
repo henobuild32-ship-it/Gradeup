@@ -2,86 +2,83 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 /**
- * PawaPay payment initiation endpoint.
- * Expects a JSON payload with:
- *   - amount: number (in minor units, e.g., cents)
- *   - currency: string (ISO 4217, e.g., 'USD')
- *   - description: string (optional description of the transaction)
- *   - successUrl: string (URL to redirect after successful payment)
- *   - cancelUrl: string (URL to redirect if payment is cancelled)
- *
- * Returns JSON containing `redirectUrl` where the client should be redirected
- * to complete the payment.
+ * GeniusPay payment initiation endpoint.
+ * NOTE: kept under /pawapay path for backward compatibility.
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { amount, currency, description, successUrl, cancelUrl } = body;
 
-    if (!amount || !currency || !successUrl || !cancelUrl) {
+    const parsedAmount = Number(amount);
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0 || !currency || !successUrl || !cancelUrl) {
       return NextResponse.json(
         { error: 'Missing required fields: amount, currency, successUrl, cancelUrl' },
         { status: 400 }
       );
     }
 
-    const pawapayApiKey = process.env.PAWAPAY_API_KEY;
-    const pawapaySecret = process.env.PAWAPAY_API_SECRET;
-    
-    // Fallback: En mode sandbox (pas de clés API configurées),
-    // on redirige vers NOTRE propre page de checkout intégrée
-    // au lieu de sauter directement vers l'URL de succès.
-    if (!pawapayApiKey || !pawapaySecret || pawapayApiKey.includes('placeholder') || pawapaySecret.includes('placeholder')) {
-      console.warn('PawaPay sandbox mode — using integrated checkout page.');
-      
-      // Construire l'URL de notre page de checkout avec les paramètres
+    const geniusPayApiKey = process.env.GENIUSPAY_API_KEY;
+    const geniusPayApiSecret = process.env.GENIUSPAY_API_SECRET;
+    const geniusPayBaseUrl = (process.env.GENIUSPAY_API_BASE_URL || 'https://geniuspay.ci/api/v1/merchant').replace(/\/$/, '');
+
+    // Fallback local: if no credentials, use integrated checkout page.
+    if (!geniusPayApiKey || !geniusPayApiSecret || geniusPayApiKey.includes('placeholder') || geniusPayApiSecret.includes('placeholder')) {
       const checkoutUrl = new URL('/checkout', request.url);
-      checkoutUrl.searchParams.set('amount', String(amount));
+      checkoutUrl.searchParams.set('amount', String(parsedAmount));
       checkoutUrl.searchParams.set('currency', currency);
       checkoutUrl.searchParams.set('description', description || 'GradeUp payment');
       checkoutUrl.searchParams.set('successUrl', successUrl);
       checkoutUrl.searchParams.set('cancelUrl', cancelUrl);
-      
       return NextResponse.json({ redirectUrl: checkoutUrl.toString() }, { status: 200 });
     }
 
-    // Mode production: vrai appel à l'API PawaPay
-    const response = await fetch('https://sandbox-api.pawapay.io/v1/payments', {
+    const response = await fetch(`${geniusPayBaseUrl}/payments`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${pawapayApiKey}`,
+        'X-API-Key': geniusPayApiKey,
+        'X-API-Secret': geniusPayApiSecret,
       },
       body: JSON.stringify({
-        amount,
+        amount: parsedAmount,
         currency,
         description: description ?? 'GradeUp payment',
-        successUrl,
-        cancelUrl,
-        referenceId: crypto.randomUUID(),
+        success_url: successUrl,
+        error_url: cancelUrl,
+        metadata: {
+          source: 'gradeup',
+          module: 'student-card',
+        },
       }),
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
+      const errorData = await response.text().catch(() => '');
       return NextResponse.json(
-        { error: 'PawaPay request failed', details: errorData },
+        { error: 'GeniusPay request failed', details: errorData },
         { status: response.status }
       );
     }
 
     const data = await response.json();
-    const redirectUrl = data.checkoutUrl || data.redirectUrl;
+    const redirectUrl =
+      data?.data?.checkout_url ||
+      data?.data?.payment_url ||
+      data?.checkout_url ||
+      data?.payment_url ||
+      data?.redirectUrl;
+
     if (!redirectUrl) {
       return NextResponse.json(
-        { error: 'PawaPay response missing redirect URL' },
+        { error: 'GeniusPay response missing redirect URL' },
         { status: 500 }
       );
     }
 
     return NextResponse.json({ redirectUrl }, { status: 200 });
   } catch (err) {
-    console.error('PawaPay endpoint error:', err);
+    console.error('GeniusPay endpoint error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

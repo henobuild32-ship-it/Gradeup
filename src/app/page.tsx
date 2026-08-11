@@ -2,7 +2,7 @@
 
 import { useAppStore } from '@/lib/store';
 import type { PageView } from '@/lib/types';
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import dynamic from 'next/dynamic';
 
 import AuthPage from '@/components/gradeup/auth-page';
@@ -52,6 +52,7 @@ const TeacherClasses = dynamic(() => import('@/components/gradeup/teacher-classe
 const TeacherLessons = dynamic(() => import('@/components/gradeup/teacher-lessons'), { ssr: false, loading: () => <PageSkeleton /> });
 const TeacherGrades = dynamic(() => import('@/components/gradeup/teacher-grades'), { ssr: false, loading: () => <PageSkeleton /> });
 const TeacherHomework = dynamic(() => import('@/components/gradeup/teacher-homework'), { ssr: false, loading: () => <PageSkeleton /> });
+const TeacherDocuments = dynamic(() => import('@/components/gradeup/teacher-documents'), { ssr: false, loading: () => <PageSkeleton /> });
 const TeacherAttendance = dynamic(() => import('@/components/gradeup/teacher-attendance'), { ssr: false, loading: () => <PageSkeleton /> });
 const TeacherSchedules = dynamic(() => import('@/components/gradeup/schedules-page'), { ssr: false, loading: () => <PageSkeleton /> });
 const TeacherAI = dynamic(() => import('@/components/gradeup/teacher-ai'), { ssr: false, loading: () => <PageSkeleton /> });
@@ -113,6 +114,7 @@ function PageRouter({ page }: { page: PageView }) {
   if (page === 'teacher-lessons') return <TeacherLessons />;
   if (page === 'teacher-grades') return <TeacherGrades />;
   if (page === 'teacher-homework') return <TeacherHomework />;
+  if (page === 'teacher-documents') return <TeacherDocuments />;
   if (page === 'teacher-attendance') return <TeacherAttendance />;
   if (page === 'teacher-schedules') return <TeacherSchedules />;
   if (page === 'teacher-ai') return <TeacherAI />;
@@ -141,47 +143,11 @@ function PageRouter({ page }: { page: PageView }) {
   return <AuthPage />;
 }
 
-// Splash screen shown during Zustand rehydration to avoid flash of auth page
-function SplashScreen() {
-  return (
-    <div className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-blue-600 via-blue-500 to-indigo-600 z-50">
-      <div className="flex flex-col items-center gap-6 animate-fade-in">
-        <div className="relative">
-          <img
-            src="/logo-gradeup.png"
-            alt="GradeUp"
-            className="w-24 h-24 rounded-2xl object-contain drop-shadow-2xl"
-          />
-          <div className="absolute inset-0 rounded-2xl bg-white/10 animate-pulse" />
-        </div>
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-white tracking-tight">GradeUp</h1>
-          <p className="text-blue-200 text-sm mt-1">Chargement en cours...</p>
-        </div>
-        <div className="flex gap-2">
-          <div className="h-2 w-2 rounded-full bg-white/60 animate-bounce" style={{ animationDelay: '0ms' }} />
-          <div className="h-2 w-2 rounded-full bg-white/60 animate-bounce" style={{ animationDelay: '150ms' }} />
-          <div className="h-2 w-2 rounded-full bg-white/60 animate-bounce" style={{ animationDelay: '300ms' }} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function HomePage() {
   const { currentPage, user, setCurrentPage, hydrateSession } = useAppStore();
-  const [hydrated, setHydrated] = useState(false);
-  const [sessionChecked, setSessionChecked] = useState(false);
 
-  // Wait for Zustand to rehydrate from localStorage before rendering anything
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setHydrated(true);
-  }, []);
-
-  // Restore the session from the HTTP-only JWT cookie on reload
-  useEffect(() => {
-    hydrateSession().finally(() => setSessionChecked(true));
+    void hydrateSession();
   }, [hydrateSession]);
 
   // Reset unauthorized pages for student users after session restoration
@@ -190,11 +156,6 @@ export default function HomePage() {
       setCurrentPage('student-dashboard');
     }
   }, [user, currentPage, setCurrentPage]);
-
-  // Show splash screen while rehydrating — avoids the flash to auth page
-  if (!hydrated || !sessionChecked) {
-    return <SplashScreen />;
-  }
 
   if (!user) {
     return <AuthPage />;

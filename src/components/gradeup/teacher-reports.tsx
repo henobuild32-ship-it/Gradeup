@@ -67,7 +67,7 @@ export default function TeacherReports() {
   const schoolId = user?.schoolId;
   const { toast } = useToast();
   const [classes, setClasses] = useState<ClassInfo[]>([]);
-  const [students, setStudents] = useState<{ id: string; fullName: string; gender?: string; birthDate?: string; classId?: string }[]>([]);
+  const [students, setStudents] = useState<{ id: string; fullName: string; gender?: string; birthDate?: string; classId?: string; classEnrollments?: { classId: string }[] }[]>([]);
   const [reportCards, setReportCards] = useState<ReportCardItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedClass, setSelectedClass] = useState<string>('all');
@@ -111,7 +111,7 @@ export default function TeacherReports() {
   // Filter students based on wizard class select
   const wizFilteredStudents = useMemo(() => {
     if (!wizClassId) return [];
-    return students.filter(s => s.classId === wizClassId);
+    return students.filter(s => (s.classId ?? s.classEnrollments?.[0]?.classId) === wizClassId);
   }, [wizClassId, students]);
 
   // Fetch grades for wizard step 2

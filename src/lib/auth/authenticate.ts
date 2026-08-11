@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { verifyAccessToken, ACCESS_COOKIE } from './jwt';
+import { db } from '@/lib/db';
 
 export class AuthError extends Error {
   status: number;
@@ -30,4 +31,20 @@ export function authenticateRequest(req: NextRequest): AuthUser {
     role: claims.role,
     name: claims.name,
   };
+}
+
+/**
+ * Comme authenticateRequest, mais vérifie en base que le compte est toujours actif.
+ * Utiliser dans les routes sensibles (admin, finances, etc.).
+ */
+export async function authenticateRequestActive(req: NextRequest): Promise<AuthUser> {
+  const auth = authenticateRequest(req);
+  const user = await db.user.findUnique({
+    where: { id: auth.userId },
+    select: { id: true, active: true, deletedAt: true },
+  });
+  if (!user || user.active === false || user.deletedAt) {
+    throw new AuthError('Compte désactivé ou supprimé. Veuillez contacter l’administrateur.', 403);
+  }
+  return auth;
 }

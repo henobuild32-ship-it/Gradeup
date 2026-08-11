@@ -5,6 +5,7 @@ import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Bell, X, ShieldCheck, Sparkles } from 'lucide-react';
 import { registerPushNotifications } from '@/services/notifications/pushRegistration';
+import { ensureWelcomeNotification } from '@/services/onesignal/welcome';
 import { toast } from 'sonner';
 
 export default function NotificationPermissionBanner() {
@@ -34,6 +35,8 @@ export default function NotificationPermissionBanner() {
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
           await registerPushNotifications(user.id);
+          // Notification de bienvenue (DB Realtime + push PWA + OneSignal) — une seule fois
+          await ensureWelcomeNotification(user.id).catch(() => {});
           toast.success('🔔 Notifications activées avec succès !', {
             description: 'Vous recevrez désormais les alertes de cours, devoirs et messages en temps réel.',
           });

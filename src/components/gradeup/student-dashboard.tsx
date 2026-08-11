@@ -74,10 +74,10 @@ export default function StudentDashboard() {
           handleRes(`/api/notifications?${params}&targetRole=STUDENT`).catch(() => []),
         ]);
 
-        setCourses(Array.isArray(coursesRes) ? coursesRes : []);
-        setGrades(Array.isArray(gradesRes) ? gradesRes : []);
-        setAttendance(Array.isArray(attendanceRes) ? attendanceRes : []);
-        setPayments(Array.isArray(paymentsRes) ? paymentsRes : []);
+        setCourses(Array.isArray(coursesRes) ? coursesRes : coursesRes?.courses || []);
+        setGrades(Array.isArray(gradesRes) ? gradesRes : gradesRes?.grades || []);
+        setAttendance(Array.isArray(attendanceRes) ? attendanceRes : attendanceRes?.attendance || []);
+        setPayments(Array.isArray(paymentsRes) ? paymentsRes : paymentsRes?.payments || []);
         setNotifications(Array.isArray(notifsRes) ? notifsRes : (Array.isArray(notifsRes?.notifications) ? notifsRes.notifications : []));
 
         // Fetch schedules for today

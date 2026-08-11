@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequest, authenticateRequestActive, AuthError } from '@/lib/auth/authenticate';
 
 // GET /api/schedules?schoolId=...&classId=...&dayOfWeek=...
 export async function GET(request: NextRequest) {
   try {
+    // Lecture : utilisateur authentifié, depuis sa propre école
+    const auth = authenticateRequest(request);
     const { searchParams } = new URL(request.url);
-    const schoolId = searchParams.get('schoolId');
+    const schoolId = searchParams.get('schoolId') || auth.schoolId;
     const classId = searchParams.get('classId');
     const dayOfWeek = searchParams.get('dayOfWeek');
     const courseId = searchParams.get('courseId');
 
-    if (!schoolId) {
-      return NextResponse.json({ error: 'schoolId requis' }, { status: 400 });
+    if (schoolId !== auth.schoolId) {
+      return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
     }
 
     const where: any = { schoolId };
@@ -38,6 +41,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(schedules);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error('[GET /api/schedules]', error);
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }
@@ -46,6 +52,12 @@ export async function GET(request: NextRequest) {
 // POST /api/schedules
 export async function POST(request: NextRequest) {
   try {
+    // Écrire : admin uniquement
+    const auth = await authenticateRequestActive(request);
+    if (auth.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Seul un administrateur peut créer un horaire.' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { courseId, schoolId, dayOfWeek, startTime, endTime, room, periodStart, periodEnd, exceptions } = body;
 
@@ -54,6 +66,9 @@ export async function POST(request: NextRequest) {
         { error: 'courseId, schoolId, dayOfWeek, startTime et endTime sont requis' },
         { status: 400 }
       );
+    }
+    if (schoolId !== auth.schoolId) {
+      return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
     }
 
     // Check that course belongs to the school
@@ -88,6 +103,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(schedule, { status: 201 });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error('[POST /api/schedules]', error);
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }
@@ -96,11 +114,22 @@ export async function POST(request: NextRequest) {
 // PUT /api/schedules
 export async function PUT(request: NextRequest) {
   try {
+    // Écrire : admin uniquement
+    const auth = await authenticateRequestActive(request);
+    if (auth.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Seul un administrateur peut modifier un horaire.' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { id, courseId, dayOfWeek, startTime, endTime, room, periodStart, periodEnd, exceptions } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'id requis' }, { status: 400 });
+    }
+
+    const existing = await db.courseSchedule.findUnique({ where: { id } });
+    if (!existing || existing.schoolId !== auth.schoolId) {
+      return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
     }
 
     const updated = await db.courseSchedule.update({
@@ -126,6 +155,9 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json(updated);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error('[PUT /api/schedules]', error);
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }
@@ -134,6 +166,12 @@ export async function PUT(request: NextRequest) {
 // DELETE /api/schedules?id=...
 export async function DELETE(request: NextRequest) {
   try {
+    // Admin uniquement
+    const auth = await authenticateRequestActive(request);
+    if (auth.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Seul un administrateur peut supprimer un horaire.' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
@@ -141,10 +179,18 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'id requis' }, { status: 400 });
     }
 
+    const existing = await db.courseSchedule.findUnique({ where: { id } });
+    if (!existing || existing.schoolId !== auth.schoolId) {
+      return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
+    }
+
     await db.courseSchedule.delete({ where: { id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error('[DELETE /api/schedules]', error);
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }

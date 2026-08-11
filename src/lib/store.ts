@@ -70,6 +70,14 @@ export const useAppStore = create<AppState>()(
         } catch {
           /* ignore */
         }
+        // Détacher l'external_id OneSignal au logout (empêche les push ciblés restaurs)
+        try {
+          if (typeof window !== 'undefined' && (window as any).OneSignal?.logout) {
+            await (window as any).OneSignal.logout();
+          }
+        } catch {
+          /* non bloquant */
+        }
         set({ user: null, activeMeetingId: null, currentPage: 'auth' });
       },
       

@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { notifyUser } from '@/services/notifications/notificationEngine';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 
 export async function GET(request: NextRequest) {
   try {
+    // Lecture publique : tableau des classes d'une école
+    // (utilisé avant/après connexion — liste non sensible : nom, niveau, effectifs)
     const { searchParams } = new URL(request.url);
     const schoolId = searchParams.get('schoolId');
 
@@ -33,9 +36,18 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Création : ADMIN uniquement
+    const auth = authenticateRequest(request);
+    if (auth.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Seul un administrateur peut créer une classe.' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { schoolId, name, level, fees } = body;
 
+    if (schoolId !== auth.schoolId) {
+      return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
+    }
     if (!schoolId || !name) {
       return NextResponse.json(
         { error: 'Missing required fields: schoolId, name' },
@@ -59,7 +71,7 @@ export async function POST(request: NextRequest) {
         schoolId,
         name,
         level: level || 'Primaire',
-        fees: fees || 0,
+        fees: typeof fees === 'number' ? fees : 0,
       },
       include: {
         _count: {
@@ -88,6 +100,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ class: schoolClass }, { status: 201 });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }

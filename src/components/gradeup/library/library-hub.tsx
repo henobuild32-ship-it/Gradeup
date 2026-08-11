@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Library, Search, Plus, Star, ExternalLink, FileText, Video, Link2, Pencil, Trash2, Clock, Filter } from 'lucide-react';
+import { Library, Search, Plus, Star, ExternalLink, FileText, Video, Link2, Pencil, Trash2, Clock, Download, CheckCircle2 } from 'lucide-react';
 
 type ResType = 'LIEN' | 'VIDEO' | 'PDF' | 'FICHIER';
 
@@ -39,6 +39,8 @@ export default function LibraryHub() {
   const [type, setType] = useState('');
 
   const [recents, setRecents] = useState<string[]>([]);
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [downloadedResources, setDownloadedResources] = useState<string[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [editRes, setEditRes] = useState<RessourceInfo | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -75,6 +77,18 @@ export default function LibraryHub() {
   useEffect(() => {
     if (tab !== 'recents') loadResources();
   }, [loadResources, tab]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    try {
+      const rawHistory = localStorage.getItem(`gradeup-library-history-${user.id}`);
+      const rawDownloads = localStorage.getItem(`gradeup-library-downloads-${user.id}`);
+      if (rawHistory) setSearchHistory(JSON.parse(rawHistory));
+      if (rawDownloads) setDownloadedResources(JSON.parse(rawDownloads));
+    } catch {
+      // ignore
+    }
+  }, [user?.id]);
 
   const openResource = (r: RessourceInfo) => {
     const target = r.type === 'LIEN' || r.type === 'VIDEO' ? r.url : r.fileUrl;
@@ -218,6 +232,66 @@ export default function LibraryHub() {
 
   const recentResources = recents.map((id) => resources.find((r) => r.id === id)).filter(Boolean) as RessourceInfo[];
 
+  const persistSearchHistory = (next: string[]) => {
+    if (!user?.id) return;
+    localStorage.setItem(`gradeup-library-history-${user.id}`, JSON.stringify(next));
+    setSearchHistory(next);
+  };
+
+  const persistDownloadedResources = (next: string[]) => {
+    if (!user?.id) return;
+    localStorage.setItem(`gradeup-library-downloads-${user.id}`, JSON.stringify(next));
+    setDownloadedResources(next);
+  };
+
+  const submitSearch = (value = q) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    setQ(trimmed);
+    setSearchHistory((prev) => {
+      const next = [trimmed, ...prev.filter((item) => item !== trimmed)].slice(0, 8);
+      persistSearchHistory(next);
+      return next;
+    });
+  };
+
+  const clearSearchHistory = () => {
+    if (!user?.id) return;
+    localStorage.removeItem(`gradeup-library-history-${user.id}`);
+    setSearchHistory([]);
+  };
+
+  const handleDownloadResource = async (r: RessourceInfo) => {
+    const targetUrl = r.type === 'LIEN' || r.type === 'VIDEO' ? r.url : r.fileUrl;
+    if (!targetUrl) {
+      toast.error('Aucune ressource téléchargeable disponible.');
+      return;
+    }
+
+    if (downloadedResources.includes(r.id)) {
+      persistDownloadedResources(downloadedResources.filter((id) => id !== r.id));
+      toast.success('Copie locale supprimée.');
+      return;
+    }
+
+    try {
+      const response = await fetch(targetUrl);
+      if (!response.ok) throw new Error('Download failed');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const extension = targetUrl.split('.').pop()?.toLowerCase() || 'bin';
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${r.title.replace(/[^a-z0-9]/gi, '_').slice(0, 40)}.${extension}`;
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+      persistDownloadedResources([r.id, ...downloadedResources.filter((id) => id !== r.id)].slice(0, 20));
+      toast.success('Ressource téléchargée pour une utilisation hors ligne.');
+    } catch {
+      toast.error('Le téléchargement a échoué.');
+    }
+  };
+
   const ResourceCard = ({ r }: { r: RessourceInfo }) => {
     const meta = TYPE_META[(r.type as ResType) || 'LIEN'];
     const Icon = meta.icon;
@@ -246,6 +320,11 @@ export default function LibraryHub() {
             <Button size="sm" className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={() => openResource(r)}>
               <ExternalLink className="w-3 h-3 mr-1" /> Ouvrir
             </Button>
+            {(r.type === 'PDF' || r.type === 'FICHIER') && (
+              <Button size="icon" variant={downloadedResources.includes(r.id) ? 'default' : 'outline'} className={downloadedResources.includes(r.id) ? 'text-emerald-600' : ''} onClick={() => handleDownloadResource(r)} title={downloadedResources.includes(r.id) ? 'Supprimer la copie locale' : 'Télécharger pour hors ligne'}>
+                {downloadedResources.includes(r.id) ? <CheckCircle2 className="w-4 h-4" /> : <Download className="w-4 h-4" />}
+              </Button>
+            )}
             <Button size="icon" variant={r.isFavorite ? 'default' : 'outline'} className={r.isFavorite ? 'text-yellow-500' : ''} onClick={() => toggleFavorite(r)}>
               <Star className="w-4 h-4" fill={r.isFavorite ? 'currentColor' : 'none'} />
             </Button>
@@ -270,35 +349,65 @@ export default function LibraryHub() {
       </div>
 
       {/* Filtres */}
-      <div className="flex flex-col lg:flex-row gap-2">
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Rechercher une ressource…" value={q} onChange={(e) => setQ(e.target.value)} />
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col lg:flex-row gap-2">
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-9"
+              placeholder="Rechercher une ressource…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && submitSearch(q)}
+            />
+          </div>
+          <Button type="button" className="bg-blue-600 hover:bg-blue-700" onClick={() => submitSearch(q)}>
+            <Search className="w-4 h-4 mr-2" /> Rechercher
+          </Button>
+          <Select value={matiere || 'all'} onValueChange={(v) => setMatiere(v === 'all' ? '' : v)}>
+            <SelectTrigger className="lg:w-44"><SelectValue placeholder="Matière" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Toutes matières</SelectItem>
+              {[...new Set(facets.matiere)].filter(Boolean).map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={niveau || 'all'} onValueChange={(v) => setNiveau(v === 'all' ? '' : v)}>
+            <SelectTrigger className="lg:w-40"><SelectValue placeholder="Niveau" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous niveaux</SelectItem>
+              {[...new Set(facets.niveau)].filter(Boolean).map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={type || 'all'} onValueChange={(v) => setType(v === 'all' ? '' : v)}>
+            <SelectTrigger className="lg:w-36"><SelectValue placeholder="Type" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous types</SelectItem>
+              <SelectItem value="LIEN">Lien</SelectItem>
+              <SelectItem value="VIDEO">Vidéo</SelectItem>
+              <SelectItem value="PDF">PDF</SelectItem>
+              <SelectItem value="FICHIER">Fichier</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <Select value={matiere || 'all'} onValueChange={(v) => setMatiere(v === 'all' ? '' : v)}>
-          <SelectTrigger className="lg:w-44"><SelectValue placeholder="Matière" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Toutes matières</SelectItem>
-            {[...new Set(facets.matiere)].filter(Boolean).map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={niveau || 'all'} onValueChange={(v) => setNiveau(v === 'all' ? '' : v)}>
-          <SelectTrigger className="lg:w-40"><SelectValue placeholder="Niveau" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tous niveaux</SelectItem>
-            {[...new Set(facets.niveau)].filter(Boolean).map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={type || 'all'} onValueChange={(v) => setType(v === 'all' ? '' : v)}>
-          <SelectTrigger className="lg:w-36"><SelectValue placeholder="Type" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tous types</SelectItem>
-            <SelectItem value="LIEN">Lien</SelectItem>
-            <SelectItem value="VIDEO">Vidéo</SelectItem>
-            <SelectItem value="PDF">PDF</SelectItem>
-            <SelectItem value="FICHIER">Fichier</SelectItem>
-          </SelectContent>
-        </Select>
+
+        {searchHistory.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground">Recherches récentes</span>
+            {searchHistory.map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => submitSearch(item)}
+                className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs text-blue-700 transition hover:bg-blue-100"
+              >
+                {item}
+              </button>
+            ))}
+            <button type="button" onClick={clearSearchHistory} className="text-xs text-muted-foreground hover:text-foreground">
+              Effacer
+            </button>
+          </div>
+        )}
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>

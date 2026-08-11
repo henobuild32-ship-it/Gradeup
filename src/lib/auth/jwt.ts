@@ -1,7 +1,16 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 
-const ACCESS_SECRET = process.env.JWT_SECRET || 'gradeup-dev-access-secret-change-me';
-const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || 'gradeup-dev-refresh-secret-change-me';
+const isProd = process.env.NODE_ENV === 'production';
+
+function requiredSecret(name: string, devFallback: string): string {
+  if (isProd && !process.env[name]) {
+    throw new Error(`Variable d'environnement manquante en production : ${name}`);
+  }
+  return process.env[name] || devFallback;
+}
+
+const ACCESS_SECRET = requiredSecret('JWT_SECRET', 'gradeup-dev-access-secret-change-me');
+const REFRESH_SECRET = requiredSecret('JWT_REFRESH_SECRET', 'gradeup-dev-refresh-secret-change-me');
 
 const ACCESS_TTL_SECONDS = 15 * 60; // 15 minutes
 const REFRESH_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 jours

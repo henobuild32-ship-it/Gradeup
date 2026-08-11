@@ -2,6 +2,7 @@ import { db } from '@/lib/db';
 import { createNotification } from './createNotification';
 import { CreateNotificationInput } from './notificationTypes';
 import { sendPushNotification } from './pushSender';
+import { sendOneSignalToUserIds } from '@/services/onesignal/sender';
 
 /**
  * Notification Engine (Cœur du Système GradeUp)
@@ -20,8 +21,11 @@ export async function notifyUser(input: CreateNotificationInput) {
       url: getRouteForNotificationType(notification.type),
     };
 
+    let targetUserIds: string[] = [];
+
     if (notification.userId) {
       // Direct notification: send to this user only
+      targetUserIds = [notification.userId];
       await sendPushNotification(notification.userId, pushPayload);
     } else {
       // Broadcast/Group notification: retrieve matching user IDs in school/class
@@ -30,7 +34,8 @@ export async function notifyUser(input: CreateNotificationInput) {
         active: true,
       };
 
-      if (notification.targetRole && notification.targetRole !== 'ALL') {
+      // 'CLASS' n'est pas un rôle utilisateur → on ne filtre que pour les vrais rôles
+      if (notification.targetRole && notification.targetRole !== 'ALL' && notification.targetRole !== 'CLASS') {
         whereClause.role = notification.targetRole;
       }
 
@@ -44,12 +49,27 @@ export async function notifyUser(input: CreateNotificationInput) {
         where: whereClause,
         select: { id: true },
       });
+      targetUserIds = targetedUsers.map((u) => u.id);
 
-      // Send to all targets in parallel background tasks
-      const pushPromises = targetedUsers.map((u) =>
-        sendPushNotification(u.id, pushPayload)
+      // PWA: envois Web Push en parallèle
+      const pushPromises = targetUserIds.map((id) =>
+        sendPushNotification(id, pushPayload)
       );
       await Promise.all(pushPromises);
+    }
+
+    // 3. Push OneSignal (mobile + web) — non bloquant
+    if (targetUserIds.length > 0) {
+      try {
+        await sendOneSignalToUserIds(targetUserIds, {
+          title: notification.title,
+          message: notification.message,
+          url: getRouteForNotificationType(notification.type),
+          data: { notificationId: notification.id, type: notification.type },
+        });
+      } catch (e) {
+        console.warn('[NotificationEngine] OneSignal (non bloquant):', e);
+      }
     }
 
     return notification;

@@ -152,7 +152,7 @@ export default function AuthPage() {
   }, [user, setCurrentPage]);
 
   // Main navigation view state
-  const [view, setView] = useState<'welcome' | 'login' | 'register-school' | 'register-user'>('welcome');
+  const [view, setView] = useState<'welcome' | 'login' | 'register-school' | 'register-user' | 'forgot'>('welcome');
 
   // Login form state
   const [loginInviteCode, setLoginInviteCode] = useState('');
@@ -164,6 +164,20 @@ export default function AuthPage() {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginIdentity, setLoginIdentity] = useState(''); // champ unifié email ou nom
   const [loginRole, setLoginRole] = useState<UserRole>('STUDENT');
+
+  // Forgot password (OTP) state
+  const [forgotStep, setForgotStep] = useState<'identify' | 'otp' | 'reset'>('identify');
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotIdentity, setForgotIdentity] = useState('');
+  const [forgotOtp, setForgotOtp] = useState('');
+  const [forgotNewPassword, setForgotNewPassword] = useState('');
+  const [forgotConfirm, setForgotConfirm] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMessage, setForgotMessage] = useState('');
+  const [forgotError, setForgotError] = useState('');
+  const [forgotIsAdmin, setForgotIsAdmin] = useState(false);
+  const [forgotCode, setForgotCode] = useState('');
+  const [forgotResendIn, setForgotResendIn] = useState(0);
 
   // Register school state
   const [regSchoolName, setRegSchoolName] = useState('');
@@ -305,6 +319,123 @@ export default function AuthPage() {
       });
     } finally {
       setLoginLoading(false);
+    }
+  };
+
+  // ── Mot de passe oublié (OTP via SMTP) ────────────────────────────────────
+  const forgotApiPayload = () => {
+    const identity = forgotIdentity.trim();
+    const isEmail = identity.includes('@');
+    return {
+      isAdminLogin: forgotIsAdmin,
+      inviteCode: loginInviteCode.toUpperCase().trim(),
+      email: forgotIsAdmin ? forgotEmail.trim() : isEmail ? identity : '',
+      fullName: (!forgotIsAdmin && !isEmail) ? identity : '',
+    };
+  };
+
+  const handleForgotRequest = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (forgotLoading) return;
+    setForgotError('');
+    setForgotMessage('');
+    if (forgotIsAdmin ? !forgotEmail.trim() : !forgotIdentity.trim()) {
+      setForgotError('Veuillez saisir votre identifiant.');
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      const res = await fetch('/api/auth/forgot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(forgotApiPayload()),
+      });
+      const data = await res.json();
+      // réponse générique anti-énumération
+      setForgotMessage(data.message || data.error || 'Si un compte correspond, un code a été envoyé.');
+      if (res.ok) {
+        setForgotCode('');
+        setForgotStep('otp');
+        setForgotResendIn(60);
+      } else {
+        setForgotError(data.error || 'Une erreur est survenue.');
+      }
+    } catch {
+      setForgotError('Erreur réseau lors de la demande.');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (forgotResendIn <= 0) return;
+    const t = setTimeout(() => setForgotResendIn((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [forgotResendIn]);
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (forgotLoading) return;
+    setForgotError('');
+    if (!/^\d{6}$/.test(forgotCode.trim())) {
+      setForgotError('Veuillez saisir le code OTP à 6 chiffres reçu par email.');
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...forgotApiPayload(), code: forgotCode.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setForgotError(data.error || 'Code invalide.');
+        return;
+      }
+      setForgotStep('reset');
+      setForgotMessage('');
+    } catch {
+      setForgotError('Erreur réseau lors de la vérification.');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (forgotLoading) return;
+    setForgotError('');
+    if (forgotNewPassword.length < 4) {
+      setForgotError('Le nouveau mot de passe doit contenir au moins 4 caractères.');
+      return;
+    }
+    if (forgotNewPassword !== forgotConfirm) {
+      setForgotError('Les deux mots de passe ne correspondent pas.');
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      const res = await fetch('/api/auth/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...forgotApiPayload(), code: forgotCode.trim(), newPassword: forgotNewPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setForgotError(data.error || 'Erreur lors de la réinitialisation.');
+        return;
+      }
+      if (data.user) {
+        setUser(data.user);
+        const dashboardPage = roleDashboardMap[data.user.role as UserRole];
+        setCurrentPage(dashboardPage);
+      }
+      toast({ title: '✅ Mot de passe réinitialisé !', description: 'Vous êtes maintenant connecté.' });
+    } catch {
+      setForgotError('Erreur réseau lors de la réinitialisation.');
+    } finally {
+      setForgotLoading(false);
     }
   };
 
@@ -993,6 +1124,25 @@ export default function AuthPage() {
                 </button>
               </p>
 
+              <p className="text-xs text-muted-foreground">
+                Mot de passe oublié ?{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForgotIsAdmin(loginIsAdmin);
+                    setForgotEmail(loginIsAdmin ? loginEmail : '');
+                    setForgotIdentity(loginIsAdmin ? '' : loginIdentity);
+                    setForgotStep('identify');
+                    setForgotMessage('');
+                    setForgotError('');
+                    setView('forgot');
+                  }}
+                  className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                >
+                  Réinitialiser mon mot de passe
+                </button>
+              </p>
+
               {/* QUICK DEMO FILL ACCORDION FOR FAST TESTING */}
               <div className="pt-4 border-t border-border/40 text-left space-y-2">
                 <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">
@@ -1050,7 +1200,247 @@ export default function AuthPage() {
   }
 
   // ---------------------------------------------------------------------------
-  // 3. INSCRIPTION (REGISTRATION SCREEN)
+  // 3. MOT DE PASSE OUBLIÉ (OTP VIA SMTP)
+  // ---------------------------------------------------------------------------
+  if (view === 'forgot') {
+    return (
+      <div className="min-h-screen flex flex-col bg-background text-foreground">
+        {renderHeader()}
+
+        <main className="flex-1 flex items-center justify-center px-4 py-12">
+          <div className="w-full max-w-md space-y-6 bg-card p-6 sm:p-8 rounded-3xl border border-border/80 shadow-xl">
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
+                <Lock className="w-7 h-7" />
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Mot de passe oublié</h1>
+              <p className="text-sm text-muted-foreground">
+                {forgotStep === 'identify' && 'Recevez un code de réinitialisation par email'}
+                {forgotStep === 'otp' && 'Saisissez le code reçu par email'}
+                {forgotStep === 'reset' && 'Choisissez votre nouveau mot de passe'}
+              </p>
+            </div>
+
+            {/* Stepper */}
+            <div className="flex items-center justify-center gap-2 text-[11px] font-bold">
+              {['identify', 'otp', 'reset'].map((step, idx) => (
+                <div key={step} className="flex items-center gap-2">
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs transition-all ${
+                      ['identify', 'otp', 'reset'].indexOf(forgotStep) >= idx
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    {idx + 1}
+                  </div>
+                  {idx < 2 && <div className="w-6 h-0.5 bg-muted rounded-full" />}
+                </div>
+              ))}
+            </div>
+
+            {forgotMessage && !forgotError && forgotStep !== 'reset' && (
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-medium">
+                {forgotMessage}
+              </div>
+            )}
+            {forgotError && (
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 text-xs font-medium">
+                {forgotError}
+              </div>
+            )}
+
+            {forgotStep === 'identify' && (
+              <form onSubmit={handleForgotRequest} className="space-y-4">
+                <div className="grid grid-cols-2 gap-1.5 p-1 bg-muted rounded-2xl">
+                  <button
+                    type="button"
+                    onClick={() => setForgotIsAdmin(false)}
+                    className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all ${
+                      !forgotIsAdmin ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <User className="w-3.5 h-3.5 inline mr-1.5" />
+                    Élève / Prof / Parent
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForgotIsAdmin(true)}
+                    className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all ${
+                      forgotIsAdmin ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <Shield className="w-3.5 h-3.5 inline mr-1.5 text-amber-500" />
+                    Direction / Admin
+                  </button>
+                </div>
+
+                {forgotIsAdmin ? (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5 text-amber-500" />
+                      Email Administrateur
+                    </Label>
+                    <Input
+                      type="email"
+                      placeholder="admin@ecole.com"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      className="h-11 rounded-xl"
+                      required
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold flex items-center gap-1.5">
+                        <Key className="w-3.5 h-3.5 text-blue-500" />
+                        Code École
+                      </Label>
+                      <Input
+                        placeholder="Ex: ECOLE-XXXXXX"
+                        value={loginInviteCode}
+                        onChange={(e) => setLoginInviteCode(e.target.value.toUpperCase())}
+                        className="h-11 font-mono uppercase tracking-wider rounded-xl"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5 text-indigo-500" />
+                        Email ou Nom Complet
+                      </Label>
+                      <Input
+                        placeholder="Jean Dupont  ou  jean@exemple.com"
+                        value={forgotIdentity}
+                        onChange={(e) => setForgotIdentity(e.target.value)}
+                        className="h-11 rounded-xl"
+                        required
+                      />
+                    </div>
+                  </>
+                )}
+
+                <Button type="submit" disabled={forgotLoading} className="w-full h-12 rounded-xl text-base font-bold bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg">
+                  {forgotLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Envoi du code...
+                    </>
+                  ) : (
+                    'Recevoir le code par email'
+                  )}
+                </Button>
+                <p className="text-[11px] text-muted-foreground text-center">
+                  Si vous ne recevez rien, vérifiez vos spams / courriers indésirables.
+                </p>
+              </form>
+            )}
+
+            {forgotStep === 'otp' && (
+              <form onSubmit={handleVerifyOtp} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-indigo-500" />
+                    Code à 6 chiffres
+                  </Label>
+                  <Input
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder="••••••"
+                    value={forgotCode}
+                    onChange={(e) => setForgotCode(e.target.value.replace(/\D/g, ''))}
+                    className="h-12 rounded-xl text-center text-xl font-black tracking-[0.5em]"
+                    autoFocus
+                    required
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Le code OTP à 6 chiffres est valable 10 minutes. Vérifiez vos spams si nécessaire.
+                  </p>
+                </div>
+
+                <Button type="submit" disabled={forgotLoading || forgotCode.length < 6} className="w-full h-12 rounded-xl text-base font-bold bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg">
+                  {forgotLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Vérification...
+                    </>
+                  ) : (
+                    'Vérifier le code'
+                  )}
+                </Button>
+
+                <div className="text-center">
+                  {forgotResendIn > 0 ? (
+                    <span className="text-xs text-muted-foreground">Renvoi possible dans {forgotResendIn}s</span>
+                  ) : (
+                    <button type="button" onClick={() => { setForgotStep('identify'); setForgotMessage(''); setForgotError(''); }} className="text-xs font-bold text-indigo-600 hover:underline">
+                      Retour et renvoyer le code
+                    </button>
+                  )}
+                </div>
+              </form>
+            )}
+
+            {forgotStep === 'reset' && (
+              <form onSubmit={handleReset} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-purple-500" />
+                    Nouveau mot de passe
+                  </Label>
+                  <Input
+                    type="password"
+                    placeholder="Au moins 4 caractères"
+                    value={forgotNewPassword}
+                    onChange={(e) => setForgotNewPassword(e.target.value)}
+                    className="h-11 rounded-xl"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold">Confirmer le mot de passe</Label>
+                  <Input
+                    type="password"
+                    placeholder="••••••••"
+                    value={forgotConfirm}
+                    onChange={(e) => setForgotConfirm(e.target.value)}
+                    className="h-11 rounded-xl"
+                    required
+                  />
+                </div>
+
+                <Button type="submit" disabled={forgotLoading} className="w-full h-12 rounded-xl text-base font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg">
+                  {forgotLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Réinitialisation...
+                    </>
+                  ) : (
+                    'Réinitialiser mon mot de passe'
+                  )}
+                </Button>
+              </form>
+            )}
+
+            <div className="pt-2 text-center">
+              <button
+                type="button"
+                onClick={() => { setView('login'); setForgotError(''); setForgotMessage(''); }}
+                className="text-xs font-bold text-primary hover:underline inline-flex items-center gap-1.5"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Retour à la connexion
+              </button>
+            </div>
+          </div>
+        </main>
+        {renderFooter()}
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 4. INSCRIPTION (REGISTRATION SCREEN)
   // ---------------------------------------------------------------------------
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">

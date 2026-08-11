@@ -31,12 +31,16 @@ function CheckoutContent() {
   const [errorMsg, setErrorMsg] = useState('');
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const amount = searchParams.get('amount') || '1500';
+  const amount = searchParams.get('amount') || '10';
   const currency = searchParams.get('currency') || 'USD';
   const description = searchParams.get('description') || 'Paiement carte d\'identité scolaire';
-  const successUrl = searchParams.get('successUrl') || '/api/payments/pawapay/success?schoolId=demo&action=generate-single&userId=new-card';
-  const cancelUrl = searchParams.get('cancelUrl') || '/api/payments/pawapay/cancel';
-  const displayAmount = currency === 'USD' ? '15,00' : (parseInt(amount) / 100).toFixed(2);
+  const successUrl = searchParams.get('successUrl') || '/api/payments/geniuspay/success?schoolId=demo&action=generate-single&userId=new-card';
+  const cancelUrl = searchParams.get('cancelUrl') || '/api/payments/geniuspay/cancel';
+  const amountNum = Number(amount);
+  const normalizedAmount = Number.isFinite(amountNum)
+    ? (amountNum > 1000 ? amountNum / 100 : amountNum)
+    : 10;
+  const displayAmount = normalizedAmount.toFixed(2).replace('.', ',');
 
   const operators = [
     { id: 'orange', name: 'Orange Money', color: 'from-orange-500 to-orange-600', icon: '📱', countries: ['CM', 'CI', 'SN', 'ML', 'BF', 'NE', 'TG', 'BJ'] },

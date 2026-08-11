@@ -90,12 +90,12 @@ export default function AdminCards() {
       const paymentStatus = params.get('payment');
       if (paymentStatus === 'success') {
         setShowPaymentDialog(false);
-        toast.success('✅ Paiement de 15$ réussi ! Vous pouvez maintenant créer la carte.', { duration: 5000 });
+        toast.success('✅ Paiement de 10 USD réussi ! Vous pouvez maintenant créer la carte.', { duration: 5000 });
         window.history.replaceState({}, '', window.location.pathname);
         setTimeout(() => openCreateModal(), 300);
       } else if (paymentStatus === 'cancel') {
         setShowPaymentDialog(false);
-        toast.error('Paiement annulé. Vous devez payer 15$ pour créer une carte.');
+        toast.error('Paiement annulé. Vous devez payer 10 USD pour créer une carte.');
         window.history.replaceState({}, '', window.location.pathname);
       }
     }
@@ -104,14 +104,14 @@ export default function AdminCards() {
   const handleInitiatePayment = async () => {
     setPaymentLoading(true);
     try {
-      const successUrl = `${window.location.origin}/api/payments/pawapay/success?schoolId=${user?.schoolId}&action=generate-single&userId=new-card`;
-      const cancelUrl = `${window.location.origin}/api/payments/pawapay/cancel`;
+      const successUrl = `${window.location.origin}/api/payments/geniuspay/success?schoolId=${user?.schoolId}&action=generate-single&userId=new-card`;
+      const cancelUrl = `${window.location.origin}/api/payments/geniuspay/cancel`;
 
-      const res = await fetch('/api/payments/pawapay', {
+      const res = await fetch('/api/payments/geniuspay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: 1500,
+          amount: 10,
           currency: 'USD',
           description: 'GradeUp - Création de carte d\'identité scolaire',
           successUrl,
@@ -445,7 +445,7 @@ export default function AdminCards() {
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => setShowPaymentDialog(true)} className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-md">
               <CreditCard className="w-4 h-4 mr-2" />
-              Nouvelle Carte (15$)
+              Nouvelle Carte (10 USD)
             </Button>
             <Button variant="outline" onClick={() => generateCards('generate-all')} disabled={generating || usersList.length === 0}>
               <RefreshCw className={`w-4 h-4 mr-2 ${generating ? 'animate-spin' : ''}`} />
@@ -531,17 +531,17 @@ export default function AdminCards() {
               <div className="p-1.5 rounded-lg bg-emerald-50">
                 <CreditCard className="h-5 w-5 text-emerald-600" />
               </div>
-              Paiement requis — 15$
+              Paiement requis — 10 USD
             </DialogTitle>
             <DialogDescription>
-              Un paiement de <strong>15 USD</strong> est requis pour créer une nouvelle carte d'identité scolaire.
+              Un paiement de <strong>10 USD</strong> est requis pour créer une nouvelle carte d'identité scolaire.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-6 py-4">
             <div className="rounded-xl bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/30 p-6 text-center border border-emerald-200">
               <p className="text-sm text-muted-foreground mb-2">Montant à payer</p>
-              <p className="text-4xl font-bold text-emerald-600">15 $</p>
+              <p className="text-4xl font-bold text-emerald-600">10 USD</p>
               <p className="text-xs text-muted-foreground mt-2">Paiement unique par carte</p>
             </div>
 
@@ -580,7 +580,7 @@ export default function AdminCards() {
               ) : (
                 <>
                   <CreditCard className="h-4 w-4 mr-2" />
-                  Payer 15 $
+                  Payer 10 USD
                 </>
               )}
             </Button>

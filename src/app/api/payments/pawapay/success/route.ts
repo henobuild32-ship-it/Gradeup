@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
   const classId = searchParams.get('classId');
   const userId = searchParams.get('userId');
 
-  console.log('PawaPay success callback triggered with params:', { schoolId, action, classId, userId });
+  console.log('GeniusPay success callback triggered with params:', { schoolId, action, classId, userId });
 
   if (schoolId && action) {
     try {
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
             type: 'CARD',
             priority: 'NORMAL',
             metadata: { cardId: newCardId, studentName: student.fullName },
-          }); } catch (e) { console.error('[PawaPay] Student notification failed (non-blocking):', e); }
+          }); } catch (e) { console.error('[GeniusPay] Student notification failed (non-blocking):', e); }
 
           // 2. Notify Parent if linked
           if (student.parentId) {
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
               type: 'CARD',
               priority: 'NORMAL',
               metadata: { cardId: newCardId, studentId: student.id, studentName: student.fullName },
-            }); } catch (e) { console.error('[PawaPay] Parent notification failed (non-blocking):', e); }
+            }); } catch (e) { console.error('[GeniusPay] Parent notification failed (non-blocking):', e); }
           }
         }
       } else if (action === 'generate-single' && userId && userId !== 'new-card') {
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
             type: 'CARD',
             priority: 'NORMAL',
             metadata: { cardId: newCardId, studentName: student.fullName },
-          }); } catch (e) { console.error('[PawaPay] Student notification failed (non-blocking):', e); }
+          }); } catch (e) { console.error('[GeniusPay] Student notification failed (non-blocking):', e); }
 
           // 2. Notify Parent if linked
           if (student.parentId) {
@@ -111,12 +111,12 @@ export async function GET(request: NextRequest) {
               type: 'CARD',
               priority: 'NORMAL',
               metadata: { cardId: newCardId, studentId: student.id, studentName: student.fullName },
-            }); } catch (e) { console.error('[PawaPay] Parent notification failed (non-blocking):', e); }
+            }); } catch (e) { console.error('[GeniusPay] Parent notification failed (non-blocking):', e); }
           }
         }
       }
     } catch (e) {
-      console.error('Error generating cards in PawaPay success callback:', e);
+      console.error('Error generating cards in GeniusPay success callback:', e);
     }
   }
 

@@ -346,6 +346,7 @@ export default function CahierCotation() {
           schoolId: user?.schoolId,
           classId: selectedClassId,
           courseId: selectedCourseId,
+          teacherId: user?.id,
           title: colTitle,
           maxScore: parseFloat(colMaxScore) || 20,
           period: selectedPeriod,

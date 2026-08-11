@@ -60,6 +60,7 @@ export async function GET(request: NextRequest) {
     const classId = searchParams.get('classId');
     const parentId = searchParams.get('parentId');
     const search = searchParams.get('search');
+    const teacherId = searchParams.get('teacherId');
 
     if (!schoolId || schoolId !== auth.schoolId) {
       return NextResponse.json({ error: 'schoolId invalide' }, { status: 400 });
@@ -80,6 +81,22 @@ export async function GET(request: NextRequest) {
       where.classEnrollments = {
         some: { classId },
       };
+    }
+
+    // A teacher only sees students enrolled in their own courses's classes
+    if (teacherId && auth.userId === teacherId && role === 'STUDENT') {
+      const teacherClasses = await db.course.findMany({
+        where: { teacherId: auth.userId, deletedAt: null },
+        select: { classId: true },
+        distinct: ['classId'],
+      });
+      const tClassIds = teacherClasses.map((c) => c.classId);
+      if (tClassIds.length > 0) {
+        where.classEnrollments = { some: { classId: { in: tClassIds } } };
+      } else {
+        // Aucune classe assignée
+        where.id = 'none';
+      }
     }
 
     // Security: filter children by parentId so parents only see their own children
@@ -208,7 +225,6 @@ export async function POST(request: NextRequest) {
         parentId: parentId || null,
         parentCode: parentCodeVal,
         isTitulaire: !!isTitulaire,
-        titulaireClasses: Array.isArray(titulaireClassIds) ? { connect: titulaireClassIds.map(id => ({ id })) } : undefined,
       },
       include: {
         school: true,
@@ -220,6 +236,21 @@ export async function POST(request: NextRequest) {
 
     if ((classId || className) && role === 'STUDENT') {
       await syncStudentClassEnrollment(user.id, schoolId, classId, className);
+    }
+
+    // Synchroniser le titulariat (SchoolClass.titulaireId)
+    if (Array.isArray(titulaireClassIds) && titulaireClassIds.filter(Boolean).length > 0) {
+      const classes = await db.schoolClass.findMany({
+        where: { id: { in: titulaireClassIds.filter(Boolean) }, schoolId },
+        select: { id: true },
+      });
+      const validIds = classes.map((c) => c.id);
+      if (validIds.length > 0) {
+        await db.schoolClass.updateMany({
+          where: { id: { in: validIds } },
+          data: { titulaireId: user.id },
+        });
+      }
     }
 
     const userWithEnrollments = await db.user.findUnique({
@@ -308,7 +339,6 @@ export async function PATCH(request: NextRequest) {
     if (allergies !== undefined) updateData.allergies = allergies;
     if (assurance !== undefined) updateData.assurance = assurance;
     if (isTitulaire !== undefined) updateData.isTitulaire = isTitulaire;
-    if (titulaireClassIds !== undefined) updateData.titulaireClassIds = Array.isArray(titulaireClassIds) ? titulaireClassIds : [];
 
     const user = await db.user.update({
       where: { id: userId },
@@ -319,6 +349,28 @@ export async function PATCH(request: NextRequest) {
         children: true,
       },
     });
+
+    // Synchroniser le titulariat (SchoolClass.titulaireId)
+    if (titulaireClassIds !== undefined) {
+      const targetClasses = Array.isArray(titulaireClassIds) ? titulaireClassIds.filter(Boolean) : [];
+      await db.schoolClass.updateMany({
+        where: { titulaireId: userId },
+        data: { titulaireId: null },
+      });
+      if (targetClasses.length > 0) {
+        const classes = await db.schoolClass.findMany({
+          where: { id: { in: targetClasses }, schoolId: user.schoolId },
+          select: { id: true },
+        });
+        const validIds = classes.map((c) => c.id);
+        if (validIds.length > 0) {
+          await db.schoolClass.updateMany({
+            where: { id: { in: validIds } },
+            data: { titulaireId: userId },
+          });
+        }
+      }
+    }
 
     if (user.role === 'STUDENT' && (classId !== undefined || className !== undefined)) {
       await syncStudentClassEnrollment(user.id, user.schoolId, classId, className);

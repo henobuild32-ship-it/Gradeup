@@ -210,7 +210,7 @@ export default function TeacherGrades() {
     if (course && user) {
       fetch(`/api/users?schoolId=${user.schoolId}&role=STUDENT&classId=${course.classId}`)
         .then((res) => res.json())
-        .then((data) => setStudents(Array.isArray(data) ? data : []))
+        .then((data) => setStudents(Array.isArray(data?.users) ? data.users : []))
         .catch(() => {});
     }
     setDialogOpen(true);

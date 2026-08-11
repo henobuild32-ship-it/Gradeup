@@ -145,6 +145,7 @@ model User {
   submissions             Submission[]        @relation("SubmissionStudent")
   presence                UserPresence?
   messageReactions        MessageReaction[]
+  passwordResets          PasswordReset[]
 
   @@unique([schoolId, fullName, role])
   @@index([schoolId, role, active])
@@ -566,6 +567,23 @@ model AiSearchHistory {
 
   @@index([userId])
   @@index([schoolId, userId, createdAt])
+}
+
+model PasswordReset {
+  id            String    @id @default(cuid())
+  userId        String
+  email         String
+  otpHash       String
+  otpSalt       String
+  otpExpiresAt  DateTime
+  used          Boolean   @default(false)
+  wrongAttempts Int       @default(0)
+  createdAt     DateTime  @default(now())
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, used])
+  @@index([createdAt])
 }
 
 model Ressource {

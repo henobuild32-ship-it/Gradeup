@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
 
     const where: Record<string, unknown> = {
       schoolId,
-      status: { in: ['auto_draft', 'draft', 'pending_admin', 'validated'] },
+      status: { in: ['auto_draft', 'draft', 'pending_admin', 'validated', 'published'] },
     };
 
     if (studentId) where.studentId = studentId;

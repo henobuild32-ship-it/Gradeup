@@ -36,6 +36,8 @@ export function serializeUser(user: any, school: any): UserInfo {
     parentId: user.parentId,
     parentCode: user.parentCode,
     active: user.active,
+    isTitulaire: user.isTitulaire,
+    titulaireClassIds: (user.titulaireClasses || []).map((c: any) => c.id),
     school: school
       ? {
           id: school.id,
@@ -91,6 +93,7 @@ export async function getSessionUser(req: NextRequest): Promise<UserInfo | null>
       school: true,
       classEnrollments: { include: { class: true } },
       children: true,
+      titulaireClasses: true,
     },
   });
   if (!user || !user.active) return null;

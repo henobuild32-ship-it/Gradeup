@@ -3,8 +3,60 @@ import { db } from '@/lib/db';
 import { setAuthCookies, serializeUser } from '@/lib/auth/session';
 import { verifyPassword } from '@/lib/password';
 
+// ====== Rate limiting (brute-force) : max 5 tentatives / 15 min par IP ======
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const loginAttempts = new Map<string, { count: number; firstAt: number }>();
+
+function getClientIp(request: NextRequest): string {
+  const fwd = request.headers.get('x-forwarded-for');
+  if (fwd) return fwd.split(',')[0].trim();
+  return request.headers.get('x-real-ip') || 'unknown';
+}
+
+function checkRateLimit(request: NextRequest): boolean {
+  const ip = getClientIp(request);
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry || now - entry.firstAt > LOGIN_WINDOW_MS) {
+    loginAttempts.set(ip, { count: 1, firstAt: now });
+    return true;
+  }
+  if (entry.count >= LOGIN_MAX_ATTEMPTS) return false;
+  entry.count += 1;
+  return true;
+}
+
+function recordFailure(request: NextRequest): void {
+  const ip = getClientIp(request);
+  const now = Date.now();
+  const entry = loginAttempts.get(ip);
+  if (!entry || now - entry.firstAt > LOGIN_WINDOW_MS) {
+    loginAttempts.set(ip, { count: 1, firstAt: now });
+  } else {
+    entry.count += 1;
+  }
+}
+
+// Nettoyage périodique des entrées expirées (évite une croissance illimitée en mémoire)
+function pruneExpiredAttempts(): void {
+  const now = Date.now();
+  for (const [key, entry] of loginAttempts) {
+    if (now - entry.firstAt > LOGIN_WINDOW_MS) loginAttempts.delete(key);
+  }
+}
+pruneExpiredAttempts();
+setInterval(pruneExpiredAttempts, LOGIN_WINDOW_MS).unref?.();
+
 export async function POST(request: NextRequest) {
   try {
+    // Bloque les attaques par force brute
+    if (!checkRateLimit(request)) {
+      return NextResponse.json(
+        { error: 'Trop de tentatives de connexion. Réessayez dans 15 minutes.' },
+        { status: 429 }
+      );
+    }
     const body = await request.json();
     const { inviteCode, fullName, password, email, isAdminLogin } = body;
 
@@ -42,6 +94,7 @@ export async function POST(request: NextRequest) {
           user = adminUser;
           school = adminUser.school;
         } else {
+          recordFailure(request);
           return NextResponse.json(
             { error: 'Aucun compte administrateur trouvé avec cet email.' },
             { status: 404 }
@@ -67,6 +120,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (!passwordMatch) {
+          recordFailure(request);
           return NextResponse.json(
             { error: 'Mot de passe incorrect.' },
             { status: 401 }
@@ -87,6 +141,7 @@ export async function POST(request: NextRequest) {
         });
 
         if (!user) {
+          recordFailure(request);
           return NextResponse.json(
             { error: 'Compte administrateur introuvable pour cette école.' },
             { status: 404 }
@@ -106,6 +161,7 @@ export async function POST(request: NextRequest) {
       // Trouver l'école par code d'invitation
       school = await db.school.findUnique({ where: { inviteCode: inviteCode.trim().toUpperCase() } });
       if (!school) {
+        recordFailure(request);
         return NextResponse.json(
           { error: 'Code école invalide. Vérifiez le code fourni par votre administrateur.' },
           { status: 404 }
@@ -127,6 +183,7 @@ export async function POST(request: NextRequest) {
           user = candidate;
         } else if (candidate && !await verifyPassword(password, candidate.password)) {
           // Email trouvé mais mauvais mot de passe
+          recordFailure(request);
           return NextResponse.json(
             { error: 'Mot de passe incorrect.' },
             { status: 401 }
@@ -162,6 +219,7 @@ export async function POST(request: NextRequest) {
 
         if (!user && candidates.length > 0) {
           // Utilisateur trouvé mais mauvais mot de passe
+          recordFailure(request);
           return NextResponse.json(
             { error: 'Mot de passe incorrect.' },
             { status: 401 }
@@ -170,6 +228,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (!user) {
+        recordFailure(request);
         return NextResponse.json(
           { error: 'Identifiant introuvable. Vérifiez votre nom, email et code école.' },
           { status: 401 }
