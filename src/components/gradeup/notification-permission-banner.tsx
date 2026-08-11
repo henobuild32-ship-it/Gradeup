@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
-import { Bell, X, ShieldCheck, Sparkles } from 'lucide-react';
+import { Bell, ShieldCheck, Sparkles } from 'lucide-react';
 import { registerPushNotifications } from '@/services/notifications/pushRegistration';
 import { ensureWelcomeNotification } from '@/services/onesignal/welcome';
 import { toast } from 'sonner';
@@ -23,7 +23,6 @@ export default function NotificationPermissionBanner() {
           setShowBanner(true);
         }
       } else if (Notification.permission === 'granted') {
-        // Permission déjà accordée → s'abonner au push et envoyer la bienvenue
         registerPushNotifications(user.id).catch(() => {});
         ensureWelcomeNotification(user.id).catch(() => {});
       }
@@ -37,16 +36,16 @@ export default function NotificationPermissionBanner() {
       if ('Notification' in window) {
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
-          await registerPushNotifications(user.id);
-          // Notification de bienvenue (DB Realtime + push PWA + OneSignal) — une seule fois
-          await ensureWelcomeNotification(user.id).catch(() => {});
-          toast.success('🔔 Notifications activées avec succès !', {
-            description: 'Vous recevrez désormais les alertes de cours, devoirs et messages en temps réel.',
-          });
           setShowBanner(false);
+          toast.success('🔔 Notifications activées !', {
+            description: 'Vous recevrez les alertes de cours, devoirs et messages en temps réel.',
+          });
+          // Tout le travail lourd en arrière-plan — ne bloque pas l'UI
+          registerPushNotifications(user.id).catch(() => {});
+          ensureWelcomeNotification(user.id).catch(() => {});
         } else if (permission === 'denied') {
-          toast.error('Notifications bloquées par votre navigateur', {
-            description: 'Vous pouvez activer les notifications dans les paramètres de votre navigateur.',
+          toast.error('Notifications bloquées par le navigateur', {
+            description: 'Activez-les dans les paramètres de votre navigateur.',
           });
           setShowBanner(false);
         }
@@ -102,7 +101,7 @@ export default function NotificationPermissionBanner() {
             className="bg-white text-blue-700 hover:bg-blue-50 font-bold text-xs shadow-md"
           >
             <ShieldCheck className="w-4 h-4 mr-1.5 text-blue-600" />
-            {loading ? 'Activation...' : 'Activer maintenant'}
+            {loading ? '...' : 'Activer maintenant'}
           </Button>
         </div>
       </div>
