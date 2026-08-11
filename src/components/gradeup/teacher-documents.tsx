@@ -284,9 +284,9 @@ export default function TeacherDocuments() {
         doc.description.toLowerCase().includes(q) ||
         doc.subject.toLowerCase().includes(q) ||
         doc.category.toLowerCase().includes(q);
-      const matchesSubject = !filterSubject || doc.subject === filterSubject;
-      const matchesLevel = !filterLevel || doc.level === filterLevel;
-      const matchesPeriod = !filterPeriod || doc.period === filterPeriod;
+      const matchesSubject = !filterSubject || filterSubject === '__all__' || doc.subject === filterSubject;
+      const matchesLevel = !filterLevel || filterLevel === '__all__' || doc.level === filterLevel;
+      const matchesPeriod = !filterPeriod || filterPeriod === '__all__' || doc.period === filterPeriod;
       return matchesSearch && matchesSubject && matchesLevel && matchesPeriod;
     });
   }, [documents, filterLevel, filterPeriod, filterSubject, search]);
@@ -356,7 +356,7 @@ export default function TeacherDocuments() {
             <SelectValue placeholder="Matière" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Toutes les matières</SelectItem>
+            <SelectItem value="__all__">Toutes les matières</SelectItem>
             {uniqueFields.subjects.map((subject) => (
               <SelectItem key={subject} value={subject}>
                 {subject}
@@ -369,7 +369,7 @@ export default function TeacherDocuments() {
             <SelectValue placeholder="Niveau" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Tous niveaux</SelectItem>
+            <SelectItem value="__all__">Tous niveaux</SelectItem>
             {uniqueFields.levels.map((level) => (
               <SelectItem key={level} value={level}>
                 {level}
@@ -382,7 +382,7 @@ export default function TeacherDocuments() {
             <SelectValue placeholder="Période" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Toutes périodes</SelectItem>
+            <SelectItem value="__all__">Toutes périodes</SelectItem>
             {uniqueFields.periods.map((period) => (
               <SelectItem key={period} value={period}>
                 {period}
