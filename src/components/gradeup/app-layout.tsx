@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import { usePWAInstall } from '@/hooks/use-pwa-install';
+import PWAInstallDialog from './pwa-install-dialog';
 import OneSignalInit from '@/components/gradeup/onesignal-init';
 import type { PageView, UserRole } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -44,6 +45,7 @@ import CommandPalette from './command-palette';
 import { toast } from 'sonner';
 import { subscribeToNotifications } from '@/services/notifications/notificationListener';
 import { registerPushNotifications } from '@/services/notifications/pushRegistration';
+import { ensureWelcomeNotification } from '@/services/onesignal/welcome';
 import NotificationPermissionBanner from './notification-permission-banner';
 import {
   LayoutDashboard,
@@ -71,8 +73,6 @@ import {
   Lightbulb,
   Video,
   Library,
-  Smartphone,
-  Apple,
   IdCard,
   DollarSign,
   GraduationCap,
@@ -421,32 +421,7 @@ function SidebarContent({
             <div className="text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider mb-1">
               Application Mobile
             </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="w-full justify-start gap-2 text-xs bg-sidebar-accent/30 border-sidebar-border hover:bg-sidebar-accent/50"
-              onClick={async () => {
-                if (isInstallable) {
-                  await installPWA();
-                } else {
-                  alert("Pour installer l'application sur Android, ouvrez le menu de votre navigateur Chrome et appuyez sur 'Ajouter à l'écran d'accueil'.");
-                }
-              }}
-            >
-              <Smartphone className="w-3.5 h-3.5 text-green-500" />
-              Télécharger sur Android
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="w-full justify-start gap-2 text-xs bg-sidebar-accent/30 border-sidebar-border hover:bg-sidebar-accent/50"
-              onClick={() => {
-                alert("Installation iOS: Apple ne permet pas l'installation automatique. Dans Safari, touchez l'icône Partager (carré avec flèche vers le haut) puis sélectionnez 'Sur l'écran d'accueil'.");
-              }}
-            >
-              <Apple className="w-3.5 h-3.5 text-slate-500 dark:text-slate-300" />
-              Télécharger sur iOS
-            </Button>
+            <PWAInstallDialog />
           </div>
         )}
       </ScrollArea>
@@ -483,7 +458,7 @@ function SidebarContent({
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const { user, currentPage, setCurrentPage, sidebarOpen, setSidebarOpen, setUser, logout } = useAppStore();
-  const { isInstallable, isAppInstalled, installPWA } = usePWAInstall();
+  const { isAppInstalled } = usePWAInstall();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
@@ -575,17 +550,17 @@ export default function AppLayout({ children }: AppLayoutProps) {
     }
   };
 
-  // Real-time notifications SSE subscription
+  // Real-time notifications SSE subscription + push re-registration
   useEffect(() => {
     if (!user) return;
 
-    // Fetch initial count
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchUnreadNotifications();
 
-    // Register background PWA Web Push notifications (only on HTTPS)
+    // Register background PWA Web Push + welcome notification on every login
     if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
       registerPushNotifications(user.id);
+      ensureWelcomeNotification(user.id).catch(() => {});
     }
 
     // Subscribe to SSE stream

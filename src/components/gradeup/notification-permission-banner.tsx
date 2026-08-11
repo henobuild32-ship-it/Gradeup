@@ -16,13 +16,16 @@ export default function NotificationPermissionBanner() {
   useEffect(() => {
     if (!user || typeof window === 'undefined') return;
 
-    // Check if Notification API is supported and permission is 'default' (not granted nor denied)
     if ('Notification' in window && 'serviceWorker' in navigator) {
       if (Notification.permission === 'default') {
         const dismissed = localStorage.getItem(`notif-banner-dismissed-${user.id}`);
         if (!dismissed) {
           setShowBanner(true);
         }
+      } else if (Notification.permission === 'granted') {
+        // Permission déjà accordée → s'abonner au push et envoyer la bienvenue
+        registerPushNotifications(user.id).catch(() => {});
+        ensureWelcomeNotification(user.id).catch(() => {});
       }
     }
   }, [user]);

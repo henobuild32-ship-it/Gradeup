@@ -16,7 +16,6 @@ const serwist = new Serwist({
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: [
-    // API routes — never cache
     {
       matcher: ({ request }) => request.url.includes('/api/'),
       handler: new NetworkOnly(),
@@ -27,7 +26,7 @@ const serwist = new Serwist({
 
 serwist.addEventListeners();
 
-// --- Native Web Push Notification Listeners (Même navigateur / PWA fermé) ---
+// --- Native Web Push Notification Listeners (works when site/PWA is closed) ---
 
 self.addEventListener("push", (event: any) => {
   try {
@@ -40,41 +39,70 @@ self.addEventListener("push", (event: any) => {
       }
     }
 
-    const title = data.title || "GradeUp 🚀";
+    const title = data.title || "GradeUp";
     const options = {
-      body: data.body || "Mbote Il'y a une nouvelle mise à jour de GradeUp.",
-      icon: data.icon || "/icons/icon-192x192.png",
-      badge: data.badge || "/icons/icon-72x72.png",
-      vibrate: [300, 100, 300, 100, 300], // Vibreur / Bip puissant natif
+      body: data.body || "Nouvelle notification de GradeUp.",
+      icon: data.icon || "/icon-192x192.png",
+      badge: data.badge || "/icon-192x192.png",
+      vibrate: [200, 100, 200],
       renotify: true,
-      tag: "gradeup-broadcast-update",
-      requireInteraction: true, // Reste visible jusqu'à interaction
+      tag: data.tag || "gradeup-notification",
+      requireInteraction: true,
       data: data.data || { url: "/" },
       actions: [
-        { action: "open", title: "Ouvrir GradeUp" }
-      ]
+        { action: "open", title: "Ouvrir" },
+        { action: "dismiss", title: "Fermer" }
+      ],
+      silent: false,
     };
 
-    event.waitUntil(self.registration.showNotification(title, options));
+    event.waitUntil(
+      self.registration.showNotification(title, options).then(() => {
+        // Envoyer un message aux clients ouverts pour mettre à jour le compteur
+        return self.clients.matchAll({ type: "window" }).then((clients: any) => {
+          clients.forEach((client: any) => {
+            client.postMessage({
+              type: "PUSH_NOTIFICATION_RECEIVED",
+              data: data,
+            });
+          });
+        });
+      })
+    );
   } catch (error) {
-    console.error("[ServiceWorker] Error receiving push notification:", error);
+    console.error("[SW] Push notification error:", error);
   }
 });
 
 self.addEventListener("notificationclick", (event: any) => {
   event.notification.close();
+
+  if (event.action === "dismiss") return;
+
   const urlToOpen = event.notification.data?.url || "/";
+
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients: any) => {
+      // Focus existing window if available
       for (let i = 0; i < windowClients.length; i++) {
         const client = windowClients[i];
-        if (client.url === urlToOpen && "focus" in client) {
-          return client.focus();
+        if ("focus" in client) {
+          client.focus();
+          if (client.navigate) {
+            return client.navigate(urlToOpen);
+          }
+          return client;
         }
       }
+      // Open new window if none exists
       if (self.clients.openWindow) {
         return self.clients.openWindow(urlToOpen);
       }
     })
   );
+});
+
+// Handle notification close (analytics tracking opportunity)
+self.addEventListener("notificationclose", (event: any) => {
+  // Optional: track notification dismissal
 });
