@@ -32,7 +32,7 @@ function CheckoutContent() {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const amount = searchParams.get('amount') || '10';
-  const currency = searchParams.get('currency') || 'USD';
+  const currency = 'USD';
   const description = searchParams.get('description') || 'Paiement carte d\'identité scolaire';
   const successUrl = searchParams.get('successUrl') || '/api/payments/geniuspay/success?schoolId=demo&action=generate-single&userId=new-card';
   const cancelUrl = searchParams.get('cancelUrl') || '/api/payments/geniuspay/cancel';
@@ -138,7 +138,7 @@ function CheckoutContent() {
                   <Wallet className="w-8 h-8 text-emerald-400" />
                 </div>
                 <p className="text-white/60 text-sm mb-2">Montant à payer</p>
-                <p className="text-5xl font-bold text-white mb-2">{displayAmount} <span className="text-2xl text-blue-300">{currency}</span></p>
+                <p className="text-5xl font-bold text-white mb-2">${displayAmount}</p>
                 <p className="text-white/40 text-xs">{description}</p>
               </div>
 
@@ -222,7 +222,7 @@ function CheckoutContent() {
                 className="w-full py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl font-bold text-lg shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
               >
                 <CreditCard className="w-5 h-5" />
-                Payer {displayAmount} {currency}
+                Payer ${displayAmount}
                 <ChevronRight className="w-5 h-5" />
               </button>
 
@@ -284,7 +284,7 @@ function CheckoutContent() {
               <div>
                 <h2 className="text-2xl font-bold text-white mb-2">✅ Paiement réussi !</h2>
                 <p className="text-white/60">
-                  Votre paiement de <strong className="text-emerald-400">{displayAmount} {currency}</strong> a été effectué avec succès.
+                  Votre paiement de <strong className="text-emerald-400">${displayAmount}</strong> a été effectué avec succès.
                 </p>
               </div>
               <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
