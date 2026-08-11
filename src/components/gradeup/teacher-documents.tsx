@@ -1,7 +1,5 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useAppStore } from '@/lib/store';
 import { publishToLibrary } from '@/lib/publishToLibrary';
 import type { TeacherDocumentInfo } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +12,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useAppStore } from '@/lib/store';
 import {
   BookOpen,
   CheckCircle2,
@@ -27,6 +27,7 @@ import {
   Search,
   Trash2,
   UploadCloud,
+  Loader2,
 } from 'lucide-react';
 
 interface TeacherDocumentFormState {
@@ -68,6 +69,8 @@ export default function TeacherDocuments() {
   const [filterLevel, setFilterLevel] = useState('');
   const [filterPeriod, setFilterPeriod] = useState('');
   const [form, setForm] = useState<TeacherDocumentFormState>(emptyForm());
+  const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const storageKey = user?.id ? `gradeup_teacher_documents_${user.id}` : '';
 
@@ -125,9 +128,7 @@ export default function TeacherDocuments() {
     const fd = new FormData();
     fd.append('file', file);
     const res = await fetch('/api/resources/upload', { method: 'POST', body: fd });
-    if (!res.ok) {
-      throw new Error('Échec du téléversement');
-    }
+    if (!res.ok) throw new Error('Échec du téléversement');
     const data = await res.json();
     return data.url as string;
   };
@@ -211,27 +212,33 @@ export default function TeacherDocuments() {
       resetForm();
       toast.success(editingDoc ? 'Document mis à jour avec une nouvelle version.' : 'Document créé.');
     } catch {
-      toast.error('Impossible d’enregistrer ce document.');
+      toast.error("Impossible d'enregistrer ce document.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleDelete = (docId: string) => {
+  const handleDelete = async (docId: string) => {
     if (!window.confirm('Supprimer ce document pédagogique ?')) return;
-    const nextDocuments = documents.filter((doc) => doc.id !== docId);
-    persistDocuments(nextDocuments);
-    toast.success('Document supprimé.');
+    setDeletingId(docId);
+    try {
+      const nextDocuments = documents.filter((doc) => doc.id !== docId);
+      persistDocuments(nextDocuments);
+      toast.success('Document supprimé.');
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const handlePublish = async (doc: TeacherDocumentInfo) => {
     if (!user) return;
+    setPublishingId(doc.id);
     try {
-      const ok = await publishToLibrary({
+      const result = await publishToLibrary({
         schoolId: user.schoolId,
         createdById: user.id,
         title: doc.title,
-        description: doc.description || 'Document pédagogique publié depuis l’espace enseignant.',
+        description: doc.description || 'Document pédagogique publié depuis l\'espace enseignant.',
         matiere: doc.subject,
         niveau: doc.level,
         author: user.fullName,
@@ -241,19 +248,25 @@ export default function TeacherDocuments() {
         category: doc.category || 'Documents pédagogiques',
         targetClassId: '',
       });
-      if (!ok) throw new Error('publish failed');
+
+      if (!result.ok) {
+        throw new Error(result.error || 'Publication échouée');
+      }
+
       const nextDocuments = documents.map((item) => (item.id === doc.id ? { ...item, published: true } : item));
       persistDocuments(nextDocuments);
-      toast.success('Document publié dans la bibliothèque.');
-    } catch {
-      toast.error('La publication dans la bibliothèque a échoué.');
+      toast.success('Document publié dans la bibliothèque avec succès !');
+    } catch (err: any) {
+      toast.error(err?.message || 'La publication dans la bibliothèque a échoué.');
+    } finally {
+      setPublishingId(null);
     }
   };
 
   const handlePrint = (doc: TeacherDocumentInfo) => {
     const printWindow = window.open('', '_blank', 'width=900,height=700');
     if (!printWindow) {
-      toast.error('Veuillez autoriser les popups pour l’impression.');
+      toast.error('Veuillez autoriser les popups pour l\'impression.');
       return;
     }
 
@@ -273,6 +286,7 @@ export default function TeacherDocuments() {
     printWindow.document.close();
     printWindow.focus();
     setTimeout(() => printWindow.print(), 300);
+    toast.success('Fenêtre d\'impression ouverte.');
   };
 
   const filteredDocuments = useMemo(() => {
@@ -307,7 +321,7 @@ export default function TeacherDocuments() {
           <div>
             <h1 className="text-2xl font-bold">Espace documents pédagogiques</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Centralisez vos préparations, suivi pédagogique et fiches d’évaluation avec historique et publication.
+              Centralisez vos préparations, suivi pédagogique et fiches d&apos;évaluation avec historique et publication.
             </p>
           </div>
           <Button onClick={openCreate} className="gap-2 rounded-full bg-blue-600 hover:bg-blue-700">
@@ -449,11 +463,32 @@ export default function TeacherDocuments() {
                   <Button size="sm" variant="outline" className="gap-1" onClick={() => handlePrint(doc)}>
                     <Printer className="h-3.5 w-3.5" /> Imprimer
                   </Button>
-                  <Button size="sm" variant="outline" className="gap-1" onClick={() => handlePublish(doc)} disabled={doc.published}>
-                    <Library className="h-3.5 w-3.5" /> Publier
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1"
+                    onClick={() => handlePublish(doc)}
+                    disabled={doc.published || publishingId === doc.id}
+                  >
+                    {publishingId === doc.id ? (
+                      <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Publication…</>
+                    ) : (
+                      <><Library className="h-3.5 w-3.5" /> Publier</>
+                    )}
                   </Button>
-                  <Button size="sm" variant="ghost" className="gap-1 text-red-600 hover:bg-red-50" onClick={() => handleDelete(doc.id)}>
-                    <Trash2 className="h-3.5 w-3.5" /> Supprimer
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="gap-1 text-red-600 hover:bg-red-50"
+                    onClick={() => handleDelete(doc.id)}
+                    disabled={deletingId === doc.id}
+                  >
+                    {deletingId === doc.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3.5 w-3.5" />
+                    )}{' '}
+                    Supprimer
                   </Button>
                 </div>
                 {doc.fileUrl ? (
@@ -536,7 +571,7 @@ export default function TeacherDocuments() {
               Annuler
             </Button>
             <Button onClick={handleSubmit} disabled={submitting} className="bg-blue-600 hover:bg-blue-700">
-              {submitting ? 'Enregistrement…' : editingDoc ? 'Mettre à jour' : 'Créer'}
+              {submitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Enregistrement…</> : editingDoc ? 'Mettre à jour' : 'Créer'}
             </Button>
           </DialogFooter>
         </DialogContent>

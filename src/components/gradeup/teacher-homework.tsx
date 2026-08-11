@@ -171,7 +171,7 @@ export default function TeacherHomework() {
       // Publish to the digital library on creation
       if (!editingHomework && addToLibrary) {
         const course = courses.find((c) => c.id === formCourseId);
-        const libOk = await publishToLibrary({
+        const libResult = await publishToLibrary({
           schoolId: user.schoolId,
           createdById: user.id,
           title: formTitle.trim(),
@@ -185,7 +185,7 @@ export default function TeacherHomework() {
           category: 'Devoirs',
           targetClassId: course?.classId || '',
         });
-        if (!libOk) toast.warning('Le devoir est créé mais l\'ajout à la bibliothèque a échoué.');
+        if (!libResult.ok) toast.warning(`Devoir créé mais bibliothèque : ${libResult.error || 'échoué'}`);
       }
 
       setDialogOpen(false); resetForm(); fetchData();
@@ -281,7 +281,7 @@ export default function TeacherHomework() {
                             type: hw.fileUrl?.toLowerCase().endsWith('.pdf') ? 'PDF' : hw.fileUrl ? 'FICHIER' : 'LIEN',
                             category: 'Devoirs',
                             targetClassId: course?.classId || '',
-                          }).then((ok) => ok ? toast.success('Devoir ajouté à la bibliothèque numérique.') : toast.error('Échec de l\'ajout à la bibliothèque.'));
+                          }).then((r) => r.ok ? toast.success('Devoir ajouté à la bibliothèque numérique.') : toast.error(r.error || 'Échec de l\'ajout à la bibliothèque.'));
                         }}>
                         <Library className="h-3.5 w-3.5" />
                       </Button>

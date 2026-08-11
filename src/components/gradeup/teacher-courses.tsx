@@ -170,7 +170,7 @@ export default function TeacherCourses() {
 
         // Also publish to the digital library (optional)
         if (addToLibrary) {
-          const libOk = await publishToLibrary({
+          const libResult = await publishToLibrary({
             schoolId: user.schoolId,
             createdById: user.id,
             title: lessonTitle.trim(),
@@ -184,7 +184,7 @@ export default function TeacherCourses() {
             category: 'Cours',
             targetClassId: selectedCourse.classId,
           });
-          if (!libOk) toast.warning('La leçon est publiée mais l\'ajout à la bibliothèque a échoué.');
+          if (!libResult.ok) toast.warning(`La leçon est publiée mais la bibliothèque : ${libResult.error || 'échoué'}`);
         }
 
         setLessonTitle('');
@@ -214,7 +214,7 @@ export default function TeacherCourses() {
   const publishExistingLesson = async (lesson: LessonInfo) => {
     if (!selectedCourse || !user) return;
     try {
-      const libOk = await publishToLibrary({
+      const libResult = await publishToLibrary({
         schoolId: user.schoolId,
         createdById: user.id,
         title: lesson.title,
@@ -228,8 +228,8 @@ export default function TeacherCourses() {
         category: 'Cours',
         targetClassId: selectedCourse.classId,
       });
-      if (libOk) toast.success('Leçon ajoutée à la bibliothèque numérique.');
-      else toast.error('Échec de l\'ajout à la bibliothèque.');
+      if (libResult.ok) toast.success('Leçon ajoutée à la bibliothèque numérique.');
+      else toast.error(libResult.error || 'Échec de l\'ajout à la bibliothèque.');
     } catch {
       toast.error('Erreur lors de l\'ajout à la bibliothèque.');
     }

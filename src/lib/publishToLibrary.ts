@@ -34,7 +34,13 @@ export function lessonResourceType(fileUrl: string, fileName: string): LibraryRe
   return 'FICHIER';
 }
 
-export async function publishToLibrary(input: PublishToLibraryInput): Promise<boolean> {
+export interface PublishResult {
+  ok: boolean;
+  error?: string;
+  resource?: any;
+}
+
+export async function publishToLibrary(input: PublishToLibraryInput): Promise<PublishResult> {
   try {
     const res = await fetch('/api/resources', {
       method: 'POST',
@@ -56,8 +62,15 @@ export async function publishToLibrary(input: PublishToLibraryInput): Promise<bo
         targetClassId: input.targetClassId || '',
       }),
     });
-    return res.ok;
-  } catch {
-    return false;
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      return { ok: false, error: data.error || `Erreur HTTP ${res.status}` };
+    }
+
+    return { ok: true, resource: data.resource };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || 'Erreur réseau' };
   }
 }
