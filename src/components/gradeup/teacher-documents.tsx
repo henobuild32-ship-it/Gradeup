@@ -72,26 +72,27 @@ export default function TeacherDocuments() {
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const storageKey = user?.id ? `gradeup_teacher_documents_${user.id}` : '';
-
   useEffect(() => {
-    if (!storageKey) return;
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) {
-        const parsed = JSON.parse(raw) as TeacherDocumentInfo[];
-        setDocuments(parsed);
-      }
-    } catch {
-      toast.error('Impossible de charger les documents pédagogiques locaux.');
-    } finally {
+    if (!user?.schoolId || !user?.id) {
       setLoading(false);
+      return;
     }
-  }, [storageKey]);
+    const fetchDocuments = async () => {
+      try {
+        const res = await fetch(`/api/documents?schoolId=${user.schoolId}&teacherId=${user.id}`);
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        setDocuments(Array.isArray(data.documents) ? data.documents : []);
+      } catch {
+        toast.error('Impossible de charger les documents pédagogiques.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDocuments();
+  }, [user?.schoolId, user?.id]);
 
-  const persistDocuments = (next: TeacherDocumentInfo[]) => {
-    if (!storageKey) return;
-    localStorage.setItem(storageKey, JSON.stringify(next));
+  const persistDocuments = async (next: TeacherDocumentInfo[]) => {
     setDocuments(next);
   };
 
@@ -149,70 +150,44 @@ export default function TeacherDocuments() {
         fileUrl = await uploadFile(selectedFileRef.current);
       }
 
-      const now = new Date().toISOString();
-      const nextDoc: TeacherDocumentInfo = editingDoc
-        ? {
-            ...editingDoc,
-            title: form.title.trim(),
-            description: form.description.trim(),
-            category: form.category.trim() || 'Général',
-            subject: form.subject.trim(),
-            level: form.level.trim(),
-            period: form.period.trim(),
-            content: form.content.trim(),
-            fileName,
-            fileUrl,
-            updatedAt: now,
-            versions: [
-              ...(editingDoc.versions || []),
-              {
-                id: `${editingDoc.id}-${Date.now()}`,
-                updatedAt: now,
-                summary: 'Mise à jour de contenu',
-                content: form.content.trim(),
-                fileUrl,
-                fileName,
-              },
-            ],
-          }
-        : {
-            id: crypto.randomUUID(),
-            schoolId: user.schoolId,
-            teacherId: user.id,
-            title: form.title.trim(),
-            description: form.description.trim(),
-            category: form.category.trim() || 'Général',
-            subject: form.subject.trim(),
-            level: form.level.trim(),
-            period: form.period.trim(),
-            content: form.content.trim(),
-            fileName,
-            fileUrl,
-            published: false,
-            createdAt: now,
-            updatedAt: now,
-            versions: [
-              {
-                id: crypto.randomUUID(),
-                updatedAt: now,
-                summary: 'Version initiale',
-                content: form.content.trim(),
-                fileUrl,
-                fileName,
-              },
-            ],
-          };
+      const payload = {
+        title: form.title.trim(),
+        description: form.description.trim(),
+        category: form.category.trim() || 'Général',
+        subject: form.subject.trim(),
+        level: form.level.trim(),
+        period: form.period.trim(),
+        content: form.content.trim(),
+        fileName,
+        fileUrl,
+      };
 
-      const nextDocuments = editingDoc
-        ? documents.map((doc) => (doc.id === editingDoc.id ? nextDoc : doc))
-        : [nextDoc, ...documents];
+      const res = editingDoc
+        ? await fetch(`/api/documents?id=${editingDoc.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+        : await fetch('/api/documents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ schoolId: user.schoolId, ...payload }),
+          });
 
-      persistDocuments(nextDocuments);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Impossible d'enregistrer ce document.");
+
+      setDocuments((prev) => {
+        if (editingDoc) {
+          return prev.map((doc) => (doc.id === editingDoc.id ? data.document : doc));
+        }
+        return [data.document, ...prev];
+      });
       setDialogOpen(false);
       resetForm();
       toast.success(editingDoc ? 'Document mis à jour avec une nouvelle version.' : 'Document créé.');
-    } catch {
-      toast.error("Impossible d'enregistrer ce document.");
+    } catch (err: any) {
+      toast.error(err?.message || "Impossible d'enregistrer ce document.");
     } finally {
       setSubmitting(false);
     }
@@ -222,9 +197,13 @@ export default function TeacherDocuments() {
     if (!window.confirm('Supprimer ce document pédagogique ?')) return;
     setDeletingId(docId);
     try {
-      const nextDocuments = documents.filter((doc) => doc.id !== docId);
-      persistDocuments(nextDocuments);
+      const res = await fetch(`/api/documents?id=${docId}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Échec de la suppression');
+      setDocuments((prev) => prev.filter((doc) => doc.id !== docId));
       toast.success('Document supprimé.');
+    } catch (err: any) {
+      toast.error(err?.message || 'Échec de la suppression.');
     } finally {
       setDeletingId(null);
     }
@@ -253,8 +232,14 @@ export default function TeacherDocuments() {
         throw new Error(result.error || 'Publication échouée');
       }
 
-      const nextDocuments = documents.map((item) => (item.id === doc.id ? { ...item, published: true } : item));
-      persistDocuments(nextDocuments);
+      // Persiste l'état publié en base
+      await fetch(`/api/documents?id=${doc.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ published: true }),
+      });
+
+      setDocuments((prev) => prev.map((item) => (item.id === doc.id ? { ...item, published: true } : item)));
       toast.success('Document publié dans la bibliothèque avec succès !');
     } catch (err: any) {
       toast.error(err?.message || 'La publication dans la bibliothèque a échoué.');

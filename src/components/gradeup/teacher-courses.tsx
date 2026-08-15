@@ -102,8 +102,8 @@ export default function TeacherCourses() {
       const schedData = await schedRes.json();
       const lessonsData = await lessonsRes.json();
 
-      setStudents(Array.isArray(studentsData) ? studentsData : []);
-      setGrades(Array.isArray(gradesData) ? gradesData : []);
+      setStudents(Array.isArray(studentsData.users) ? studentsData.users : Array.isArray(studentsData) ? studentsData : []);
+      setGrades(Array.isArray(gradesData.grades) ? gradesData.grades : Array.isArray(gradesData) ? gradesData : []);
       setSchedules(Array.isArray(schedData) ? schedData : []);
       setLessons(Array.isArray(lessonsData.lessons) ? lessonsData.lessons : []);
     } catch {

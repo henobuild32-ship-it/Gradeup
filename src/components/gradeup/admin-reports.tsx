@@ -744,7 +744,7 @@ export default function AdminReports() {
       }
       
       setGeneratingReport(true);
-      setTimeout(() => {
+      try {
         if (manualTemplateType === 'official') {
           const mapped: InteractiveCourseRow[] = RDC_OFFICIAL_CURRICULUM.map((item, idx) => ({
             id: `manual-course-${idx}`,
@@ -769,9 +769,12 @@ export default function AdminReports() {
           generateBlankCourses(manualRowsCount);
         }
         setShowRDCBulletin(true);
-        setGeneratingReport(false);
         toast.success('Le bulletin a été dessiné avec succès !');
-      }, 500);
+      } catch {
+        toast.error('Erreur lors de la génération du bulletin');
+      } finally {
+        setGeneratingReport(false);
+      }
     }
   };
 

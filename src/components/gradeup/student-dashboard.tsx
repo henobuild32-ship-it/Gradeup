@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { toast } from 'sonner';
 import { TrendingUp, BookOpen, CalendarX, CreditCard, User, Bell, FileText, Clock, Sparkles, Award, Key, Copy, Check, RefreshCw, Users, CalendarDays } from 'lucide-react';
 import { AttendanceTrendChart } from './charts-widget';
 import PresenceWidget from './presence-widget';
@@ -341,10 +342,14 @@ export default function StudentDashboard() {
                       body: JSON.stringify({ userId: user.id }),
                     });
                     const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || 'Échec de la régénération');
                     if (data.parentCode) {
                       setParentCode(data.parentCode);
+                      toast.success('Nouveau code parent généré.');
                     }
-                  } catch { /* skip */ }
+                  } catch (err: any) {
+                    toast.error(err?.message || 'Impossible de régénérer le code parent.');
+                  }
                   setGeneratingCode(false);
                 }}
                 disabled={generatingCode}

@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { BookOpen, Users, FileText, Plus, GraduationCap, Clock, Lightbulb, RefreshCw, CalendarDays, AlertTriangle } from 'lucide-react';
 import type { CourseInfo, LessonInfo, UserInfo } from '@/lib/types';
+import { toast } from 'sonner';
 import PresenceWidget from './presence-widget';
 import WeeklyScheduleView from './weekly-schedule-view';
 
@@ -47,7 +48,7 @@ export default function TeacherDashboard() {
       }
       setTotalStudents(total);
     } catch {
-      // Silently handle
+      if (isManual) toast.error('Impossible d\'actualiser le tableau de bord.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -78,8 +79,6 @@ export default function TeacherDashboard() {
   });
 
   if (!user) return null;
-
-  const timeSlots = ['08:00', '10:00', '12:00', '14:00', '16:00'];
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -138,7 +137,6 @@ export default function TeacherDashboard() {
                 <div className="text-2xl font-bold">
                   {loading ? <Skeleton className="h-8 w-8 inline-block" /> : courses.length}
                 </div>
-                <span className="text-xs font-medium text-emerald-600 mb-1">+1</span>
               </div>
             </div>
           </CardContent>
@@ -155,7 +153,6 @@ export default function TeacherDashboard() {
                 <div className="text-2xl font-bold">
                   {loading ? <Skeleton className="h-8 w-8 inline-block" /> : totalStudents}
                 </div>
-                <span className="text-xs font-medium text-emerald-600 mb-1">+5%</span>
               </div>
             </div>
           </CardContent>
@@ -248,7 +245,7 @@ export default function TeacherDashboard() {
                       </div>
                       {/* Time label */}
                       <span className="text-[10px] font-semibold text-muted-foreground mb-1 block">
-                        {timeSlots[index % timeSlots.length]}
+                        {new Date(lesson.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                       </span>
                       {/* Card */}
                       <div className="p-4 rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50/50 to-white hover:from-blue-50 hover:to-white hover:shadow-md transition-all duration-300">

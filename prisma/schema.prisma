@@ -50,6 +50,8 @@ model School {
   presences            Presence[]
   years                SchoolYear[]
   submissions          Submission[]
+  teacherDocuments     TeacherDocument[]
+  timeSlots            SchoolTimeSlot[]
 
   @@index([subscriptionStatus])
   @@index([inviteCode])
@@ -146,6 +148,7 @@ model User {
   presence                UserPresence?
   messageReactions        MessageReaction[]
   passwordResets          PasswordReset[]
+  teacherDocuments        TeacherDocument[]
 
   @@unique([schoolId, fullName, role])
   @@index([schoolId, role, active])
@@ -915,5 +918,46 @@ model CotationTransmission {
   @@index([schoolId, classId, status])
   @@index([titulaireId, status])
   @@index([evaluationId, status])
+}
+
+model TeacherDocument {
+  id          String   @id @default(cuid())
+  schoolId    String
+  teacherId   String
+  title       String
+  description String   @default("")
+  category    String   @default("Général")
+  subject     String   @default("")
+  level       String   @default("")
+  period      String   @default("")
+  content     String   @default("")
+  fileUrl     String   @default("")
+  fileName    String   @default("")
+  published   Boolean  @default(false)
+  versions    Json     @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  school  School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  teacher User   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, teacherId])
+  @@index([schoolId, teacherId, published])
+}
+
+model SchoolTimeSlot {
+  id        String   @id @default(cuid())
+  schoolId  String
+  start     String
+  end       String
+  isBreak   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
 }
 

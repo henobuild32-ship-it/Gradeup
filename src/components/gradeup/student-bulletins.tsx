@@ -62,7 +62,6 @@ export default function StudentBulletins() {
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchBulletins(false);
-    await new Promise(r => setTimeout(r, 600));
     setRefreshing(false);
   };
 

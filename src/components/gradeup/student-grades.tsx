@@ -42,7 +42,6 @@ export default function StudentGrades() {
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchGrades(false);
-    await new Promise(r => setTimeout(r, 600));
     setRefreshing(false);
   };
 

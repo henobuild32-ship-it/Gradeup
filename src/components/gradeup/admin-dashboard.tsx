@@ -286,8 +286,8 @@ export default function AdminDashboard() {
       color: 'text-blue-600',
       bg: 'bg-blue-50',
       border: 'border-blue-200',
-      change: '+12%',
-      up: true,
+      badge: `${stats?.totalClasses ?? 0} classes`,
+      badgeClass: 'bg-blue-50 text-blue-600',
     },
     {
       title: 'Total Professeurs',
@@ -296,18 +296,18 @@ export default function AdminDashboard() {
       color: 'text-green-600',
       bg: 'bg-green-50',
       border: 'border-green-200',
-      change: '+3%',
-      up: true,
+      badge: `${stats?.totalCourses ?? 0} cours`,
+      badgeClass: 'bg-green-50 text-green-600',
     },
     {
       title: 'Revenus',
-      value: `${(stats?.totalRevenue ?? 0).toLocaleString()} USD`,
+      value: `${(stats?.totalRevenue ?? 0).toLocaleString()} ${user?.school?.currency || 'USD'}`,
       icon: DollarSign,
       color: 'text-emerald-600',
       bg: 'bg-emerald-50',
       border: 'border-emerald-200',
-      change: '+18%',
-      up: true,
+      badge: `${(stats?.pendingRevenue ?? 0).toLocaleString()} en attente`,
+      badgeClass: 'bg-emerald-50 text-emerald-600',
     },
     {
       title: 'Total Parents',
@@ -316,8 +316,10 @@ export default function AdminDashboard() {
       color: 'text-purple-600',
       bg: 'bg-purple-50',
       border: 'border-purple-200',
-      change: '-2%',
-      up: false,
+      badge: stats?.attendanceToday
+        ? `${stats.attendanceToday.present} présents aujourd'hui`
+        : 'Aucune présence aujourd\'hui',
+      badgeClass: 'bg-purple-50 text-purple-600',
     },
   ];
 
@@ -608,10 +610,8 @@ export default function AdminDashboard() {
                     <div className={`p-3 rounded-xl ${card.bg} group-hover:scale-110 transition-transform duration-300`}>
                       <card.icon className={`h-6 w-6 ${card.color}`} />
                     </div>
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                      card.up ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
-                    }`}>
-                      {card.up ? '↑' : '↓'} {card.change}
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${card.badgeClass}`}>
+                      {card.badge}
                     </span>
                   </div>
                   <div>

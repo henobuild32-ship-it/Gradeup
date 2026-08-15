@@ -55,8 +55,10 @@ import {
   ChevronUp,
   History,
   CornerDownLeft,
+  Loader2,
 } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { toast } from 'sonner';
 import GradieWelcome from './GradieWelcome';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -605,11 +607,44 @@ function AiMessageActions({
 }) {
   const [liked, setLiked] = useState<boolean | null>(null);
   const [copied, setCopied] = useState(false);
+  const [translated, setTranslated] = useState<string | null>(null);
+  const [translating, setTranslating] = useState(false);
+  const [showActions, setShowActions] = useState(false);
 
   const handleCopy = async () => {
     await navigator.clipboard?.writeText(content).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleTranslate = async () => {
+    if (translating) return;
+    setTranslating(true);
+    try {
+      const res = await fetch('/api/ai/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: content, targetLang: 'fr' }),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setTranslated(data.translation || content);
+      setShowActions(true);
+    } catch {
+      toast.error('Traduction indisponible pour le moment.');
+    } finally {
+      setTranslating(false);
+    }
+  };
+
+  const handleExport = () => {
+    const blob = new Blob(['\uFEFF' + content], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `gradie-message-${Date.now()}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const actions = [
@@ -618,26 +653,39 @@ function AiMessageActions({
     { id: 'copy', icon: copied ? Check : Copy, color: copied ? 'text-emerald-400' : 'text-white/50', action: handleCopy, title: 'Copier' },
     { id: 'share', icon: Share2, color: 'text-white/50', action: () => navigator.share?.({ text: content }).catch(() => {}), title: 'Partager' },
     { id: 'speak', icon: isSpeaking ? VolumeX : Volume2, color: isSpeaking ? 'text-indigo-400' : 'text-white/50', action: onSpeak, title: 'Lire à voix haute' },
-    { id: 'translate', icon: Globe, color: 'text-white/50', action: () => {}, title: 'Traduire' },
-    { id: 'export', icon: Download, color: 'text-white/50', action: () => {}, title: 'Exporter' },
+    { id: 'translate', icon: translating ? Loader2 : Globe, color: 'text-white/50', action: handleTranslate, title: 'Traduire' },
+    { id: 'export', icon: Download, color: 'text-white/50', action: handleExport, title: 'Exporter' },
     { id: 'regen', icon: RotateCcw, color: 'text-white/50', action: onRegenerate, title: 'Régénérer' },
   ];
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t border-white/5">
-      {actions.map((act) => {
-        const Icon = act.icon;
-        return (
-          <button
-            key={act.id}
-            onClick={act.action}
-            className="w-[40px] h-[40px] rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 flex items-center justify-center transition-all"
-            title={act.title}
-          >
-            <Icon className={`w-4 h-4 ${act.color}`} />
-          </button>
-        );
-      })}
+    <div className="mt-2 pt-2 border-t border-white/5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {actions.map((act) => {
+          const Icon = act.icon;
+          return (
+            <button
+              key={act.id}
+              onClick={act.action}
+              className="w-[40px] h-[40px] rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 flex items-center justify-center transition-all"
+              title={act.title}
+            >
+              <Icon className={`w-4 h-4 ${act.color} ${act.id === 'translate' && translating ? 'animate-spin' : ''}`} />
+            </button>
+          );
+        })}
+      </div>
+      {showActions && translated && translated !== content && (
+        <div className="mt-2 rounded-xl bg-white/5 border border-white/10 p-3 text-sm text-white/90">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs text-white/50 font-semibold">Traduction (FR)</span>
+            <button onClick={() => setShowActions(false)} className="text-white/40 hover:text-white">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <p className="whitespace-pre-wrap">{translated}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -655,6 +703,7 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
   const [showSearch, setShowSearch] = useState(false);
   const [showMenuSheet, setShowMenuSheet] = useState(false);
   const [showAttachmentSheet, setShowAttachmentSheet] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
   const [listening, setListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
@@ -674,6 +723,48 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const readerRef = useRef<ReadableStreamDefaultReader | null>(null);
+  const attachInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Attach / upload document ─────────────────────────────────────────────────
+  const handleAttachFile = async (file: File) => {
+    if (!file) return;
+    let convId = activeConversation?.id;
+    if (!convId) {
+      const res = await fetch('/api/ai/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        convId = data.conversation.id;
+        await loadConversation(convId!);
+      }
+    }
+    if (!convId) {
+      toast.error('Impossible de créer la conversation pour joindre le fichier.');
+      return;
+    }
+
+    setUploadingDoc(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('userId', userId);
+      fd.append('conversationId', convId);
+      const res = await fetch('/api/ai/upload', { method: 'POST', body: fd });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || 'Échec du téléversement');
+      }
+      await loadConversation(convId);
+      toast.success(`Fichier « ${file.name} » analysé par Gradie.`);
+    } catch (err: any) {
+      toast.error(err?.message || 'Échec du téléversement du fichier.');
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
 
   // ── Auto scroll ─────────────────────────────────────────────────────────────
   const scrollToBottom = useCallback((smooth = true) => {
@@ -1036,37 +1127,55 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
         <ThreeDotsMenuSheet
           onClose={() => setShowMenuSheet(false)}
           onNewChat={createNewConversation}
-          onOpenHistory={() => {}}
+          onOpenHistory={() => setShowSearch(true)}
           onOpenSearch={() => setShowSearch(true)}
           onOpenSearchHistory={() => setShowSearchHistory(true)}
           onClearAll={() => {
-            if (confirm('Vider tout l\'historique ?')) setConversations([]);
+            if (!confirm('Vider tout l\'historique ?')) return;
+            (async () => {
+              let cleared = 0;
+              for (const c of conversations) {
+                const res = await fetch(`/api/ai/conversations/${c.id}?userId=${userId}`, { method: 'DELETE' });
+                if (res.ok) cleared++;
+              }
+              setConversations([]);
+              setActiveConversation(null);
+              if (cleared > 0) toast.success(`${cleared} conversation(s) supprimée(s).`);
+              else toast.error('Aucune conversation supprimée.');
+            })();
           }}
           onExport={() => {
             if (!activeConversation) return;
-            const data = {
-              title: activeConversation.title,
-              model: selectedModel,
-              exportedAt: new Date().toISOString(),
-              messages: activeConversation.messages.map(m => ({
-                role: m.role,
-                content: m.content,
-                createdAt: m.createdAt,
-              })),
-            };
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const md = [
+              `# ${activeConversation.title}`,
+              `Modèle : ${selectedModel}`,
+              `Exporté le : ${new Date().toLocaleString('fr-FR')}`,
+              '',
+              ...activeConversation.messages.map(m =>
+                `## ${m.role === 'user' ? '👤 Utilisateur' : '🤖 Gradie'}\n\n${m.content}`
+              ),
+            ].join('\n\n');
+            const blob = new Blob(['\uFEFF' + md], { type: 'text/markdown;charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `gradie-${activeConversation.title.replace(/[^a-z0-9]/gi, '_')}-${Date.now()}.json`;
+            a.download = `gradie-${activeConversation.title.replace(/[^a-z0-9]/gi, '_')}-${Date.now()}.md`;
             a.click();
             URL.revokeObjectURL(url);
           }}
           onDeleteCurrent={() => {
-            if (activeConversation) {
-              setConversations(p => p.filter(c => c.id !== activeConversation.id));
-              setActiveConversation(null);
-            }
+            if (!activeConversation) return;
+            if (!confirm('Supprimer cette conversation ?')) return;
+            (async () => {
+              const res = await fetch(`/api/ai/conversations/${activeConversation.id}?userId=${userId}`, { method: 'DELETE' });
+              if (res.ok) {
+                setConversations(p => p.filter(c => c.id !== activeConversation.id));
+                setActiveConversation(null);
+                toast.success('Conversation supprimée.');
+              } else {
+                toast.error('Échec de la suppression de la conversation.');
+              }
+            })();
           }}
           activeTitle={activeConversation?.title}
           selectedModel={selectedModel}
@@ -1079,9 +1188,21 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
       {showAttachmentSheet && (
         <AttachmentSheet
           onClose={() => setShowAttachmentSheet(false)}
-          onSelect={(t) => console.log('Selected attachment type:', t)}
+          onSelect={() => attachInputRef.current?.click()}
         />
       )}
+
+      <input
+        ref={attachInputRef}
+        type="file"
+        accept="application/pdf,.docx,text/plain,image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleAttachFile(file);
+          e.target.value = '';
+        }}
+      />
 
       {/* ── 7. CENTRAL MESSAGES AREA (Desktop max 860px, Mobile 100%, Padding 20px) ─ */}
       <main className="flex-1 min-h-0 overflow-hidden relative">

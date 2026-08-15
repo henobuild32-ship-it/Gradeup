@@ -653,7 +653,13 @@ export default function CahierCotation() {
                   user?.fullName}
               </div>
               <div>
-                <strong>Année Scolaire:</strong> 2025-2026
+                <strong>Année Scolaire:</strong>{' '}
+                {(() => {
+                  const now = new Date();
+                  const y = now.getFullYear();
+                  const start = now.getMonth() >= 8 ? y : y - 1;
+                  return `${start}-${start + 1}`;
+                })()}
               </div>
             </div>
           </div>

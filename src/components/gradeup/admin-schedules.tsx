@@ -184,28 +184,35 @@ export default function AdminSchedules() {
     }
   };
 
-  // ── Load time slots from localStorage ───────────────────────────────────────
+  // ── Load time slots from backend ───────────────────────────────────────────
   useEffect(() => {
     if (!user?.schoolId) return;
-    const key = `gradeup-timeslots-${user.schoolId}`;
-    try {
-      const saved = localStorage.getItem(key);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) setTimeSlots(parsed);
+    const fetchTimeSlots = async () => {
+      try {
+        const res = await fetch(`/api/schedules/timeslots?schoolId=${user.schoolId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (Array.isArray(data.timeSlots) && data.timeSlots.length > 0) {
+          setTimeSlots(data.timeSlots);
+        }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
-    }
+    };
+    fetchTimeSlots();
   }, [user?.schoolId]);
 
-  const saveTimeSlots = useCallback((slots: TimeSlot[]) => {
-    if (!user?.schoolId) return;
-    const key = `gradeup-timeslots-${user.schoolId}`;
+  const saveTimeSlots = useCallback(async (slots: TimeSlot[]): Promise<boolean> => {
+    if (!user?.schoolId) return false;
     try {
-      localStorage.setItem(key, JSON.stringify(slots));
+      const res = await fetch(`/api/schedules/timeslots?schoolId=${user.schoolId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ timeSlots: slots }),
+      });
+      return res.ok;
     } catch {
-      // ignore
+      return false;
     }
   }, [user?.schoolId]);
 
@@ -270,7 +277,7 @@ export default function AdminSchedules() {
   }, [slotCourseId, courses]);
 
   // ── Time Slot Management ───────────────────────────────────────────────────
-  const handleAddTimeSlot = () => {
+  const handleAddTimeSlot = async () => {
     const lastEnd = getLastSlotEnd(timeSlots);
     const newEnd = addMinutes(lastEnd, 50);
     const newSlot: TimeSlot = {
@@ -281,8 +288,9 @@ export default function AdminSchedules() {
     };
     const updated = [...timeSlots, newSlot];
     setTimeSlots(updated);
-    saveTimeSlots(updated);
-    toast.success(`Plage horaire ajoutée : ${lastEnd} → ${newEnd}`);
+    const ok = await saveTimeSlots(updated);
+    if (ok) toast.success(`Plage horaire ajoutée : ${lastEnd} → ${newEnd}`);
+    else toast.error('Impossible d\'enregistrer la plage horaire.');
   };
 
   const handleOpenEditTimeSlot = (ts: TimeSlot) => {
@@ -303,7 +311,7 @@ export default function AdminSchedules() {
     setShowTimeSlotManager(true);
   };
 
-  const handleSaveTimeSlot = () => {
+  const handleSaveTimeSlot = async () => {
     if (!tsStart || !tsEnd) { toast.error('Heure de début et fin obligatoires'); return; }
     if (tsStart >= tsEnd) { toast.error('L\'heure de fin doit être après l\'heure de début'); return; }
 
@@ -317,25 +325,31 @@ export default function AdminSchedules() {
       updated = [...timeSlots, newTs].sort((a, b) => a.start.localeCompare(b.start));
     }
     setTimeSlots(updated);
-    saveTimeSlots(updated);
+    const ok = await saveTimeSlots(updated);
+    if (!ok) {
+      toast.error(editingTimeSlot ? 'Impossible de modifier la plage horaire.' : 'Impossible d\'ajouter la plage horaire.');
+      return;
+    }
     setShowTimeSlotManager(false);
     toast.success(editingTimeSlot ? 'Plage horaire modifiée' : 'Plage horaire ajoutée');
   };
 
-  const handleDeleteTimeSlot = (tsId: string) => {
+  const handleDeleteTimeSlot = async (tsId: string) => {
     if (!confirm('Supprimer cette plage horaire ?')) return;
     const updated = timeSlots.filter((ts) => ts.id !== tsId);
     setTimeSlots(updated);
-    saveTimeSlots(updated);
-    toast.success('Plage horaire supprimée');
+    const ok = await saveTimeSlots(updated);
+    if (ok) toast.success('Plage horaire supprimée');
+    else toast.error('Impossible de supprimer la plage horaire.');
   };
 
-  const handleToggleBreak = (tsId: string) => {
+  const handleToggleBreak = async (tsId: string) => {
     const updated = timeSlots.map((ts) =>
       ts.id === tsId ? { ...ts, isBreak: !ts.isBreak } : ts
     );
     setTimeSlots(updated);
-    saveTimeSlots(updated);
+    const ok = await saveTimeSlots(updated);
+    if (!ok) toast.error('Impossible d\'enregistrer la pause.');
   };
 
   // ── Course Slot Management ─────────────────────────────────────────────────
