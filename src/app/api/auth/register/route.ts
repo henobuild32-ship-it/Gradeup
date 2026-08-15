@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '@/lib/db';
 import { hashPassword } from '@/lib/password';
 import { setAuthCookies } from '@/lib/auth/session';
+
+const registerSchema = z.object({
+  gender: z.enum(['M', 'F'], { error: 'Le sexe est obligatoire (M ou F).' }),
+  dateOfBirth: z.coerce.date({ error: 'La date de naissance est obligatoire.' }),
+  classId: z.string().optional(),
+  specialty: z.string().optional(),
+  phone: z.string().optional(),
+  qualification: z.string().optional(),
+});
 
 function generateCode(prefix: string, length: number = 6): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -31,10 +41,18 @@ async function generateUniqueParentCode(): Promise<string> {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { mode, schoolName, fullName, email, password, inviteCode, role, classIds, parentCode } = body;
+    const { mode, schoolName, fullName, email, password, inviteCode, role, classIds, parentCode, gender, dateOfBirth, specialty, phone, qualification } = body;
 
     // === MODE: create-school (Admin creates a school) ===
     if (mode === 'create-school') {
+      const parsed = registerSchema.safeParse({ gender, dateOfBirth, specialty, phone, qualification });
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: parsed.error.issues[0]?.message || 'Champs obligatoires manquants.' },
+          { status: 400 }
+        );
+      }
+      const g = parsed.data.gender;
       if (!fullName || !schoolName || !email || !password) {
         return NextResponse.json(
           { error: 'Veuillez remplir tous les champs.' },
@@ -78,6 +96,8 @@ export async function POST(request: NextRequest) {
           password: await hashPassword(password),
           role: 'ADMIN',
           parentCode: parentCodeVal,
+          gender: g,
+          birthDate: parsed.data.dateOfBirth.toISOString(),
         },
         include: {
           school: true,
@@ -110,6 +130,68 @@ export async function POST(request: NextRequest) {
           { error: 'Le mot de passe doit contenir au moins 4 caractères.' },
           { status: 400 }
         );
+      }
+
+      const g = gender as string | undefined;
+      if (!g || (g !== 'M' && g !== 'F')) {
+        return NextResponse.json(
+          { error: 'Le sexe (M ou F) est obligatoire.' },
+          { status: 400 }
+        );
+      }
+
+      let birthDateValue = '';
+      if (role === 'STUDENT' || role === 'TEACHER') {
+        if (!dateOfBirth) {
+          return NextResponse.json(
+            { error: 'La date de naissance est obligatoire pour ce rôle.' },
+            { status: 400 }
+          );
+        }
+        const dob = new Date(dateOfBirth);
+        if (isNaN(dob.getTime())) {
+          return NextResponse.json(
+            { error: 'La date de naissance est invalide.' },
+            { status: 400 }
+          );
+        }
+        birthDateValue = dob.toISOString();
+      }
+
+      // STUDENT: classId obligatoire + matricule auto-généré
+      let matriculeValue = '';
+      if (role === 'STUDENT') {
+        const classIdVal = (classIds && Array.isArray(classIds) ? classIds[0] : null) as string | undefined;
+        if (!classIdVal) {
+          return NextResponse.json(
+            { error: 'La classe est obligatoire pour un élève.' },
+            { status: 400 }
+          );
+        }
+        matriculeValue = `MAT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+        while (await db.user.findFirst({ where: { matricule: matriculeValue } })) {
+          matriculeValue = `MAT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+        }
+      }
+
+      // TEACHER: specialty + phone obligatoires
+      let specialtyValue = '';
+      let phoneValue = '';
+      if (role === 'TEACHER') {
+        specialtyValue = (specialty || '').trim();
+        phoneValue = (phone || '').trim();
+        if (!specialtyValue) {
+          return NextResponse.json(
+            { error: 'La spécialité est obligatoire pour un professeur.' },
+            { status: 400 }
+          );
+        }
+        if (!phoneValue) {
+          return NextResponse.json(
+            { error: 'Le numéro de téléphone est obligatoire pour un professeur.' },
+            { status: 400 }
+          );
+        }
       }
 
       // Find school by invite code
@@ -159,7 +241,13 @@ export async function POST(request: NextRequest) {
         role,
         parentCode: parentCodeVal,
         email: cleanEmail || '',
+        gender: g,
       };
+      if (birthDateValue) userData.birthDate = birthDateValue;
+      if (matriculeValue) userData.matricule = matriculeValue;
+      if (specialtyValue) userData.specialty = specialtyValue;
+      if (phoneValue) userData.phone = phoneValue;
+      if (qualification) userData.qualification = (qualification as string) || '';
 
       // Role-specific logic
       let linkedStudent: { id: string; fullName: string } | null = null;

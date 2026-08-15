@@ -52,6 +52,7 @@ model School {
   submissions          Submission[]
   teacherDocuments     TeacherDocument[]
   timeSlots            SchoolTimeSlot[]
+  bulletins            Bulletin[]
 
   @@index([subscriptionStatus])
   @@index([inviteCode])
@@ -91,7 +92,9 @@ model User {
   parentPhone2            String    @default("")
   cardId                  String?   @unique
   postName                String    @default("")
-  gender                  String    @default("M")
+  gender                  Gender    @default(M)
+  specialty               String    @default("")
+  qualification           String    @default("")
   birthDate               String    @default("")
   matricule               String    @default("")
   academicYear            String    @default("")
@@ -149,6 +152,9 @@ model User {
   messageReactions        MessageReaction[]
   passwordResets          PasswordReset[]
   teacherDocuments        TeacherDocument[]
+  bulletins               Bulletin[] @relation("BulletinStudent")
+  validatedBulletinsAsTitulaire Bulletin[] @relation("BulletinTitulaireValidator")
+  validatedBulletinsAsAdmin     Bulletin[] @relation("BulletinAdminValidator")
 
   @@unique([schoolId, fullName, role])
   @@index([schoolId, role, active])
@@ -172,6 +178,7 @@ model SchoolClass {
   enrollments      EnrolledClass[]
   reportCards      ReportCard[]
   transmissions    CotationTransmission[]
+  bulletins        Bulletin[]
   school           School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   titulaire        User?     @relation("TitulaireClasses", fields: [titulaireId], references: [id], onDelete: SetNull)
   titulaireId      String?
@@ -959,5 +966,53 @@ model SchoolTimeSlot {
   school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
   @@index([schoolId])
+}
+
+model Bulletin {
+  id                     String   @id @default(cuid())
+  studentId              String
+  classId                String
+  schoolId               String
+  term                   Int
+  academicYear           String
+  average                Float    @default(0)
+  rank                   Int?
+  mention                String   @default("")
+  appreciation           String   @default("")
+  gradesSnapshot         Json
+  attendanceSummary      Json     @default("{}")
+  status                 BulletinStatus @default(DRAFT)
+  validatedByTitulaireId String?
+  validatedByAdminId     String?
+  validatedAt            DateTime?
+  publishedAt            DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  deletedAt              DateTime?
+
+  student                User          @relation("BulletinStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  class                  SchoolClass   @relation(fields: [classId], references: [id], onDelete: Cascade)
+  school                 School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  validatedByTitulaire   User?         @relation("BulletinTitulaireValidator", fields: [validatedByTitulaireId], references: [id], onDelete: SetNull)
+  validatedByAdmin       User?         @relation("BulletinAdminValidator", fields: [validatedByAdminId], references: [id], onDelete: SetNull)
+
+  @@unique([studentId, term, academicYear])
+  @@index([schoolId, classId, status])
+  @@index([classId, term, academicYear])
+  @@index([studentId])
+}
+
+enum Gender {
+  M
+  F
+}
+
+enum BulletinStatus {
+  DRAFT
+  PENDING_TITULAIRE
+  VALIDATED_TITULAIRE
+  PENDING_ADMIN
+  VALIDATED_ADMIN
+  PUBLISHED
 }
 

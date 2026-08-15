@@ -1,472 +1,309 @@
-﻿🎓 GradeUp - CAHIER DES CHARGES COMPLET POUR IA DÉVELOPPEUSE
-Version: 2.0 Enterprise | Créé par: Axions Labs
-Objectif: Construire une plateforme scolaire 100% fonctionnelle, 0% maquette. Chaque bouton doit faire une vraie action en base de données.
+﻿
 
-0. INSTRUCTION ABSOLUE POUR L'IA QUI LIT CE FICHIER
-Tu es une IA développeuse senior Full-Stack. Tu dois construire GradeUp exactement comme décrit ici.
+0. INSTRUCTIONS ABSOLUES POUR L'IA - LIS ÇA EN PREMIER
+Tu dois implémenter exactement ce fichier. Si tu triches, le projet est raté.
 
-RÈGLE D'OR : AUCUN BOUTON MORT.
-Si un bouton existe dans l'UI, il DOIT :
+INTERDICTIONS V3 - CE QUI DOIT DISPARAÎTRE DÉFINITIVEMENT
+COMPTES DE DÉMO INTERDITS : Supprime TOUT : bouton "Se connecter en tant qu'Admin démo", "Compte Élève test", liste demoUsers, demoCredentials, DEMO_ACCOUNTS, MOCK_USERS. Page Login/Register doit être 100% vide, juste 2 inputs email/password + code école. Aucune donnée pré-remplie.
+POURCENTAGES FAKE INTERDITS : Dans TOUS les tableaux de bord (Admin, Prof, Élève, Parent), il est INTERDIT d'afficher des petits pourcentages sous les vrais chiffres du genre +5%, -2%, (5%), ↑ 12% vs mois dernier. Les cartes stats affichent UNIQUEMENT : Icône + Titre + VRAI CHIFFRE venant de /api/stats. Rien d'autre.
+BOUTONS MORTS INTERDITS : Les boutons Publier Maintenant (Bibliothèque) et Publier Leçon (Professeur) doivent être 100% fonctionnels avec upload réel vers Supabase, validation Zod, toast et invalidation. Pas de console.log.
+RÈGLE D'OR BOUTON
+Chaque bouton = useMutation + loading spinner + toast success/error + queryClient.invalidateQueries(). Pas d'exception.
 
-Avoir un onClick réel
-Appeler une vraie API /api/...
-Avoir un état loading (spinner / disabled)
-Avoir un état success (toast + refresh data via React Query)
-Avoir un état error (toast d'erreur explicite)
-Mettre à jour la base de données Prisma (pas de console.log, pas de alert("bientôt disponible"))
-CE QUI EST INTERDIT :
+1. CORRECTIONS MAJEURES V3 DEMANDÉES PAR LE CLIENT
+A. Suppression Totale Démo
+Fichiers à supprimer/vérifier: src/components/demo-accounts.tsx, src/lib/demo-data.ts, toute constante DEMO_
+Login: email, password, bouton Se connecter. C'est tout.
+Register: nom, email, password, code d'invitation école, rôle. Pas de bouton "Remplir avec compte test".
+B. Formulaires d'Inscription Enrichis (OBLIGATOIRE)
+Tout élève qui rejoint l'école (par code ou créé par Admin) DOIT avoir ces champs obligatoires. Si un seul manque, c'est un bug.
 
-❌ mockData, fakeUsers, dummyLessons en production
-❌ TODO, coming soon, not implemented
-❌ Stats hardcodées (ex: users: 120). Tout vient de GET /api/stats
-❌ localStorage pour l'utilisateur. Auth = cookies HTTP-only uniquement (voir section 5)
-❌ Faire confiance à l'ID envoyé par le client. Toujours vérifier la session côté serveur via getSessionUser(req)
-Si une fonctionnalité n'est pas détaillée ici, applique le bon sens d'une vraie école et implémente-la en 100% fonctionnel avec vraie donnée.
+Champs User communs (tous rôles):
 
-1. VISION PRODUIT
-GradeUp gère 4 rôles dans UNE seule application Next.js :
+name: string, min 3
+email: email unique
+password: min 8
+gender: enum M | F - OBLIGATOIRE - Select Radio avec M / F, pas de Autre par défaut
+dateOfBirth: date, obligatoire pour Élève/Prof
+phone: string, optionnel mais présent dans le form
+address: string, optionnel
+Champs spécifiques Élève (STUDENT):
 
-Rôle	Couleur	Accès principal
-ADMIN	from-blue-600 to-blue-500	Tout gère. Crée l'école, les classes, les utilisateurs, voit tous les paiements.
-TEACHER	from-emerald-600 to-emerald-500	Gère ses cours, leçons, notes, présences, devoirs. Ne voit que ses classes.
-STUDENT	from-violet-600 to-violet-500	Consulte ses cours/leçons/notes/paiements. Génère son code parent.
-PARENT	from-amber-600 to-amber-500	Suit son/ses enfant(s) via code parent. Lecture seule.
-Langue UI: Français 100%. Devise configurable.
+classId: select des classes de l'école - OBLIGATOIRE
+gender: M/F - OBLIGATOIRE
+matricule: auto-généré MAT-{YEAR}-{RANDOM 4 chiffres} côté serveur, affiché en lecture seule
+dateOfBirth: OBLIGATOIRE
+parentPhone: téléphone parent
+Champs spécifiques Professeur (TEACHER):
 
-2. STACK TECHNIQUE NON-NÉGOCIABLE
-Frontend: Next.js 14+ (App Router), React 18, TypeScript strict, Tailwind CSS, shadcn/ui + Radix UI, Zustand (store global), TanStack Query (cache serveur), next-themes (dark mode)
+gender: M/F - OBLIGATOIRE
+specialty: ex: "Mathématiques", "Français" - OBLIGATOIRE
+qualification: ex: "Licence", "Master" - optionnel
+phone: OBLIGATOIRE
+Où ça doit être:
 
-Backend: Next.js API Routes, Prisma ORM, PostgreSQL (pas SQLite en prod)
+Formulaire Admin + Nouvel Élève / + Nouveau Prof : doit contenir TOUS ces champs
+Formulaire Inscription par code école (quand un user s'inscrit lui-même avec inviteCode) : après avoir validé le code, le formulaire doit demander gender, dateOfBirth, classId si STUDENT, specialty si TEACHER. Pas juste email/password.
+C. Tableaux de Bord Sans Pourcentages Fake
+AVANT (INTERDIT):
 
-Services:
+Total Élèves
+124
++5% vs mois dernier
+MAINTENANT (OBLIGATOIRE V3):
 
-Supabase: Auth Realtime + Storage (fichiers) + Realtime (websockets)
-GLM (Zhipu AI): glm-4.5-flash pour Gradie IA
-Jitsi Meet External API: Pour Grada Vio (visio en iframe, pas de serveur)
-PawaPay: Paiements mobiles (optionnel)
-Outils obligatoires:
+Total Élèves
+124 élèves inscrits
+[icône Users]
+Données viennent de GET /api/stats uniquement. Aucun calcul fake de croissance.
 
-zod pour validation de TOUS les formulaires et API
-react-hook-form + zodResolver
-date-fns pour les dates
-lucide-react pour icônes
-3. MODÈLE DE DONNÉES PRISMA - SOURCE DE VÉRITÉ
-Tu dois implémenter ce schéma exact. Aucune table manquante = bug.
-
+2. MODÈLE DE DONNÉES PRISMA V3 - AVEC SEXE ET BULLETIN
 prisma
+enum Gender { M F }
+enum Role { ADMIN TEACHER STUDENT PARENT }
+enum BulletinStatus { DRAFT PENDING_TITULAIRE VALIDATED_TITULAIRE PENDING_ADMIN VALIDATED_ADMIN PUBLISHED }
+
 model School {
-  id             String   @id @default(cuid())
-  name           String
-  email          String
-  inviteCode     String   @unique // ex: GRADEUP-XXXX
-  currency       String   @default("USD")
-  createdAt      DateTime @default(now())
-  users          User[]
-  classes        SchoolClass[]
-  years          SchoolYear[]
+  id String @id @default(cuid())
+  name String
+  email String
+  inviteCode String @unique
+  currency String @default("USD")
+  users User[]
+  classes SchoolClass[]
+  years SchoolYear[]
+  bulletins Bulletin[]
 }
 
 model User {
-  id             String   @id @default(cuid())
-  email          String   @unique
-  password       String   // hash scrypt, JAMAIS en clair
-  name           String
-  role           Role     // ADMIN, TEACHER, STUDENT, PARENT
-  schoolId       String
-  school         School   @relation(fields: [schoolId], references: [id])
-  isActive       Boolean  @default(true)
-  avatarUrl      String?
+  id String @id @default(cuid())
+  email String @unique
+  password String
+  name String
+  role Role
+  gender Gender // <-- NOUVEAU OBLIGATOIRE
+  dateOfBirth DateTime? // obligatoire pour STUDENT/TEACHER
+  phone String?
+  address String?
+  schoolId String
+  school School @relation(fields: [schoolId], references: [id])
+  isActive Boolean @default(true)
+  avatarUrl String?
   
-  // STUDENT specifics
-  classId        String?
-  class          SchoolClass? @relation(fields: [classId], references: [id])
-  parentCode     String?  @unique // code généré pour parent ex: PAR-8CH4K9
-  parentId       String?
-  parent         User?    @relation("ParentChildren", fields: [parentId], references: [id])
-  children       User[]   @relation("ParentChildren")
+  // STUDENT
+  matricule String? @unique // MAT-2024-XXXX
+  classId String?
+  class SchoolClass? @relation(fields: [classId], references: [id])
+  parentCode String? @unique
+  parentPhone String?
+  parentId String?
+  parent User? @relation("ParentChildren", fields: [parentId], references: [id])
+  children User[] @relation("ParentChildren")
   
-  // TEACHER specifics
-  courses        Course[]
-  
-  // Common
-  grades         Grade[]
-  attendances    Attendance[]
-  payments       Payment[]
-  messagesSent   Message[] @relation("Sent")
-  messagesRecv   Message[] @relation("Received")
-  favoris        Favori[]
-  aiMemories     AiMemory[]
-  aiConversations AiConversation[]
-  createdAt      DateTime @default(now())
+  // TEACHER
+  specialty String? // ex: Math
+  qualification String?
+  // titulaire de classes
+  titulaireClasses SchoolClass[] @relation("Titulaire")
+
+  grades Grade[]
+  attendances Attendance[]
+  payments Payment[]
+  bulletins Bulletin[] // bulletins de l'élève
+  validatedBulletinsAsTitulaire Bulletin[] @relation("TitulaireValidator")
+  validatedBulletinsAsAdmin Bulletin[] @relation("AdminValidator")
+  createdAt DateTime @default(now())
 }
 
 model SchoolClass {
-  id             String @id @default(cuid())
-  name           String // ex: "6ème A"
-  level          Level  // MATERNELLE, PRIMAIRE, SECONDAIRE
-  fees           Float
-  schoolId       String
-  school         School @relation(fields: [schoolId], references: [id])
-  students       User[]
-  courses        Course[]
+  id String @id @default(cuid())
+  name String
+  level Level
+  fees Float
+  schoolId String
+  school School @relation(fields: [schoolId], references: [id])
+  students User[]
+  courses Course[]
+  titulaireId String? // <-- PROF TITULAIRE
+  titulaire User? @relation("Titulaire", fields: [titulaireId], references: [id])
+  bulletins Bulletin[]
 }
 
-model Course {
-  id             String @id @default(cuid())
-  title          String
-  description    String
-  classId        String
-  class          SchoolClass @relation(fields: [classId], references: [id])
-  teacherId      String
-  teacher        User @relation(fields: [teacherId], references: [id])
-  lessons        Lesson[]
-  grades         Grade[]
-  homeworks      Homework[]
-  schedules      CourseSchedule[]
+model Bulletin {
+  id String @id @default(cuid())
+  studentId String
+  student User @relation(fields: [studentId], references: [id])
+  classId String
+  class SchoolClass @relation(fields: [classId], references: [id])
+  schoolId String
+  school School @relation(fields: [schoolId], references: [id])
+  term Int // 1,2,3
+  academicYear String // "2024-2025"
+  average Float // moyenne générale calculée
+  rank Int? // rang dans classe
+  mention String? // Passable, Assez Bien...
+  appreciation String? @db.Text // appréciation générale
+  gradesSnapshot Json // snapshot de toutes les notes du trimestre [{course, score, max, comment}]
+  attendanceSummary Json // {present: 45, absent: 2, late: 1}
+  status BulletinStatus @default(DRAFT)
+  validatedByTitulaireId String?
+  validatedByTitulaire User? @relation("TitulaireValidator", fields: [validatedByTitulaireId], references: [id])
+  validatedByAdminId String?
+  validatedByAdmin User? @relation("AdminValidator", fields: [validatedByAdminId], references: [id])
+  validatedAt DateTime?
+  publishedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([studentId, term, academicYear])
 }
 
-model Lesson {
-  id             String @id @default(cuid())
-  title          String
-  contentMdx     String @db.Text // contenu riche MDX
-  courseId       String
-  course         Course @relation(fields: [courseId], references: [id])
-  files          String[] // URLs Supabase Storage
-  createdAt      DateTime @default(now())
-}
+// ... Garde tous les autres modèles Course, Lesson, Grade, etc. de la V2
+model Course { id String @id @default(cuid()) title String description String classId String class SchoolClass @relation(fields: [classId], references: [id]) teacherId String teacher User @relation(fields: [teacherId], references: [id]) lessons Lesson[] grades Grade[] }
+model Lesson { id String @id @default(cuid()) title String contentMdx String @db.Text courseId String course Course @relation(fields: [courseId], references: [id]) files String[] isPublished Boolean @default(false) publishedAt DateTime? createdAt DateTime @default(now()) }
+model Grade { id String @id @default(cuid()) studentId String student User @relation(fields: [studentId], references: [id]) courseId String course Course @relation(fields: [courseId], references: [id]) term Int score Float maxScore Float @default(20) comment String? createdAt DateTime @default(now()) @@unique([studentId, courseId, term]) }
+model Ressource { id String @id @default(cuid()) title String description String? fileUrl String? externalLink String? subject String level String category String visibility String authorId String classId String? isPublished Boolean @default(false) createdAt DateTime @default(now()) }
+3. SYSTÈME BULLETIN - WORKFLOW COMPLET DOUBLE VALIDATION (PRIORITAIRE)
+C'est la fonctionnalité la plus importante de la V3. Elle doit être parfaite, sans erreur.
 
-model Grade {
-  id             String @id @default(cuid())
-  studentId      String
-  student        User @relation(fields: [studentId], references: [id])
-  courseId       String
-  course         Course @relation(fields: [courseId], references: [id])
-  term           Int // 1, 2, 3
-  score          Float // ex: 14.5
-  maxScore       Float @default(20)
-  comment        String?
-  createdAt      DateTime @default(now())
-  @@unique([studentId, courseId, term])
-}
+Logique Métier:
 
-model Homework {
-  id             String @id @default(cuid())
-  title          String
-  description    String @db.Text
-  dueDate        DateTime
-  courseId       String
-  course         Course @relation(fields: [courseId], references: [id])
-  createdAt      DateTime @default(now())
-}
+Génération DRAFT: Quand le prof titulaire clique Générer Bulletins T1 dans sa classe.
+POST /api/bulletins/generate { classId, term }
+Pour chaque élève de la classe, calcule moyenne via AverageService, rang, mention, snapshot notes, résumé présence.
+Crée Bulletin avec status=DRAFT
+Validation Titulaire: Interface Prof Titulaire (seul le titulaireId de la classe peut).
+Page Mes Classes > [Classe] > Bulletins T1
+Tableau avec liste bulletins DRAFT. Bouton Valider comme Titulaire par bulletin ou Valider Tout
+PUT /api/bulletins/[id]/validate-titulaire -> vérifie session.user.id == class.titulaireId, sinon 403. Passe status à VALIDATED_TITULAIRE
+Validation Admin: Interface Admin Bulletins à Valider
+GET /api/bulletins?status=VALIDATED_TITULAIRE
+Admin voit bulletin complet avec notes, appréciation. Peut modifier appreciation. Bouton Valider comme Admin
+PUT /api/bulletins/[id]/validate-admin -> status VALIDATED_ADMIN
+Publication: Admin uniquement. Bouton Publier Bulletin ou Publier Tous les Bulletins Validés
+PUT /api/bulletins/[id]/publish -> status PUBLISHED, publishedAt=now()
+Effet immédiat:
+Crée Notification pour élève et ses parents: "Votre bulletin T1 est disponible"
+Broadcast Supabase Realtime bulletin-published-{schoolId}
+Bulletin devient visible instantanément pour Élève et Parent
+Consultation Élève/Parent:
+Élève: Dashboard a une carte Bulletin T1 - Publié - Moy: 14.2 - Rang: 3. Clic -> page bulletin complète avec tableau matières, moyennes, appréciations, rang, mention, graphique.
+Parent: Même chose, sélecteur enfant si plusieurs. Bouton Télécharger PDF -> génère PDF avec jspdf (en-tête école, infos élève avec sexe M/F, tableau notes, moyenne, rang, appréciations, signatures "Titulaire" et "Admin", cachet).
+Si bulletin pas encore PUBLISHED, message clair: "Bulletin en cours de validation par le titulaire" ou "par l'administration". Pas de 404.
+Permissions strictes:
 
-model Attendance {
-  id             String @id @default(cuid())
-  studentId      String
-  student        User @relation(fields: [studentId], references: [id])
-  date           DateTime
-  status         AttendanceStatus // PRESENT, ABSENT, LATE
-  reason         String?
-}
+Générer: ADMIN ou titulaire de la classe
+Valider titulaire: uniquement class.titulaireId
+Valider admin: uniquement ADMIN
+Publier: uniquement ADMIN
+Voir: élève propriétaire + ses parents + ADMIN + titulaire de sa classe
+4. CORRECTION BOUTONS PUBLIER - DOIVENT ÊTRE PARFAITS
+A. Bibliothèque Numérique - Bouton Publier Maintenant
+Où: library-page.tsx -> Dialog Nouvelle Ressource
+Champs obligatoires Zod:
 
-model Payment {
-  id             String @id @default(cuid())
-  studentId      String
-  student        User @relation(fields: [studentId], references: [id])
-  amount         Float
-  month          Int // 1-12
-  year           Int
-  status         PaymentStatus // PAID, PENDING, LATE
-  method         String? // Mobile Money, Cash...
-  createdAt      DateTime @default(now())
-}
+title (min 3)
+description (min 10) - si vide, appelle GLM pour auto-générer
+subject (Math, Français...)
+level (Maternelle, Primaire...)
+category (Cours, Exercice, Exam, Vidéo...)
+type: file ou link - radio
+Si file: upload vers /api/resources/upload -> Supabase Storage, retourne fileUrl
+Si link: externalLink URL valide
+visibility: PUBLIC/SCHOOL/CLASS/PRIVATE
+Si CLASS: classId obligatoire
+Action bouton Publier Maintenant:
 
-model SchoolYear {
-  id             String @id @default(cuid())
-  schoolId       String
-  school         School @relation(fields: [schoolId], references: [id])
-  academicYear   String // "2024-2025"
-  status         YearStatus // ACTIVE, CLOSED, LOCKED
-  closedAt       DateTime?
-  promotedCount  Int @default(0)
-  repeatCount    Int @default(0)
-  leavingCount   Int @default(0)
-}
+tsx
+POST /api/resources { title, description, fileUrl, externalLink, subject, level, category, visibility, classId, isPublished: true }
+Loading spinner
+Success: toast "Ressource publiée", invalidateQueries(['resources']), dialog se ferme, ressource apparaît immédiatement dans catalogue
+Error: toast avec message Zod
+B. Professeur - Bouton Publier Leçon
+Où: teacher-lessons.tsx -> Nouvelle Leçon
+Champs:
 
-model VideoConference {
-  id             String @id @default(cuid())
-  title          String
-  type           String // INSTANT, SCHEDULED
-  status         String // WAITING, LIVE, ENDED
-  isLocked       Boolean @default(false)
-  creatorId      String
-  schoolId       String
-  jitsiRoomName  String @unique
-  scheduledAt    DateTime?
-  participants   Participant[]
-  recordings     Recording[]
-}
+title, courseId (select cours du prof), contentMdx (MDX Editor obligatoire, pas textarea), files[] (upload multiple vers Supabase)
+Bouton Publier:
 
-model Participant {
-  id             String @id @default(cuid())
-  conferenceId   String
-  conference     VideoConference @relation(fields: [conferenceId], references: [id])
-  userId         String
-  role           String // HOST, CO_HOST, PARTICIPANT
-  joinedAt       DateTime @default(now())
-}
+POST /api/lessons { title, contentMdx, courseId, files, isPublished: true }
+Après publish, leçon visible immédiatement côté élève dans Mes Leçons. Si isPublished=false, brouillon uniquement prof.
+Bouton Publier Notes (si existe): Quand prof saisit notes, bouton Publier les notes du T1 -> rend notes visibles pour élèves/parents + déclenche possibilité génération bulletin.
 
-model Ressource {
-  id             String @id @default(cuid())
-  title          String
-  description    String?
-  fileUrl        String? // ou externalLink
-  externalLink   String?
-  subject        String
-  level          String
-  category       String // COURS, EXERCICE, EXAM, VIDEO...
-  visibility     String // PUBLIC, SCHOOL, CLASS, PRIVATE
-  authorId       String
-  classId        String?
-  createdAt      DateTime @default(now())
-  favoris        Favori[]
-}
+5. TABLEAUX DE BORD CORRIGÉS - SANS POURCENTAGES
+Composant StatCard V3 OBLIGATOIRE:
 
-model Favori {
-  id           String @id @default(cuid())
-  userId       String
-  user         User @relation(fields: [userId], references: [id])
-  ressourceId  String
-  ressource    Ressource @relation(fields: [ressourceId], references: [id])
-  @@unique([userId, ressourceId])
-}
+tsx
+// INTERDIT: { trend: "+5%" } { subtext: "(5%)" }
+// OBLIGATOIRE:
+<Card>
+  <CardHeader><Users className="text-blue-600" /><CardTitle>Total Élèves</CardTitle></CardHeader>
+  <CardContent><div className="text-3xl font-bold">{data.totalStudents}</div><p className="text-sm text-muted-foreground">{data.totalStudents} inscrits</p></CardContent>
+</Card>
+Admin: 4 cartes: Élèves, Profs, Classes, Paiements en attente - chiffres réels
+Teacher: Mes Cours, Mes Élèves, Leçons publiées, Devoirs à corriger
+Student: Ma Moyenne Générale (anneau SVG), Matières, Absences, Prochain devoir
+Parent: Moyenne enfant, Rang, Absences, Statut paiement
+6. FORMULAIRES INSCRIPTION V3 - DÉTAIL TECHNIQUE
+Validation Zod V3:
 
-// IA & Comms
-model AiConversation { id String @id @default(cuid()) userId String user User @relation(fields:[userId], references:[id]) title String messages Json isPinned Boolean @default(false) isFavorite Boolean @default(false) createdAt DateTime @default(now()) }
-model AiMemory { id String @id @default(cuid()) userId String user User @relation(fields:[userId], references:[id]) fact String @db.Text createdAt DateTime @default(now()) }
-model Message { id String @id @default(cuid()) senderId String sender User @relation("Sent", fields:[senderId], references:[id]) receiverId String receiver User @relation("Received", fields:[receiverId], references:[id]) content String @db.Text isRead Boolean @default(false) createdAt DateTime @default(now()) }
-model Notification { id String @id @default(cuid()) schoolId String title String content String isRead Boolean @default(false) createdAt DateTime @default(now()) }
+ts
+const studentSchema = z.object({
+  name: z.string().min(3),
+  email: z.string().email(),
+  password: z.string().min(8),
+  gender: z.enum(["M", "F"], { required_error: "Sexe obligatoire" }),
+  dateOfBirth: z.coerce.date(),
+  classId: z.string().cuid(),
+  phone: z.string().optional(),
+  parentPhone: z.string().optional(),
+  inviteCode: z.string().min(6)
+})
 
-enum Role { ADMIN TEACHER STUDENT PARENT }
-enum Level { MATERNELLE PRIMAIRE SECONDAIRE }
-enum AttendanceStatus { PRESENT ABSENT LATE }
-enum PaymentStatus { PAID PENDING LATE }
-enum YearStatus { ACTIVE LOCKED CLOSED }
-4. AUTHENTIFICATION - SÉCURITÉ MAXIMALE
-Flow obligatoire:
+const teacherSchema = z.object({
+  name: z.string().min(3),
+  email: z.string().email(),
+  password: z.string().min(8),
+  gender: z.enum(["M", "F"]),
+  dateOfBirth: z.coerce.date(),
+  specialty: z.string().min(2, "Spécialité obligatoire"),
+  phone: z.string().min(8),
+  inviteCode: z.string().min(6)
+})
+UI: Pour gender, utiliser RadioGroup shadcn:
 
-POST /api/auth/register: Vérifie inviteCode School. Hash password avec scrypt + sel (fichier src/lib/password.ts). Crée User.
-POST /api/auth/login: Vérifie email + password hash. Si OK, crée 2 cookies HTTP-only:
-gradeup_token (15 min, JWT HS256 avec JWT_SECRET)
-gradeup_refresh (7 jours, JWT avec JWT_REFRESH_SECRET)
-GET /api/auth/me: Lit cookie gradeup_token, vérifie JWT via getSessionUser(req). Retourne user. Si expiré, tente refresh auto.
-POST /api/auth/refresh: Vérifie gradeup_refresh, réémet gradeup_token.
-POST /api/auth/logout: Supprime les 2 cookies.
-Frontend: Zustand store ne contient PAS le user en localStorage. Au mount de src/app/page.tsx, appelle GET /api/auth/me pour hydrater le store. Si 401 -> page login.
+tsx
+<RadioGroup><RadioGroupItem value="M" /> Masculin <RadioGroupItem value="F" /> Féminin</RadioGroup>
+Backend: Dans POST /api/auth/register et POST /api/users, vérifier gender existe, sinon 400. Générer matricule automatiquement pour STUDENT.
 
-Protection API: CHAQUE route /api/... doit commencer par const session = await getSessionUser(req); if(!session) return 401. Ne JAMAIS faire confiance à body.userId.
+7. API ROUTES V3 MISES À JOUR
+Ajoute ces routes au contrat V2:
 
-5. MATRICE DES PERMISSIONS - QUI PEUT FAIRE QUOI
-Action	ADMIN	TEACHER	STUDENT	PARENT
-Créer/Desactiver User	✅	❌	❌	❌
-Créer Classe	✅	❌	❌	❌
-Créer Cours	✅	✅ (siens)	❌	❌
-Créer Leçon	❌	✅ (siens)	❌	❌
-Saisir Notes	❌	✅ (siens)	❌	❌
-Voir Notes	✅	✅ (siens)	✅ (siennes)	✅ (enfant)
-Voir Paiements	✅	❌	✅ (siens)	✅ (enfant)
-Générer Code Parent	❌	❌	✅	❌
-Utiliser Code Parent	❌	❌	❌	✅ (à l'inscription)
-Clôturer Année	✅	❌	❌	❌
-Si un TEACHER tente GET /api/users -> 403. Si un STUDENT tente POST /api/courses -> 403.
+POST /api/bulletins/generate - body { classId, term } - ADMIN ou titulaire
+GET /api/bulletins?classId=&term=&status=&studentId= - filtré par permission
+GET /api/bulletins/[id] - détail complet avec gradesSnapshot
+PUT /api/bulletins/[id]/validate-titulaire - titulaire only
+PUT /api/bulletins/[id]/validate-admin - admin only + peut edit appreciation
+PUT /api/bulletins/[id]/publish - admin only
+GET /api/bulletins/[id]/pdf - génère PDF avec jspdf
+GET /api/classes/[id]/titulaire - pour assigner titulaire
+Modifie:
 
-6. SPÉCIFICATIONS FONCTIONNELLES - CHAQUE BOUTON DOIT FAIRE ÇA
-A. ADMIN - Tout doit être CRUD réel
-1. Dashboard:
+POST /api/auth/register - doit accepter gender, dateOfBirth, classId, specialty, phone
+POST /api/users - idem + génération matricule
+8. CHECKLIST VALIDATION FINALE V3 - À COCHER PAR L'IA
+Avant de dire "c'est fini", l'IA doit vérifier:
 
-Cartes stats: GET /api/stats -> { totalUsers, totalClasses, totalPaymentsPending, avgGrade }. Pas de chiffres en dur.
-Bouton Actualiser -> queryClient.invalidateQueries(['stats'])
-Graphique paiements -> données réelles des 6 derniers mois.
-2. Gestion Utilisateurs:
+ Page Login: aucun compte démo visible, juste email/password
+ Page Register: formulaire demande gender M/F, date naissance, classe si élève, spécialité si prof
+ Admin crée élève: formulaire contient gender M/F, date naissance, classe, matricule auto-généré, tout enregistré en DB
+ Admin crée prof: formulaire contient gender M/F, spécialité, téléphone, enregistré
+ Élève s'inscrit avec code école: on lui demande gender + classe + date naissance, pas juste email
+ Dashboards: aucune carte n'affiche "(5%)" ou "+5%". Juste vrai chiffre
+ Bibliothèque: bouton Publier Maintenant upload un vrai fichier vers Supabase et la ressource apparaît dans le catalogue pour tous
+ Prof publie leçon: leçon avec MDX + fichier, visible immédiatement côté élève
+ Bulletin: titulaire génère DRAFT -> valide -> admin valide -> publie. Élève voit bulletin instantanément, parent aussi. PDF téléchargeable sans erreur, avec sexe M/F affiché, moyenne, rang, mention.
+ npm run build passe sans erreur
+Si un seul point fail, corrige.
 
-Bouton + Nouvel Utilisateur: Ouvre Dialog shadcn. Form zod: name, email, role, classId (si STUDENT). POST /api/users -> toast success -> invalidateQueries.
-Recherche rapide: Input avec debounce 300ms. GET /api/users?search=... -> dropdown avec avatar, rôle, classe. Clic -> fiche inline avec bouton Voir Profil.
-Tableau users: Colonnes avec actions: Modifier (PUT /api/users/[id]), Désactiver (PUT isActive=false), Supprimer (DELETE avec confirmation Dialog).
-Export CSV: Bouton Exporter CSV -> GET /api/users/export -> génère CSV UTF-8 avec BOM \uFEFF pour Excel.
-3. Gestion Classes:
-
-Bouton Créer Classe: name, level, fees. POST /api/classes.
-Dans chaque ligne classe: Gérer Élèves -> Sheet qui liste élèves actuels + ajoute via search. Voir Paiements.
-4. Paiements:
-
-Filtres par Classe / Statut / Mois. Tout filtre doit re-fetch GET /api/payments?classId=&status=.
-Bouton Marquer Payé: PUT /api/payments/[id] { status: PAID }
-Bouton Exporter Paiements: CSV.
-5. Notifications: Bouton Notifier École Entière: POST /api/notifications { title, content, schoolId } -> crée une notif pour tous + broadcast Realtime.
-
-B. TEACHER - Cœur pédagogique
-1. Dashboard: Mes Cours (3), Mes Élèves (45), Leçons ce mois (12). + Conseil du jour (via Gradie IA).
-
-2. Cours: Bouton Nouveau Cours: title, description, classId (select parmi ses classes). POST /api/courses.
-
-3. Leçons (Le plus critique):
-
-Bouton Nouvelle Leçon: Dialog avec MDX Editor. Champs: title, courseId, contentMdx, fichier (upload vers /api/resources/upload -> Supabase Storage -> retourne URL). POST /api/lessons.
-Timeline visuelle: GET /api/lessons?courseId=. Chaque leçon a boutons Modifier, Supprimer, Voir Fichiers.
-Aucun lorem ipsum. Si vide: Empty state avec illustration + bouton Créer première leçon.
-4. Notes: Vue tableau Excel-like.
-
-Select Classe -> Cours -> Trimestre. GET /api/grades?classId=&courseId=&term=
-Chaque cellule note est un Input. onBlur -> POST /api/grades { studentId, courseId, term, score, maxScore, comment } avec upsert (unique contrainte).
-Validation: score <= maxScore, 0-20.
-5. Présences: Calendrier. Pour chaque jour, liste élèves avec 3 boutons radio: Présent/Absent/Retard. POST /api/attendance/bulk (tableau). Raison obligatoire si Absent.
-
-6. Devoirs: Titre, Description, Date Limite, Cours. POST /api/homeworks.
-
-C. STUDENT
-1. Dashboard: Anneau progression SVG animé (moyenne générale). Prochains devoirs (GET /api/homeworks?myClass=true). Dernières leçons.
-
-2. Cours/Leçons: Lecture seule. Bouton Télécharger Fichier -> window.open(fileUrl). Pas de bouton modifier.
-
-3. Notes: Graphique évolution par trimestre (recharts). Tableau par matière avec moyenne calculée côté serveur AverageService.
-
-4. Code Parent: Bouton Générer mon code parent: POST /api/users/me/parent-code -> génère PAR-XXXXXX unique, affiche avec bouton Copier + Régénérer. Si déjà généré, affiche le code existant.
-
-D. PARENT
-Inscription: Champ Code Parent de votre enfant obligatoire. POST /api/auth/register vérifie parentCode existe, lie parentId.
-Dashboard: Sélecteur Mes Enfants si plusieurs. Affiche notes, paiements, absences de l'enfant sélectionné. GET /api/students/[childId]/grades.
-Pour TOUS les rôles:
-
-Mode Sombre: Toggle dans header next-themes, persistant.
-Palette Commande Cmd+K: cmdk lib, recherche navigation + utilisateurs.
-Messagerie: GET /api/messages?with=userId, POST /api/messages. Temps réel via Supabase.
-Notifications: Badge non-lu, PUT /api/notifications/[id]/read.
-Profil: PUT /api/users/me { name, avatar }, upload avatar vers Supabase.
-7. API CONTRACT - 23+ ROUTES MINIMUM
-Chaque route doit:
-
-Valider avec Zod
-Vérifier session getSessionUser
-Vérifier permission rôle
-Retourner JSON typé { data, error }
-Liste obligatoire (à implémenter):
-POST /api/auth/register, login, /api/auth/me, refresh, logout
-GET/POST /api/users, GET/PUT/DELETE /api/users/[id], POST /api/users/me/parent-code
-GET/POST /api/classes, PUT/DELETE /api/classes/[id]
-GET/POST /api/courses, PUT/DELETE /api/courses/[id]
-GET/POST /api/lessons, PUT/DELETE /api/lessons/[id]
-GET/POST /api/grades, PUT /api/grades/[id] + GET /api/stats/averages
-GET/POST /api/homeworks
-GET/POST /api/attendance, POST /api/attendance/bulk
-GET/POST /api/payments, PUT /api/payments/[id]
-GET/POST /api/messages
-GET/POST /api/notifications, PUT /api/notifications/[id]/read
-GET /api/stats
-GET/POST /api/resources, POST /api/resources/upload, POST /api/resources/[id]/favorite
-GET/POST /api/conferences, POST /api/conferences/[id]/participants
-GET/POST /api/ai/conversations, PATCH /api/ai/conversations/[id]
-POST /api/ai/chat (GLM)
-GET/POST /api/end-of-year, GET /api/stats/progression
-
-8. LOGIQUE MÉTIER CRITIQUE (Ne pas simuler)
-Moyenne: AverageService.calculate(studentId, term) -> moyenne pondérée de toutes les notes / maxScore * 20. Pas de valeur fixe.
-
-Clôture Année Scolaire (Module Admin):
-
-GET /api/end-of-year?classId= calcule pour chaque élève: moyenne générale, taux présence, autoDecision: si moyenne >=10 -> PROMOTED, 8-10 -> REPEAT, <8 -> LEAVE. Configurable.
-POST /api/end-of-year { action: 'lock-year' } -> status LOCKED, empêche POST grades/attendance si year LOCKED.
-POST /api/end-of-year { action: 'close-year' } -> TRANSACTION ATOMIQUE Prisma: crée nouvelle SchoolYear, met à jour chaque User avec nextClassId/nextStatus, notifie élèves/parents, broadcast year-closed via Supabase Realtime.
-Paiement: Si paiement en retard > 30 jours, cron ou check à chaque GET -> status LATE + notification.
-
-9. MODULES AVANCÉS DÉTAILLÉS
-Grada Vio (Visio): Utilise jitsi-meet-external-api. src/components/gradeup/meeting-room.tsx charge script https://meet.jit.si/external_api.js uniquement au clic Rejoindre. Room name = gradeup-{schoolId}-{conferenceId}. Hôte peut lock, kick, promote. Salle d'attente gérée via table Participant.
-
-Gradie IA Enterprise:
-
-POST /api/ai/chat: Reçoit conversationId, message, files[]. Si fichier PDF/Image -> extrait texte (pdfjs + OCR via GLM vision). Appelle glm-completion.ts avec contexte + AiMemory (faits mémorisés). Si réponse contient [MEM: ...] -> sauvegarde dans AiMemory.
-Features UI: Recherche conversations, Epingler, Favori, Renommer (PATCH), Copier message, Régénérer réponse, TTS (Web Speech API), STT (Web Speech API), Export MD, Langues FR/EN/Lingala/Swahili.
-Bibliothèque: GET /api/resources?subject=Math&level=Primaire. Upload via POST /api/resources/upload (Supabase Storage bucket gradeup, sinon fallback /public/uploads). Si description vide, appelle GLM pour auto-générer.
-
-Temps Réel (Supabase Realtime):
-Helper src/lib/realtime.ts:
-
-subscribeToMessages(userId, callback) -> canal postgres_changes sur table Message
-subscribeToParticipants(conferenceId, callback) -> sur Participant
-subscribeToYearClosed(schoolId, callback) -> canal broadcast school-year-{schoolId}
-Toujours avec fallback polling (20s) si Supabase non configuré.
-SQL à exécuter dans Supabase: alter publication supabase_realtime add table "Message", "Participant", "Notification", "SchoolYear";
-Performance: Dans src/app/page.tsx, TOUTES les pages (sauf auth) doivent être dynamic(() => import(...), { ssr: false, loading: () => <Skeleton /> }). Jitsi script chargé lazy.
-
-10. FRONTEND ARCHITECTURE
-src/
-├── app/
-│   ├── page.tsx (Router principal avec dynamic imports)
-│   ├── api/ (toutes les routes)
-│   └── layout.tsx (ThemeProvider + QueryClientProvider)
-├── components/
-│   ├── gradeup/ (31 composants: admin-dashboard, teacher-grades, student-dashboard, chat-page, ai-assistant, video-hub, library-page, end-of-year...)
-│   └── ui/ (shadcn: button, dialog, sheet, table...)
-├── lib/
-│   ├── store.ts (Zustand: user, school, theme, selectedChild)
-│   ├── types.ts (tous les types TS)
-│   ├── auth/session.ts (getSessionUser)
-│   ├── password.ts (scrypt hash)
-│   ├── realtime.ts (Supabase)
-│   └── ai/glm-completion.ts
-└── hooks/ (useDebounce, useRealtime...)
-Gestion d'état:
-
-Serveur: React Query partout. Pas de useEffect fetch.
-Client: Zustand pour user/school/theme.
-Formulaire: react-hook-form + zod.
-Responsive: Sidebar = Sheet sur <md. Dialogs = fullscreen sur mobile. Utiliser sm:, md:, lg: partout.
-
-11. DESIGN SYSTEM
-Couleur primaire: bg-gradient-to-br from-blue-600 to-blue-700 text-white
-Cartes: rounded-2xl shadow-sm border bg-card hover:shadow-md transition-all
-Animations: animate-in fade-in slide-in-from-bottom-2, hover:translate-y-[-2px]
-Empty states: Toujours une illustration + texte + CTA bouton. Jamais de page blanche.
-Loading: Skeleton shadcn, pas de spinner plein écran sauf auth.
-Toasts: sonner ou useToast pour chaque action.
-12. VARIABLES D'ENVIRONNEMENT
-DATABASE_URL="postgresql://..."
-DIRECT_URL="postgresql://..."
-NEXT_PUBLIC_SUPABASE_URL="https://..."
-NEXT_PUBLIC_SUPABASE_ANON_KEY="..."
-SUPABASE_SERVICE_ROLE_KEY="..." # OBLIGATOIRE en prod pour uploads
-SUPABASE_STORAGE_BUCKET="gradeup"
-GLM_API_KEY="..." # Zhipu AI
-GLM_MODEL="glm-4.5-flash"
-JWT_SECRET="génère avec openssl rand -base64 32"
-JWT_REFRESH_SECRET="génère autre"
-NEXT_PUBLIC_VAPID_PUBLIC_KEY="..."
-VAPID_PRIVATE_KEY="..."
-13. CHECKLIST DE VALIDATION FINALE - AVANT DE DIRE "C'EST FINI"
-L'IA doit vérifier elle-même:
-
- Je peux créer une école avec code invite, puis créer ADMIN, TEACHER, STUDENT, PARENT et me connecter avec chaque rôle.
- En tant que TEACHER, je crée un cours -> une leçon avec fichier -> le fichier s'ouvre bien côté STUDENT.
- En tant que TEACHER, je saisis une note -> STUDENT la voit instantanément, PARENT la voit.
- En tant que STUDENT, je génère code parent -> PARENT s'inscrit avec ce code -> voit bien son enfant.
- Recherche utilisateur avec debounce fonctionne, affiche dropdown réel.
- Export CSV paiements ouvre bien dans Excel avec accents.
- Mode sombre persiste après refresh.
- Messagerie temps réel: 2 onglets ouverts, message apparaît sans refresh.
- Visio Jitsi se lance, micro/caméra/share screen fonctionnent.
- IA Gradie répond, mémorise [MEM:], upload PDF le résume.
- Bibliothèque: upload fichier + favori + filtre fonctionnent.
- Clôture année: lock empêche notes, close crée nouvelle année et notifie.
- Aucune page blanche, aucun bouton alert("bientôt"), aucune donnée fake.
-Si un seul point échoue, corrige avant de livrer.
-
-14. SI UNE INFO MANQUE DANS CE CAHIER
-Applique cette règle: "Qu'est-ce qu'une vraie école attendrait ?"
-
-Exemple: On n'a pas parlé de bulletin PDF? Implémente-le: GET /api/students/[id]/bulletin?term=1 génère PDF avec jspdf + notes + moyenne + appréciation.
-
-On n'a pas parlé de oubli mot de passe? Implémente POST /api/auth/forgot-password.
-
-Toujours implémenter en 100% réel, jamais en fake.
-
-Fin du cahier. Maintenant code. Aucune excuse.
-© Axions Labs Technologies - GradeUp 2.0 
+Fin Cahier V3 FINAL. Code maintenant. Pas d'excuse. Pas de démo. Pas de pourcentage fake. Bulletin parfait.
 

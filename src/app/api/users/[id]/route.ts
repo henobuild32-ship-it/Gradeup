@@ -67,11 +67,16 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { fullName, email, password, newPassword, oldPassword, role, photoUrl, parentId, isTitulaire, titulaireClassIds } = body;
+    const { fullName, email, password, newPassword, oldPassword, role, photoUrl, parentId, isTitulaire, titulaireClassIds, gender, birthDate, specialty, qualification, phone, matricule, postName } = body;
 
     const existing = await db.user.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Gender must be M or F
+    if (gender !== undefined && gender !== 'M' && gender !== 'F') {
+      return NextResponse.json({ error: 'Le sexe doit être M ou F.' }, { status: 400 });
     }
 
     // Password change: validate old password
@@ -107,6 +112,13 @@ export async function PUT(
         ...(photoUrl !== undefined && { photoUrl }),
         ...(parentId !== undefined && { parentId: parentId || null }),
         ...(isTitulaire !== undefined && { isTitulaire }),
+        ...(gender !== undefined && { gender }),
+        ...(birthDate !== undefined && { birthDate }),
+        ...(specialty !== undefined && { specialty }),
+        ...(qualification !== undefined && { qualification }),
+        ...(phone !== undefined && { phone }),
+        ...(matricule !== undefined && { matricule }),
+        ...(postName !== undefined && { postName }),
       },
       include: {
         school: true,

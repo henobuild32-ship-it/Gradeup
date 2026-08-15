@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
@@ -66,6 +67,10 @@ interface UserItem {
   email: string;
   role: string;
   active?: boolean;
+  gender?: string;
+  birthDate?: string;
+  specialty?: string;
+  phone?: string;
   classEnrollments?: Array<{ class: { id: string; name: string } }>;
   isTitulaire?: boolean;
   titulaireClassIds?: string[];
@@ -124,6 +129,10 @@ export default function AdminUsers() {
   const [formEmail, setFormEmail] = useState('');
   const [formPassword, setFormPassword] = useState('');
   const [formRole, setFormRole] = useState('STUDENT');
+  const [formGender, setFormGender] = useState<'M' | 'F' | ''>('');
+  const [formBirthDate, setFormBirthDate] = useState('');
+  const [formSpecialty, setFormSpecialty] = useState('');
+  const [formPhone, setFormPhone] = useState('');
   const [formClassName, setFormClassName] = useState('');
   const [formParentId, setFormParentId] = useState('');
   const [formIsTitulaire, setFormIsTitulaire] = useState(false);
@@ -191,6 +200,10 @@ export default function AdminUsers() {
     setFormEmail('');
     setFormPassword('');
     setFormRole('STUDENT');
+    setFormGender('');
+    setFormBirthDate('');
+    setFormSpecialty('');
+    setFormPhone('');
     setFormClassName('');
     setFormParentId('');
     setFormIsTitulaire(false);
@@ -209,6 +222,10 @@ export default function AdminUsers() {
     setFormEmail(u.email);
     setFormPassword('');
     setFormRole(u.role);
+    setFormGender((u.gender === 'M' || u.gender === 'F') ? u.gender : '');
+    setFormBirthDate(u.birthDate || '');
+    setFormSpecialty(u.specialty || '');
+    setFormPhone(u.phone || '');
     setFormClassName(u.classEnrollments?.[0]?.class?.name || '');
     setFormParentId('');
     setFormIsTitulaire(u.isTitulaire || false);
@@ -225,6 +242,24 @@ export default function AdminUsers() {
       toast.error('Le mot de passe est requis');
       return;
     }
+    if (!formGender) {
+      toast.error('Le sexe (M ou F) est obligatoire');
+      return;
+    }
+    if ((formRole === 'STUDENT' || formRole === 'TEACHER') && !formBirthDate.trim()) {
+      toast.error('La date de naissance est obligatoire pour ce rôle');
+      return;
+    }
+    if (formRole === 'TEACHER') {
+      if (!formSpecialty.trim()) {
+        toast.error('La spécialité est obligatoire pour un professeur');
+        return;
+      }
+      if (!formPhone.trim()) {
+        toast.error('Le numéro de téléphone est obligatoire pour un professeur');
+        return;
+      }
+    }
 
     setSubmitting(true);
     try {
@@ -234,6 +269,10 @@ export default function AdminUsers() {
           fullName: formName,
           email: formEmail,
           role: formRole,
+          gender: formGender,
+          birthDate: formBirthDate,
+          specialty: formSpecialty,
+          phone: formPhone,
           isTitulaire: formIsTitulaire,
           titulaireClassIds: formIsTitulaire ? formTitulaireClassIds : [],
         };
@@ -254,6 +293,10 @@ export default function AdminUsers() {
           email: formEmail,
           password: formPassword,
           role: formRole,
+          gender: formGender,
+          birthDate: formBirthDate,
+          specialty: formSpecialty,
+          phone: formPhone,
           isTitulaire: formIsTitulaire,
           titulaireClassIds: formIsTitulaire ? formTitulaireClassIds : [],
         };
@@ -581,6 +624,70 @@ export default function AdminUsers() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label>Sexe *</Label>
+              <RadioGroup
+                value={formGender}
+                onValueChange={(v) => setFormGender(v as 'M' | 'F')}
+                className="grid grid-cols-2 gap-2"
+              >
+                <Label
+                  htmlFor="au-form-gender-m"
+                  className={`flex items-center justify-center gap-2 h-10 rounded-lg border font-semibold text-sm cursor-pointer transition-all ${
+                    formGender === 'M' ? 'border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-950/40' : 'border-border/60 hover:bg-muted'
+                  }`}
+                >
+                  <RadioGroupItem value="M" id="au-form-gender-m" className="sr-only" />
+                  Masculin
+                </Label>
+                <Label
+                  htmlFor="au-form-gender-f"
+                  className={`flex items-center justify-center gap-2 h-10 rounded-lg border font-semibold text-sm cursor-pointer transition-all ${
+                    formGender === 'F' ? 'border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-950/40' : 'border-border/60 hover:bg-muted'
+                  }`}
+                >
+                  <RadioGroupItem value="F" id="au-form-gender-f" className="sr-only" />
+                  Féminin
+                </Label>
+              </RadioGroup>
+            </div>
+            {(formRole === 'STUDENT' || formRole === 'TEACHER') && (
+              <div className="space-y-2">
+                <Label htmlFor="form-birthdate">Date de naissance *</Label>
+                <Input
+                  id="form-birthdate"
+                  type="date"
+                  value={formBirthDate}
+                  onChange={(e) => setFormBirthDate(e.target.value)}
+                  className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                />
+              </div>
+            )}
+            {formRole === 'TEACHER' && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="form-specialty">Spécialité *</Label>
+                  <Input
+                    id="form-specialty"
+                    value={formSpecialty}
+                    onChange={(e) => setFormSpecialty(e.target.value)}
+                    placeholder="Ex: Mathématiques"
+                    className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="form-phone">Téléphone *</Label>
+                  <Input
+                    id="form-phone"
+                    type="tel"
+                    value={formPhone}
+                    onChange={(e) => setFormPhone(e.target.value)}
+                    placeholder="+243 ..."
+                    className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  />
+                </div>
+              </>
+            )}
             {formRole === 'TEACHER' && (
               <div className="space-y-3 p-3 border rounded-lg bg-slate-50/50 dark:bg-slate-900/20">
                 <div className="flex items-center gap-2">

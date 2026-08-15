@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '@/lib/db';
 import { authenticateRequest, authenticateRequestActive, AuthError } from '@/lib/auth/authenticate';
 import { notifyUser } from '@/services/notifications/notificationEngine';
@@ -154,6 +155,8 @@ export async function POST(request: NextRequest) {
       gender,
       birthDate,
       matricule,
+      specialty,
+      qualification,
       phone,
       parentPhone,
       parentPhone2,
@@ -195,6 +198,65 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validation Zod V3 : gender obligatoire M/F
+    const genderSchema = z.enum(['M', 'F'], { error: 'Le sexe (M ou F) est obligatoire.' });
+    const genderVal = genderSchema.safeParse(gender);
+    if (!genderVal.success) {
+      return NextResponse.json(
+        { error: genderVal.error.issues[0]?.message || 'Le sexe (M ou F) est obligatoire.' },
+        { status: 400 }
+      );
+    }
+    const g = genderVal.data;
+
+    // dateOfBirth obligatoire pour STUDENT/TEACHER
+    let birthDateVal = birthDate || '';
+    if (role === 'STUDENT' || role === 'TEACHER') {
+      if (!birthDateVal) {
+        return NextResponse.json(
+          { error: 'La date de naissance est obligatoire pour ce rôle.' },
+          { status: 400 }
+        );
+      }
+      const dob = new Date(birthDateVal);
+      if (isNaN(dob.getTime())) {
+        return NextResponse.json(
+          { error: 'La date de naissance est invalide.' },
+          { status: 400 }
+        );
+      }
+      birthDateVal = dob.toISOString();
+    }
+
+    // STUDENT : matricule auto-généré MAT-YYYY-XXXX si absent
+    let matriculeVal = matricule || '';
+    if (role === 'STUDENT' && !matriculeVal) {
+      matriculeVal = `MAT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      while (await db.user.findFirst({ where: { matricule: matriculeVal } })) {
+        matriculeVal = `MAT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      }
+    }
+
+    // TEACHER : specialty + phone obligatoires
+    let specialtyVal = '';
+    let phoneVal = phone || '';
+    if (role === 'TEACHER') {
+      specialtyVal = (specialty || '').trim();
+      phoneVal = (phone || '').trim();
+      if (!specialtyVal) {
+        return NextResponse.json(
+          { error: 'La spécialité est obligatoire pour un professeur.' },
+          { status: 400 }
+        );
+      }
+      if (!phoneVal) {
+        return NextResponse.json(
+          { error: 'Le numéro de téléphone est obligatoire pour un professeur.' },
+          { status: 400 }
+        );
+      }
+    }
+
     let parentCodeVal = await generateParentCode();
     while (await db.user.findUnique({ where: { parentCode: parentCodeVal } })) {
       parentCodeVal = generateParentCode();
@@ -209,10 +271,11 @@ export async function POST(request: NextRequest) {
         role,
         photoUrl: photoUrl || '',
         postName: postName || '',
-        gender: gender || 'M',
-        birthDate: birthDate || '',
-        matricule: matricule || '',
-        phone: phone || '',
+        gender: g,
+        birthDate: birthDateVal,
+        matricule: matriculeVal,
+        specialty: specialtyVal,
+        phone: phoneVal,
         parentPhone: parentPhone || '',
         parentPhone2: parentPhone2 || '',
         academicYear: academicYear || '',
@@ -293,6 +356,8 @@ export async function PATCH(request: NextRequest) {
       gender,
       birthDate,
       matricule,
+      specialty,
+      qualification,
       phone,
       parentPhone,
       parentPhone2,
@@ -335,9 +400,16 @@ export async function PATCH(request: NextRequest) {
     if (fullName !== undefined) updateData.fullName = fullName;
     if (email !== undefined) updateData.email = email;
     if (postName !== undefined) updateData.postName = postName;
-    if (gender !== undefined) updateData.gender = gender;
+    if (gender !== undefined) {
+      if (gender !== 'M' && gender !== 'F') {
+        return NextResponse.json({ error: 'Le sexe doit être M ou F.' }, { status: 400 });
+      }
+      updateData.gender = gender;
+    }
     if (birthDate !== undefined) updateData.birthDate = birthDate;
     if (matricule !== undefined) updateData.matricule = matricule;
+    if (specialty !== undefined) updateData.specialty = specialty;
+    if (qualification !== undefined) updateData.qualification = qualification;
     if (phone !== undefined) updateData.phone = phone;
     if (parentPhone !== undefined) updateData.parentPhone = parentPhone;
     if (parentPhone2 !== undefined) updateData.parentPhone2 = parentPhone2;

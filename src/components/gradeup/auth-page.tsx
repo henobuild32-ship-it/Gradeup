@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Loader2,
   Eye,
@@ -186,6 +187,8 @@ export default function AuthPage() {
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [regSchoolType, setRegSchoolType] = useState('Complexe Scolaire');
+  const [regAdminGender, setRegAdminGender] = useState<'M' | 'F' | ''>('');
+  const [regAdminBirthDate, setRegAdminBirthDate] = useState('');
   const [regLoading, setRegLoading] = useState(false);
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [showRegConfirmPassword, setShowRegConfirmPassword] = useState(false);
@@ -199,6 +202,10 @@ export default function AuthPage() {
   const [joinClassIds, setJoinClassIds] = useState<string[]>([]);
   const [joinParentCode, setJoinParentCode] = useState('');
   const [joinEmail, setJoinEmail] = useState('');
+  const [joinGender, setJoinGender] = useState<'M' | 'F' | ''>('');
+  const [joinBirthDate, setJoinBirthDate] = useState('');
+  const [joinSpecialty, setJoinSpecialty] = useState('');
+  const [joinPhone, setJoinPhone] = useState('');
   const [joinLoading, setJoinLoading] = useState(false);
   const [showJoinPassword, setShowJoinPassword] = useState(false);
   const [showJoinConfirmPassword, setShowJoinConfirmPassword] = useState(false);
@@ -459,6 +466,14 @@ export default function AuthPage() {
       toast({ title: 'Mot de passe trop court', description: 'Le mot de passe doit comporter au moins 4 caractères.', variant: 'destructive' });
       return;
     }
+    if (!regAdminGender) {
+      toast({ title: 'Sexe obligatoire', description: 'Veuillez sélectionner votre sexe (M ou F).', variant: 'destructive' });
+      return;
+    }
+    if (!regAdminBirthDate.trim()) {
+      toast({ title: 'Date de naissance requise', description: 'Veuillez renseigner votre date de naissance.', variant: 'destructive' });
+      return;
+    }
     setRegLoading(true);
     try {
       const res = await fetch('/api/auth/register', {
@@ -470,6 +485,8 @@ export default function AuthPage() {
           schoolName: `${regSchoolName.trim()} (${regSchoolType})`,
           email: regEmail.trim(),
           password: regPassword,
+          gender: regAdminGender,
+          dateOfBirth: regAdminBirthDate,
         }),
       });
       const data = await res.json();
@@ -519,6 +536,24 @@ export default function AuthPage() {
       toast({ title: 'Classe obligatoire', description: 'Veuillez sélectionner au moins une classe.', variant: 'destructive' });
       return;
     }
+    if (!joinGender) {
+      toast({ title: 'Sexe obligatoire', description: 'Veuillez sélectionner votre sexe (M ou F).', variant: 'destructive' });
+      return;
+    }
+    if ((joinRole === 'STUDENT' || joinRole === 'TEACHER') && !joinBirthDate.trim()) {
+      toast({ title: 'Date de naissance requise', description: 'Veuillez renseigner votre date de naissance.', variant: 'destructive' });
+      return;
+    }
+    if (joinRole === 'TEACHER') {
+      if (!joinSpecialty.trim()) {
+        toast({ title: 'Spécialité requise', description: 'Veuillez renseigner votre spécialité.', variant: 'destructive' });
+        return;
+      }
+      if (!joinPhone.trim()) {
+        toast({ title: 'Téléphone requis', description: 'Veuillez renseigner votre numéro de téléphone.', variant: 'destructive' });
+        return;
+      }
+    }
     if (joinRole === 'PARENT' && !joinParentCode.trim()) {
       toast({ title: 'Code Parent requis', description: 'Le code parent de votre enfant est requis.', variant: 'destructive' });
       return;
@@ -535,6 +570,10 @@ export default function AuthPage() {
           password: joinPassword,
           inviteCode: joinInviteCode.trim().toUpperCase(),
           role: joinRole,
+          gender: joinGender,
+          dateOfBirth: joinBirthDate || undefined,
+          specialty: joinRole === 'TEACHER' ? joinSpecialty.trim() : undefined,
+          phone: joinRole === 'TEACHER' ? joinPhone.trim() : undefined,
           classIds: (joinRole === 'STUDENT' || joinRole === 'TEACHER') ? joinClassIds : undefined,
           parentCode: joinRole === 'PARENT' ? joinParentCode.trim().toUpperCase() : undefined,
         }),
@@ -1142,55 +1181,6 @@ export default function AuthPage() {
                   Réinitialiser mon mot de passe
                 </button>
               </p>
-
-              {/* QUICK DEMO FILL ACCORDION FOR FAST TESTING */}
-              <div className="pt-4 border-t border-border/40 text-left space-y-2">
-                <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">
-                  Raccourcis Démo Rapide :
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  <Badge
-                    onClick={() => {
-                      setLoginIsAdmin(true);
-                      setLoginEmail('admin@demo.com');
-                      setLoginPassword('admin123');
-                      setLoginIdentity('');
-                    }}
-                    variant="outline"
-                    className="cursor-pointer hover:bg-amber-500/10 text-[10px] py-1"
-                  >
-                    ⚡ Admin Démo
-                  </Badge>
-                  <Badge
-                    onClick={() => {
-                      setLoginIsAdmin(false);
-                      setLoginInviteCode('DEMO2026');
-                      setLoginIdentity('Professeur Démo');
-                      setLoginFullName('Professeur Démo');
-                      setLoginEmail('');
-                      setLoginPassword('prof123');
-                    }}
-                    variant="outline"
-                    className="cursor-pointer hover:bg-blue-500/10 text-[10px] py-1"
-                  >
-                    ⚡ Prof Démo
-                  </Badge>
-                  <Badge
-                    onClick={() => {
-                      setLoginIsAdmin(false);
-                      setLoginInviteCode('DEMO2026');
-                      setLoginIdentity('Élève Démo');
-                      setLoginFullName('Élève Démo');
-                      setLoginEmail('');
-                      setLoginPassword('eleve123');
-                    }}
-                    variant="outline"
-                    className="cursor-pointer hover:bg-emerald-500/10 text-[10px] py-1"
-                  >
-                    ⚡ Élève Démo
-                  </Badge>
-                </div>
-              </div>
             </div>
           </div>
         </main>
@@ -1617,6 +1607,55 @@ export default function AuthPage() {
 
                   <PasswordStrengthIndicator password={regPassword} />
 
+                  {/* Sexe M/F obligatoire */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold">
+                      Sexe <span className="text-destructive">*</span>
+                    </Label>
+                    <RadioGroup
+                      value={regAdminGender}
+                      onValueChange={(v) => setRegAdminGender(v as 'M' | 'F')}
+                      className="grid grid-cols-2 gap-2"
+                    >
+                      <Label
+                        htmlFor="reg-gender-m"
+                        className={`flex items-center justify-center gap-2 h-11 rounded-xl border font-semibold text-sm cursor-pointer transition-all ${
+                          regAdminGender === 'M'
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border/60 hover:bg-muted text-muted-foreground'
+                        }`}
+                      >
+                        <RadioGroupItem value="M" id="reg-gender-m" className="sr-only" />
+                        <User className="w-4 h-4" /> Masculin
+                      </Label>
+                      <Label
+                        htmlFor="reg-gender-f"
+                        className={`flex items-center justify-center gap-2 h-11 rounded-xl border font-semibold text-sm cursor-pointer transition-all ${
+                          regAdminGender === 'F'
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border/60 hover:bg-muted text-muted-foreground'
+                        }`}
+                      >
+                        <RadioGroupItem value="F" id="reg-gender-f" className="sr-only" />
+                        <User className="w-4 h-4" /> Féminin
+                      </Label>
+                    </RadioGroup>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="reg-birthdate" className="text-xs font-bold">
+                      Date de Naissance <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="reg-birthdate"
+                      type="date"
+                      value={regAdminBirthDate}
+                      onChange={(e) => setRegAdminBirthDate(e.target.value)}
+                      className="h-11 rounded-xl"
+                      required
+                    />
+                  </div>
+
                   <Button
                     type="submit"
                     disabled={regLoading}
@@ -1742,6 +1781,91 @@ export default function AuthPage() {
                     required
                   />
                 </div>
+              )}
+
+              {/* Gender M/F obligatoire */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold">
+                  Sexe <span className="text-destructive">*</span>
+                </Label>
+                <RadioGroup
+                  value={joinGender}
+                  onValueChange={(v) => setJoinGender(v as 'M' | 'F')}
+                  className="grid grid-cols-2 gap-2"
+                >
+                  <Label
+                    htmlFor="join-gender-m"
+                    className={`flex items-center justify-center gap-2 h-11 rounded-xl border font-semibold text-sm cursor-pointer transition-all ${
+                      joinGender === 'M'
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border/60 hover:bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    <RadioGroupItem value="M" id="join-gender-m" className="sr-only" />
+                    <User className="w-4 h-4" /> Masculin
+                  </Label>
+                  <Label
+                    htmlFor="join-gender-f"
+                    className={`flex items-center justify-center gap-2 h-11 rounded-xl border font-semibold text-sm cursor-pointer transition-all ${
+                      joinGender === 'F'
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border/60 hover:bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    <RadioGroupItem value="F" id="join-gender-f" className="sr-only" />
+                    <User className="w-4 h-4" /> Féminin
+                  </Label>
+                </RadioGroup>
+              </div>
+
+              {/* Date de naissance pour STUDENT/TEACHER */}
+              {(joinRole === 'STUDENT' || joinRole === 'TEACHER') && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="join-birthdate" className="text-xs font-bold">
+                    Date de Naissance <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="join-birthdate"
+                    type="date"
+                    value={joinBirthDate}
+                    onChange={(e) => setJoinBirthDate(e.target.value)}
+                    className="h-11 rounded-xl"
+                    required
+                  />
+                </div>
+              )}
+
+              {/* Spécialité + Téléphone pour TEACHER */}
+              {joinRole === 'TEACHER' && (
+                <>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="join-specialty" className="text-xs font-bold">
+                      Spécialité <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="join-specialty"
+                      placeholder="Ex: Mathématiques, Français"
+                      value={joinSpecialty}
+                      onChange={(e) => setJoinSpecialty(e.target.value)}
+                      className="h-11 rounded-xl"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="join-phone" className="text-xs font-bold">
+                      Téléphone <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="join-phone"
+                      type="tel"
+                      placeholder="+243 ..."
+                      value={joinPhone}
+                      onChange={(e) => setJoinPhone(e.target.value)}
+                      className="h-11 rounded-xl"
+                      required
+                    />
+                  </div>
+                </>
               )}
 
               {/* Identity details */}

@@ -32,6 +32,8 @@ interface StudentItem {
   gender?: string;
   birthDate?: string;
   matricule?: string;
+  specialty?: string;
+  qualification?: string;
   ine?: string;
   phone?: string;
   parentPhone?: string;
@@ -213,6 +215,8 @@ export default function AdminCards() {
       gender: student.gender || 'M',
       birthDate: student.birthDate || '',
       matricule: student.matricule || '',
+      specialty: student.specialty || '',
+      qualification: student.qualification || '',
       phone: student.phone || '',
       parentPhone: student.parentPhone || '',
       parentPhone2: student.parentPhone2 || '',
@@ -244,6 +248,8 @@ export default function AdminCards() {
       gender: 'M',
       birthDate: '',
       matricule: '',
+      specialty: '',
+      qualification: '',
       phone: '',
       parentPhone: '',
       parentPhone2: '',
@@ -305,6 +311,16 @@ export default function AdminCards() {
     if (isCreating && !formData.fullName) {
       toast.error('Le nom complet est obligatoire.');
       return;
+    }
+    if (cardRole === 'TEACHER') {
+      if (!formData.specialty?.trim()) {
+        toast.error('La spécialité est obligatoire pour un professeur.');
+        return;
+      }
+      if (!formData.phone?.trim()) {
+        toast.error('Le numéro de téléphone est obligatoire pour un professeur.');
+        return;
+      }
     }
     setSubmitting(true);
     try {
@@ -637,6 +653,27 @@ export default function AdminCards() {
                 </SelectContent>
               </Select>
             </div>
+
+            {cardRole === 'TEACHER' && (
+              <>
+                <div className="space-y-2">
+                  <Label>Spécialité *</Label>
+                  <Input 
+                    value={formData.specialty || ''} 
+                    onChange={(e) => setFormData({...formData, specialty: e.target.value})} 
+                    placeholder="Ex: Mathématiques"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Qualification</Label>
+                  <Input 
+                    value={formData.qualification || ''} 
+                    onChange={(e) => setFormData({...formData, qualification: e.target.value})} 
+                    placeholder="Ex: Licence, Master"
+                  />
+                </div>
+              </>
+            )}
             
             <div className="space-y-2">
               <Label>Date de naissance</Label>
@@ -755,11 +792,11 @@ export default function AdminCards() {
             </div>
             
             <div className="space-y-2">
-              <Label>Téléphone Élève</Label>
+              <Label>{cardRole === 'TEACHER' ? 'Téléphone *' : 'Téléphone Élève'}</Label>
               <Input 
                 value={formData.phone || ''} 
                 onChange={(e) => setFormData({...formData, phone: e.target.value})} 
-                placeholder="Optionnel"
+                placeholder={cardRole === 'TEACHER' ? 'Obligatoire' : 'Optionnel'}
               />
             </div>
             

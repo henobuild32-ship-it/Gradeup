@@ -34,7 +34,7 @@ function CheckoutContent() {
   const amount = searchParams.get('amount') || '10';
   const currency = 'USD';
   const description = searchParams.get('description') || 'Paiement carte d\'identité scolaire';
-  const successUrl = searchParams.get('successUrl') || '/api/payments/geniuspay/success?schoolId=demo&action=generate-single&userId=new-card';
+  const successUrl = searchParams.get('successUrl') || '/dashboard';
   const cancelUrl = searchParams.get('cancelUrl') || '/api/payments/geniuspay/cancel';
   const amountNum = Number(amount);
   const normalizedAmount = Number.isFinite(amountNum)
