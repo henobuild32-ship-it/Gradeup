@@ -41,6 +41,41 @@ export async function GET(request: NextRequest) {
       where.student = { classEnrollments: { some: { classId } } };
     }
 
+    // ─── Règle métier : paiement en retard > 30 jours → statut LATE ───
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const overdue = await db.payment.findMany({
+      where: {
+        schoolId,
+        status: 'pending',
+        createdAt: { lt: cutoff },
+        deletedAt: null,
+      },
+      select: { id: true, studentId: true },
+      take: 200,
+    });
+    if (overdue.length > 0) {
+      await db.payment.updateMany({
+        where: { id: { in: overdue.map((p) => p.id) } },
+        data: { status: 'late' },
+      });
+      // Notifier les élèves concernés (non bloquant)
+      try {
+        const { notifyUser } = await import('@/services/notifications/notificationEngine');
+        for (const p of overdue) {
+          notifyUser({
+            schoolId,
+            userId: p.studentId,
+            senderId: auth.userId,
+            title: '⚠️ Scolarité en retard',
+            message: 'Un paiement en attente a plus de 30 jours de retard.',
+            type: 'PAYMENT',
+            priority: 'HIGH',
+            metadata: { paymentId: p.id },
+          }).catch(() => {});
+        }
+      } catch { /* notifications non bloquantes */ }
+    }
+
     const payments = await db.payment.findMany({
       where,
       include: {

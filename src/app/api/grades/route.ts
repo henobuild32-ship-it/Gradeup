@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 import { syncStudentReport } from '@/lib/grade-sync';
+import { assertYearOpen } from '@/lib/year-status';
 
 export async function GET(request: NextRequest) {
   try {
@@ -85,14 +86,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    try {
+      await assertYearOpen(schoolId);
+    } catch (e: any) {
+      return NextResponse.json({ error: e.message }, { status: 403 });
+    }
+
+    const parsedScore = parseFloat(score);
+    const parsedMax = maxScore ? parseFloat(maxScore) : 20;
+    if (isNaN(parsedScore) || parsedScore < 0 || parsedScore > parsedMax) {
+      return NextResponse.json(
+        { error: `La note doit être comprise entre 0 et ${parsedMax}` },
+        { status: 400 }
+      );
+    }
+
     const grade = await db.grade.create({
       data: {
         schoolId,
         courseId,
         studentId,
         teacherId,
-        score: parseFloat(score),
-        maxScore: maxScore ? parseFloat(maxScore) : 20,
+        score: parsedScore,
+        maxScore: parsedMax,
         trimester: trimester || '1',
         comment: comment || '',
       },

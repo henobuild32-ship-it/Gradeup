@@ -79,8 +79,8 @@ export default function SchoolCalendar() {
           fetch(`/api/payments?${params}`).then((r) => r.json()).catch(() => []),
         ]);
 
-        const homeworks: HomeworkInfo[] = Array.isArray(hwRes) ? hwRes : [];
-        const payments: { id: string; month: string; status: string; amount: number; student?: { fullName: string } }[] = Array.isArray(payRes) ? payRes : [];
+        const homeworks: HomeworkInfo[] = Array.isArray(hwRes) ? hwRes : Array.isArray((hwRes as any)?.homework) ? (hwRes as any).homework : [];
+        const payments: { id: string; month: string; status: string; amount: number; student?: { fullName: string } }[] = Array.isArray(payRes) ? payRes : Array.isArray((payRes as any)?.payments) ? (payRes as any).payments : [];
 
         const calendarEvents: CalendarEvent[] = [];
 

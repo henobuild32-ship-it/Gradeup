@@ -12,6 +12,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { TrendingUp, Award, AlertTriangle, BarChart3, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function StudentGrades() {
   const user = useAppStore((s) => s.user);
@@ -29,7 +30,9 @@ export default function StudentGrades() {
       const data = await res.json();
       setGrades(Array.isArray(data.grades) ? data.grades : []);
     } catch {
-      // ignore
+      if (!showLoading) {
+        toast.error('Erreur lors de l\'actualisation des notes');
+      }
     } finally {
       if (showLoading) setLoading(false);
     }
@@ -258,7 +261,15 @@ export default function StudentGrades() {
                                 ))}
                               </div>
                             </TableCell>
-                            <TableCell className="text-center text-muted-foreground">/20</TableCell>
+                            <TableCell className="text-center text-muted-foreground">
+                              <div className="flex flex-wrap justify-center gap-1">
+                                {entry.grades.map((g) => (
+                                  <span key={g.id} className="inline-flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold bg-muted">
+                                    /{g.maxScore}
+                                  </span>
+                                ))}
+                              </div>
+                            </TableCell>
                             <TableCell className="text-center">
                               <div className="flex flex-col items-center gap-1.5">
                                 <div className="w-24 h-2 rounded-full bg-muted overflow-hidden">

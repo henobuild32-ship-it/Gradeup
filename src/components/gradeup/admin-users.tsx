@@ -56,6 +56,7 @@ import {
   UserPlus,
   Power,
   PowerOff,
+  Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -328,19 +329,53 @@ export default function AdminUsers() {
     return allUsers.filter(u => u.role === role).length;
   };
 
+  const exportCSV = () => {
+    if (filteredUsers.length === 0) {
+      toast.error('Aucun utilisateur à exporter');
+      return;
+    }
+    const headers = ['Nom', 'Email', 'Rôle', 'Actif', 'Classe(s)'];
+    const rows = filteredUsers.map((u) => [
+      u.fullName,
+      u.email,
+      u.role,
+      u.active === false ? 'Non' : 'Oui',
+      u.classEnrollments?.map((e) => e.class.name).join(' / ') || '',
+    ]);
+    const csv = [headers, ...rows]
+      .map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(';'))
+      .join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `utilisateurs-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Utilisateurs exportés en CSV');
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Page Header */}
       <div className="mb-6 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">Gestion des utilisateurs</h1>
-            <p className="text-sm text-muted-foreground mt-1">Gérez les élèves, professeurs et parents</p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold">Gestion des utilisateurs</h1>
+              <p className="text-sm text-muted-foreground mt-1">Gérez les élèves, professeurs et parents</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button onClick={exportCSV} variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300 transition-all">
+                <Download className="h-4 w-4 mr-2" />
+                Exporter CSV
+              </Button>
+              <Button onClick={openCreateDialog} className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-lg shadow-blue-500/20">
+                <UserPlus className="h-4 w-4 mr-2" />
+                Ajouter
+              </Button>
+            </div>
           </div>
-          <Button onClick={openCreateDialog} className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-lg shadow-blue-500/20">
-            <UserPlus className="h-4 w-4 mr-2" />
-            Ajouter
-          </Button>
         </div>
       </div>
 

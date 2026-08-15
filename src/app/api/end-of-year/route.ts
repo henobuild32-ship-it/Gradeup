@@ -316,11 +316,37 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'lock-year') {
+      // Verrouille réellement l'année scolaire active de l'école
+      const now = new Date();
+      const year = await db.schoolYear.findFirst({
+        where: { schoolId, status: 'OPEN' },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (year) {
+        await db.schoolYear.update({
+          where: { id: year.id },
+          data: { status: 'LOCKED', closedAt: now },
+        });
+      } else {
+        // Aucune année enregistrée : on en crée une verrouillée par sécurité
+        const school = await db.school.findUnique({
+          where: { id: schoolId },
+          select: { academicYear: true },
+        });
+        await db.schoolYear.create({
+          data: {
+            schoolId,
+            year: school?.academicYear || new Date().getFullYear().toString(),
+            status: 'LOCKED',
+            closedAt: now,
+          },
+        });
+      }
       await db.notification.create({
         data: {
           schoolId,
           title: 'Année scolaire verrouillée',
-          message: `L'année scolaire a été verrouillée par l'administration.`,
+          message: `L'année scolaire a été verrouillée par l'administration. Les saisies de notes et de présences sont suspendues.`,
           type: 'SYSTEM',
           senderId: adminId,
         },

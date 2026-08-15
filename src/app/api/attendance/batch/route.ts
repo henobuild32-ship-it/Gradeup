@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
+import { assertYearOpen } from '@/lib/year-status';
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,6 +18,12 @@ export async function POST(request: NextRequest) {
         { error: 'Champs requis manquants: schoolId, teacherId, date, records' },
         { status: 400 }
       );
+    }
+
+    try {
+      await assertYearOpen(schoolId);
+    } catch (e: any) {
+      return NextResponse.json({ error: e.message }, { status: 403 });
     }
 
     const attCourseId = courseId || '';

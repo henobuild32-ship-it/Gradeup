@@ -441,7 +441,7 @@ function ThreeDotsMenuSheet({
     { label: 'Exporter la conversation', icon: Download, action: onExport, color: 'text-emerald-300' },
     { label: 'Supprimer cette conversation', icon: Trash2, action: onDeleteCurrent, color: 'text-rose-400' },
     { label: 'Vider tout l\'historique', icon: Trash2, action: onClearAll, color: 'text-red-500' },
-    { label: 'Informations sur l\'IA', icon: Bot, action: () => {}, color: 'text-indigo-400' },
+    { label: 'Informations sur l\'IA', icon: Bot, action: () => { const m = models.find(x => x.id === selectedModel); toast.info(`Gradie IA — ${m?.name || 'GLM'}\n\nAssistant scolaire intelligent. Mémorise vos faits via [MEM:], traite PDF/images, traduit en FR/EN/Lingala/Swahili.`); }, color: 'text-indigo-400' },
   ];
 
   if (showModels) {

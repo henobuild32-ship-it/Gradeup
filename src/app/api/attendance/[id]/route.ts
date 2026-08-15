@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
+import { assertYearOpen } from '@/lib/year-status';
 
 export async function GET(
   request: NextRequest,
@@ -46,6 +47,12 @@ export async function PUT(
     const existing = await db.attendance.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: 'Attendance record not found' }, { status: 404 });
+    }
+
+    try {
+      await assertYearOpen(existing.schoolId);
+    } catch (e: any) {
+      return NextResponse.json({ error: e.message }, { status: 403 });
     }
 
     if (date && date !== existing.date) {

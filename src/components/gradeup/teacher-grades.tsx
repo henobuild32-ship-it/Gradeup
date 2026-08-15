@@ -233,6 +233,10 @@ export default function TeacherGrades() {
       toast.error('Veuillez saisir des notes valides');
       return;
     }
+    if (score < 0 || score > maxScore) {
+      toast.error(`La note doit être comprise entre 0 et ${maxScore}`);
+      return;
+    }
 
     setSubmitting(true);
     try {

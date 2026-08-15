@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 import { syncStudentReport } from '@/lib/grade-sync';
+import { assertYearOpen } from '@/lib/year-status';
 
 export async function GET(
   request: NextRequest,
@@ -54,6 +55,21 @@ export async function PUT(
     const existing = await db.grade.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: 'Grade not found' }, { status: 404 });
+    }
+
+    try {
+      await assertYearOpen(existing.schoolId);
+    } catch (e: any) {
+      return NextResponse.json({ error: e.message }, { status: 403 });
+    }
+
+    const newScore = score !== undefined ? parseFloat(score) : existing.score;
+    const newMax = maxScore !== undefined ? parseFloat(maxScore) : existing.maxScore;
+    if (isNaN(newScore) || newScore < 0 || newScore > newMax) {
+      return NextResponse.json(
+        { error: `La note doit être comprise entre 0 et ${newMax}` },
+        { status: 400 }
+      );
     }
 
     const updatedTrimester = trimester !== undefined ? trimester : existing.trimester;

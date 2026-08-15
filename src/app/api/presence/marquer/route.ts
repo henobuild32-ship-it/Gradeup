@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
+import { assertYearOpen } from '@/lib/year-status';
 
 // Haversine formula — returns distance in meters between two GPS points
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -43,6 +44,12 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Utilisateur introuvable' }, { status: 404 });
     if (user.schoolId !== schoolId) return NextResponse.json({ error: 'Accès refusé' }, { status: 403 });
     if (!school) return NextResponse.json({ error: 'École introuvable' }, { status: 404 });
+
+    try {
+      await assertYearOpen(schoolId);
+    } catch (e: any) {
+      return NextResponse.json({ error: e.message }, { status: 403 });
+    }
 
     // ─── Geolocation check ───
     let geoValid = true;
