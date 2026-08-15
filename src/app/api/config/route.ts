@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequestActive, AuthError } from '@/lib/auth/authenticate';
 
 export async function GET(request: NextRequest) {
   try {
@@ -40,6 +41,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'schoolId is required' }, { status: 400 });
     }
 
+    authenticateRequestActive(request);
+
     const school = await db.school.findUnique({
       where: { id: schoolId },
       select: {
@@ -75,11 +78,15 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const auth = await authenticateRequestActive(request);
     const body = await request.json();
     const { schoolId, currency, name, email, logoUrl, latitude, longitude } = body;
 
     if (!schoolId) {
       return NextResponse.json({ error: 'schoolId is required' }, { status: 400 });
+    }
+    if (auth.role !== 'ADMIN' || auth.schoolId !== schoolId) {
+      return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
     }
 
     const existing = await db.school.findUnique({ where: { id: schoolId } });
@@ -111,6 +118,9 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ config: school, school });
   } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }

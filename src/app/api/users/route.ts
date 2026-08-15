@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
+import { authenticateRequest, authenticateRequestActive, AuthError } from '@/lib/auth/authenticate';
 import { notifyUser } from '@/services/notifications/notificationEngine';
 import { hashPassword } from '@/lib/password';
 
@@ -136,6 +136,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await authenticateRequestActive(request);
     const body = await request.json();
     const {
       schoolId,
@@ -176,6 +177,11 @@ export async function POST(request: NextRequest) {
         { error: 'Missing required fields: schoolId, fullName, password, role' },
         { status: 400 }
       );
+    }
+
+    // Admin uniquement, et admin de la même école
+    if (auth.role !== 'ADMIN' || auth.schoolId !== schoolId) {
+      return NextResponse.json({ error: 'Accès non autorisé. Action réservée aux administrateurs.' }, { status: 403 });
     }
 
     const existing = await db.user.findFirst({
@@ -276,6 +282,7 @@ export async function POST(request: NextRequest) {
 // PATCH: Toggle user active status or update user info
 export async function PATCH(request: NextRequest) {
   try {
+    const auth = await authenticateRequestActive(request);
     const body = await request.json();
     const {
       userId,
@@ -311,6 +318,16 @@ export async function PATCH(request: NextRequest) {
 
     if (!userId) {
       return NextResponse.json({ error: 'userId requis.' }, { status: 400 });
+    }
+
+    // Admin uniquement, et la cible doit être dans la même école
+    if (auth.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Accès non autorisé. Action réservée aux administrateurs.' }, { status: 403 });
+    }
+
+    const targetUser = await db.user.findUnique({ where: { id: userId }, select: { id: true, schoolId: true } });
+    if (!targetUser || targetUser.schoolId !== auth.schoolId) {
+      return NextResponse.json({ error: 'Utilisateur introuvable dans votre établissement.' }, { status: 403 });
     }
 
     const updateData: Record<string, unknown> = {};
@@ -400,11 +417,22 @@ export async function PATCH(request: NextRequest) {
 // DELETE: Remove a user
 export async function DELETE(request: NextRequest) {
   try {
+    const auth = await authenticateRequestActive(request);
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
 
     if (!userId) {
       return NextResponse.json({ error: 'userId requis.' }, { status: 400 });
+    }
+
+    // Admin uniquement, et la cible doit être dans la même école
+    if (auth.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Accès non autorisé. Action réservée aux administrateurs.' }, { status: 403 });
+    }
+
+    const targetUser = await db.user.findUnique({ where: { id: userId }, select: { id: true, schoolId: true } });
+    if (!targetUser || targetUser.schoolId !== auth.schoolId) {
+      return NextResponse.json({ error: 'Utilisateur introuvable dans votre établissement.' }, { status: 403 });
     }
 
     // Check if user has children (parent)

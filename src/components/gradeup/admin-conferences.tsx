@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '@/lib/store';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,9 +16,12 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { VideoConferenceInfo } from '@/lib/types';
 
+type ClassItem = { id: string; name: string };
+
 export default function AdminConferences() {
   const { user } = useAppStore();
   const [conferences, setConferences] = useState<VideoConferenceInfo[]>([]);
+  const [classes, setClasses] = useState<ClassItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -32,7 +35,19 @@ export default function AdminConferences() {
     targetClassId: '',
   });
 
-  const fetchConferences = async () => {
+  const fetchClasses = useCallback(async () => {
+    if (!user?.schoolId) return;
+    try {
+      const res = await fetch(`/api/classes?schoolId=${user.schoolId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setClasses(Array.isArray(data.classes) ? data.classes : []);
+    } catch {
+      toast.error("Erreur lors du chargement des classes");
+    }
+  }, [user?.schoolId]);
+
+  const fetchConferences = useCallback(async () => {
     if (!user?.schoolId) return;
     setIsLoading(true);
     try {
@@ -48,15 +63,20 @@ export default function AdminConferences() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user?.schoolId]);
 
   useEffect(() => {
     fetchConferences();
-  }, [user?.schoolId]);
+    fetchClasses();
+  }, [fetchConferences, fetchClasses]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user?.schoolId) return;
+    if (formData.targetRole === 'CLASS' && !formData.targetClassId) {
+      toast.error("Veuillez sélectionner une classe");
+      return;
+    }
     
     setIsSubmitting(true);
     try {
@@ -67,6 +87,7 @@ export default function AdminConferences() {
           ...formData,
           schoolId: user.schoolId,
           creatorId: user.id,
+          targetClassId: formData.targetRole === 'CLASS' ? formData.targetClassId : '',
         }),
       });
 
@@ -183,7 +204,7 @@ export default function AdminConferences() {
                   <Label htmlFor="targetRole">Audience cible</Label>
                   <Select 
                     value={formData.targetRole}
-                    onValueChange={val => setFormData({...formData, targetRole: val})}
+                      onValueChange={val => setFormData({ ...formData, targetRole: val, targetClassId: val === 'CLASS' ? formData.targetClassId : '' })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Sélectionnez l'audience" />
@@ -193,9 +214,31 @@ export default function AdminConferences() {
                       <SelectItem value="TEACHER">Professeurs uniquement</SelectItem>
                       <SelectItem value="PARENT">Parents uniquement</SelectItem>
                       <SelectItem value="STUDENT">Élèves uniquement</SelectItem>
+                      <SelectItem value="CLASS">Une classe spécifique</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+
+                {formData.targetRole === 'CLASS' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="targetClassId">Classe</Label>
+                    <Select 
+                      value={formData.targetClassId}
+                      onValueChange={val => setFormData({ ...formData, targetClassId: val })}
+                    >
+                      <SelectTrigger id="targetClassId">
+                        <SelectValue placeholder="Sélectionnez une classe" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {classes.map((cls) => (
+                          <SelectItem key={cls.id} value={cls.id}>
+                            {cls.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
               
               <DialogFooter>

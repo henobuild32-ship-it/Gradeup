@@ -101,6 +101,7 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Présence', page: 'admin-presence', icon: ClipboardCheck, emoji: '✅' },
     { label: 'Rapports', page: 'admin-reports', icon: BarChart3, emoji: '📈' },
     { label: 'Notifications', page: 'admin-notifications', icon: Bell, emoji: '🔔' },
+    { label: 'Visioconférences', page: 'admin-conferences', icon: Video, emoji: '🎥' },
     { label: 'Cours', page: 'admin-courses', icon: BookOpen, emoji: '📚' },
     { label: 'Emploi du temps', page: 'admin-schedules', icon: CalendarDays, emoji: '🗓️' },
     { label: 'Bulletins Sync', page: 'auto-report-sync', icon: Zap, emoji: '⚡' },
@@ -173,6 +174,7 @@ const bottomTabsByRole: Record<UserRole, { label: string; page: PageView; icon: 
   ADMIN: [
     { label: 'Accueil', page: 'admin-dashboard', icon: LayoutDashboard },
     { label: 'Classes', page: 'admin-classes', icon: School },
+    { label: 'Visio', page: 'admin-conferences', icon: Video },
     { label: 'Grady IA', page: 'admin-ai', icon: Bot },
     { label: 'Frais', page: 'admin-tuition', icon: DollarSign },
     { label: 'Profil', page: 'profile', icon: User },

@@ -32,7 +32,8 @@ import {
   Download,
   AlertOctagon,
   CheckCircle,
-  Loader2
+  Loader2,
+  Video
 } from 'lucide-react';
 import WelcomeBanner from './welcome-banner';
 import ActivityFeed from './activity-feed';
@@ -188,36 +189,34 @@ export default function AdminDashboard() {
   const runTransitionProcess = async () => {
     setIsTransitioning(true);
     setTransitionStep(3);
-    
-    const steps = [
-      { progress: 15, msg: 'Archivage des bulletins scolaires...' },
-      { progress: 40, msg: 'Calcul des classements et mentions de fin d\'année...' },
-      { progress: 65, msg: 'Incrémentation des niveaux des classes (N+1)...' },
-      { progress: 85, msg: 'Réinitialisation des frais scolarité et création du nouvel exercice...' },
-      { progress: 100, msg: 'Finalisation de la clôture annuelle.' }
-    ];
-
-    for (const step of steps) {
-      setTransitionProgress(step.progress);
-      setTransitionStatusMsg(step.msg);
-      await new Promise(r => setTimeout(r, 1200));
-    }
+    setTransitionProgress(10);
+    setTransitionStatusMsg('Préparation de la clôture annuelle...');
 
     try {
+      // Appel backend réel — la progression reflète l'état réel de l'opération
       const res = await fetch('/api/end-of-year', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ schoolId: user?.schoolId }),
       });
+
       if (res.ok) {
-        toast.success("La transition annuelle a été effectuée avec succès !");
+        const data = await res.json().catch(() => ({}));
+        setTransitionProgress(100);
+        setTransitionStatusMsg('Transition annuelle terminée avec succès.');
+        toast.success(data.message || "La transition annuelle a été effectuée avec succès !");
         setTransitionStep(4);
         fetchStats();
       } else {
-        toast.error("La transition a rencontré une erreur.");
+        const err = await res.json().catch(() => ({}));
+        setTransitionProgress(0);
+        setTransitionStatusMsg('');
+        toast.error(err.error || "La transition a rencontré une erreur.");
         setTransitionOpen(false);
       }
     } catch {
+      setTransitionProgress(0);
+      setTransitionStatusMsg('');
       toast.error("Échec lors de la transition.");
       setTransitionOpen(false);
     } finally {
@@ -228,10 +227,55 @@ export default function AdminDashboard() {
   // Export Financial Reports
   const handleExportFinances = async () => {
     setExportingReport(true);
-    // Simulate generation
-    await new Promise(r => setTimeout(r, 1500));
-    setExportingReport(false);
-    toast.success("Rapport d'analyse financière exporté avec succès (format PDF/Excel)");
+    try {
+      const rows = [
+        ['Indicateur', 'Valeur'],
+        ['Total élèves', String(stats?.totalStudents ?? 0)],
+        ['Total professeurs', String(stats?.totalTeachers ?? 0)],
+        ['Total parents', String(stats?.totalParents ?? 0)],
+        ['Total classes', String(stats?.totalClasses ?? 0)],
+        ['Total cours', String(stats?.totalCourses ?? 0)],
+        ['Total paiements', String(stats?.totalPayments ?? 0)],
+        ['Revenus totaux', String(stats?.totalRevenue ?? 0)],
+        ['Revenus en attente', String(stats?.pendingRevenue ?? 0)],
+      ];
+
+      if (pendingPayments.length > 0) {
+        rows.push(['', '']);
+        rows.push(['Paiements en attente', '']);
+        pendingPayments.forEach((payment) => {
+          rows.push([
+            payment.student?.fullName || 'Inconnu',
+            `${payment.amount ?? 0} USD - ${payment.month || 'Mois non précisé'}`,
+          ]);
+        });
+      }
+
+      if (overduePayments.length > 0) {
+        rows.push(['', '']);
+        rows.push(['Paiements en retard', '']);
+        overduePayments.forEach((payment) => {
+          rows.push([
+            payment.student?.fullName || 'Inconnu',
+            `${payment.amount ?? 0} USD - ${payment.month || 'Mois non précisé'}`,
+          ]);
+        });
+      }
+
+      const csv = rows
+        .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
+        .join('\n');
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `rapport-financier-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Rapport financier exporté avec succès');
+    } finally {
+      setExportingReport(false);
+    }
   };
 
   const statCards = [
@@ -635,6 +679,9 @@ export default function AdminDashboard() {
           </Button>
           <Button variant="outline" onClick={() => setCurrentPage('admin-classes')} className="border-blue-200 text-blue-700 hover:bg-blue-50 rounded-xl">
             <BookOpen className="h-4 w-4 mr-2" /> Créer une classe
+          </Button>
+          <Button variant="outline" onClick={() => setCurrentPage('admin-conferences')} className="border-blue-200 text-blue-700 hover:bg-blue-50 rounded-xl">
+            <Video className="h-4 w-4 mr-2" /> Visioconférences
           </Button>
           <Button variant="outline" onClick={() => setCurrentPage('admin-notifications')} className="border-blue-200 text-blue-700 hover:bg-blue-50 rounded-xl">
             <Bell className="h-4 w-4 mr-2" /> Envoyer notification

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
+import { authenticateRequest, authenticateRequestActive, AuthError } from '@/lib/auth/authenticate';
 
 export async function GET(request: NextRequest) {
   try {
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = authenticateRequest(request);
+    const auth = await authenticateRequestActive(request);
     const body = await request.json();
     const { schoolId, classId, teacherId, name, description } = body;
 
@@ -69,6 +69,11 @@ export async function POST(request: NextRequest) {
         { error: 'Missing required fields: schoolId, classId, teacherId, name' },
         { status: 400 }
       );
+    }
+
+    // Admin uniquement, et admin de la même école
+    if (auth.role !== 'ADMIN' || auth.schoolId !== schoolId) {
+      return NextResponse.json({ error: 'Accès non autorisé. Action réservée aux administrateurs.' }, { status: 403 });
     }
 
     const course = await db.course.create({
@@ -106,12 +111,21 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const auth = authenticateRequest(request);
+    const auth = await authenticateRequestActive(request);
     const body = await request.json();
     const { id, name, description, teacherId, status, maxScore, coefficient } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Missing required field: id' }, { status: 400 });
+    }
+
+    // Admin uniquement, et admin de la même école
+    if (auth.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Accès non autorisé. Action réservée aux administrateurs.' }, { status: 403 });
+    }
+    const existing = await db.course.findUnique({ where: { id }, select: { schoolId: true } });
+    if (!existing || existing.schoolId !== auth.schoolId) {
+      return NextResponse.json({ error: 'Cours introuvable dans votre établissement.' }, { status: 403 });
     }
 
     const course = await db.course.update({

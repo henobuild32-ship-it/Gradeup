@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
+import { authenticateRequest, authenticateRequestActive, AuthError } from '@/lib/auth/authenticate';
 import { notifyUser } from '@/services/notifications/notificationEngine';
 
 async function generateUniqueCardId(fullName: string) {
@@ -25,11 +25,16 @@ async function generateUniqueCardId(fullName: string) {
 
 export async function POST(request: NextRequest) {
   try {
-    authenticateRequest(request);
+    const auth = await authenticateRequestActive(request);
     const { schoolId, action, classId, userId } = await request.json();
 
     if (!schoolId || !action) {
       return NextResponse.json({ error: 'schoolId and action are required' }, { status: 400 });
+    }
+
+    // Admin uniquement, et admin de la même école
+    if (auth.role !== 'ADMIN' || auth.schoolId !== schoolId) {
+      return NextResponse.json({ error: 'Accès non autorisé. Action réservée aux administrateurs.' }, { status: 403 });
     }
 
     if (action === 'generate-all' || (action === 'generate-class' && classId)) {
@@ -94,6 +99,9 @@ export async function POST(request: NextRequest) {
       if (!userId) return NextResponse.json({ error: 'userId is required' }, { status: 400 });
       const student = await db.user.findUnique({ where: { id: userId } });
       if (!student) return NextResponse.json({ error: 'Student not found' }, { status: 404 });
+      if (student.schoolId !== schoolId) {
+        return NextResponse.json({ error: 'Élève introuvable dans votre établissement.' }, { status: 403 });
+      }
 
       const newCardId = await generateUniqueCardId(student.fullName);
       const updated = await db.user.update({

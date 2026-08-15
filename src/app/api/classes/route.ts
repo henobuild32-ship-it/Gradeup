@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { notifyUser } from '@/services/notifications/notificationEngine';
-import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
+import { authenticateRequestActive, AuthError } from '@/lib/auth/authenticate';
 
 export async function GET(request: NextRequest) {
   try {
+    authenticateRequestActive(request);
     // Lecture publique : tableau des classes d'une école
     // (utilisé avant/après connexion — liste non sensible : nom, niveau, effectifs)
     const { searchParams } = new URL(request.url);
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Création : ADMIN uniquement
-    const auth = authenticateRequest(request);
+    const auth = await authenticateRequestActive(request);
     if (auth.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Seul un administrateur peut créer une classe.' }, { status: 403 });
     }
