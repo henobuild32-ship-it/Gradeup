@@ -45,6 +45,10 @@ const AdminCourses = dynamic(() => import('@/components/gradeup/admin-courses'),
 const AdminPresence = dynamic(() => import('@/components/gradeup/admin-presence'), { ssr: false, loading: () => <PageSkeleton /> });
 const AdminSchedules = dynamic(() => import('@/components/gradeup/admin-schedules'), { ssr: false, loading: () => <PageSkeleton /> });
 const AutoReportSyncPanel = dynamic(() => import('@/components/gradeup/auto-report-sync-panel'), { ssr: false, loading: () => <PageSkeleton /> });
+const AdminSchoolCalendar = dynamic(() => import('@/components/gradeup/admin-school-calendar'), { ssr: false, loading: () => <PageSkeleton /> });
+const AdminCoefficients = dynamic(() => import('@/components/gradeup/admin-coefficients'), { ssr: false, loading: () => <PageSkeleton /> });
+const AdminPassages = dynamic(() => import('@/components/gradeup/admin-passages'), { ssr: false, loading: () => <PageSkeleton /> });
+const AdminNoteModifications = dynamic(() => import('@/components/gradeup/admin-note-modifications'), { ssr: false, loading: () => <PageSkeleton /> });
 const CahierCotation = dynamic(() => import('@/components/gradeup/cahier-cotation'), { ssr: false, loading: () => <PageSkeleton /> });
 const TeacherDashboard = dynamic(() => import('@/components/gradeup/teacher-dashboard'), { ssr: false, loading: () => <PageSkeleton /> });
 const TeacherCourses = dynamic(() => import('@/components/gradeup/teacher-courses'), { ssr: false, loading: () => <PageSkeleton /> });
@@ -102,6 +106,10 @@ function PageRouter({ page }: { page: PageView }) {
   if (page === 'admin-courses') return <AdminCourses />;
   if (page === 'admin-presence') return <AdminPresence />;
   if (page === 'admin-schedules') return <AdminSchedules />;
+  if (page === 'admin-school-calendar') return <AdminSchoolCalendar />;
+  if (page === 'admin-coefficients') return <AdminCoefficients />;
+  if (page === 'admin-passages') return <AdminPassages />;
+  if (page === 'admin-note-modifications') return <AdminNoteModifications />;
   if (page === 'auto-report-sync') return <AutoReportSyncPanel />;
   if (page === 'cahier-cotation') return <CahierCotation />;
   if (page === 'admin-tuition') return <TuitionTracking />;

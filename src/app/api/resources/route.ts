@@ -31,6 +31,8 @@ export async function GET(req: NextRequest) {
     const type = searchParams.get('type');
     const q = searchParams.get('q')?.trim();
     const favoritesOnly = searchParams.get('favorites') === '1';
+    const publishedOnly = searchParams.get('publishedOnly') === '1';
+    const includeDrafts = searchParams.get('includeDrafts') === '1';
 
     if (!schoolId) return NextResponse.json({ error: 'schoolId requis' }, { status: 400 });
 
@@ -40,6 +42,12 @@ export async function GET(req: NextRequest) {
     if (category) where.category = category;
     if (type) where.type = type;
     if (q) where.OR = [{ title: { contains: q, mode: 'insensitive' } }, { description: { contains: q, mode: 'insensitive' } }];
+    // Par défaut seules les ressources publiées sont renvoyées (définition : isPublished=true)
+    if (!includeDrafts && !publishedOnly) {
+      where.isPublished = true;
+    } else if (publishedOnly) {
+      where.isPublished = true;
+    }
 
     let resources = await db.ressource.findMany({
       where,
@@ -71,7 +79,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const {
       schoolId, createdById, title, description, category, matiere, niveau,
-      author, url, fileUrl, type, visibility, targetRole, targetClassId,
+      author, url, fileUrl, type, visibility, targetRole, targetClassId, isPublished
     } = body;
 
     if (!schoolId || !title) {
@@ -102,6 +110,7 @@ export async function POST(req: NextRequest) {
         visibility: visibility || 'PUBLIC',
         targetRole: targetRole || 'ALL',
         targetClassId: targetClassId || '',
+        isPublished: typeof isPublished === 'boolean' ? isPublished : true,
       },
     });
 

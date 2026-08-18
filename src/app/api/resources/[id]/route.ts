@@ -25,7 +25,7 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await req.json();
-    const { title, description, category, matiere, niveau, author, url, fileUrl, type, visibility, targetRole, targetClassId } = body;
+    const { title, description, category, matiere, niveau, author, url, fileUrl, type, visibility, targetRole, targetClassId, isPublished } = body;
 
     const existing = await db.ressource.findUnique({ where: { id } });
     if (!existing) return NextResponse.json({ error: 'Ressource introuvable.' }, { status: 404 });
@@ -43,6 +43,7 @@ export async function PATCH(
     if (typeof visibility === 'string') data.visibility = visibility;
     if (typeof targetRole === 'string') data.targetRole = targetRole;
     if (typeof targetClassId === 'string') data.targetClassId = targetClassId;
+    if (typeof isPublished === 'boolean') data.isPublished = isPublished;
 
     const resource = await db.ressource.update({ where: { id }, data });
     return NextResponse.json({ resource });

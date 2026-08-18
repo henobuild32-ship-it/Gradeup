@@ -27,6 +27,8 @@ import {
   MessageCircle,
   Camera,
   IdCard,
+  GraduationCap,
+  ArrowRight,
 } from 'lucide-react';
 import IdCard3D from './IdCard3D';
 
@@ -60,6 +62,22 @@ export default function ProfilePage() {
   const [savingConfig, setSavingConfig] = useState(false);
   const [fullUser, setFullUser] = useState<any>(null);
   const [loadingCard, setLoadingCard] = useState(false);
+  const [passages, setPassages] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (user?.id && user.role === 'STUDENT' && user.schoolId) {
+      const fetchPassages = async () => {
+        try {
+          const res = await fetch(`/api/passages?schoolId=${user.schoolId}&studentId=${user.id}`);
+          const data = await res.json();
+          setPassages(Array.isArray(data.passages) ? data.passages : []);
+        } catch {
+          setPassages([]);
+        }
+      };
+      fetchPassages();
+    }
+  }, [user?.id, user?.role, user?.schoolId]);
 
   useEffect(() => {
     if (user) {
@@ -327,6 +345,51 @@ export default function ProfilePage() {
               <p className="text-sm text-muted-foreground italic text-center py-8">
                 Impossible de charger votre carte d&apos;identité. Veuillez contacter l&apos;administration.
               </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Parcours scolaire (élèves uniquement) */}
+      {user.role === 'STUDENT' && (
+        <Card className="transition-all duration-300 hover:shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <div className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30">
+                <GraduationCap className="h-4 w-4 text-emerald-600" />
+              </div>
+              Parcours scolaire
+            </CardTitle>
+            <CardDescription>
+              Historique de vos passages entre les classes au fil des années
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {passages.length === 0 ? (
+              <div className="py-6 text-center text-muted-foreground text-sm">
+                <GraduationCap className="h-10 w-10 text-emerald-300 mx-auto mb-2" />
+                Aucun passage enregistré pour l&apos;instant.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {passages.map((p) => (
+                  <div key={p.id} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 rounded-xl bg-accent/30 border border-border">
+                    <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+                      <span className="text-sm font-medium">{p.sourceClass?.name || p.sourceClassId}</span>
+                      <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">{p.targetClass?.name || p.targetClassId}</span>
+                      {p.result === 'REDOUBLE' ? (
+                        <Badge className="bg-red-100 text-red-700 border-red-200 hover:bg-red-100">Redouble</Badge>
+                      ) : (
+                        <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-100">Réussi</Badge>
+                      )}
+                    </div>
+                    <span className="text-[11px] text-muted-foreground sm:shrink-0">
+                      {p.sourceYear || '—'} → {p.targetYear || '—'} · {p.datePassage ? new Date(p.datePassage).toLocaleDateString('fr-FR') : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>

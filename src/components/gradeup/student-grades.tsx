@@ -11,8 +11,15 @@ import { Button } from '@/components/ui/button';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { TrendingUp, Award, AlertTriangle, BarChart3, RefreshCw } from 'lucide-react';
+import { TrendingUp, Award, AlertTriangle, BarChart3, RefreshCw, PenLine } from 'lucide-react';
 import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Loader2 } from 'lucide-react';
+
+type GradeWithMod = GradeInfo & { modStatus?: string };
 
 export default function StudentGrades() {
   const user = useAppStore((s) => s.user);
@@ -20,6 +27,11 @@ export default function StudentGrades() {
   const [loading, setLoading] = useState(true);
   const [trimester, setTrimester] = useState('1');
   const [refreshing, setRefreshing] = useState(false);
+  const [modTarget, setModTarget] = useState<GradeWithMod | null>(null);
+  const [modReason, setModReason] = useState('');
+  const [modNewScore, setModNewScore] = useState('');
+  const [modSending, setModSending] = useState(false);
+  const [modStatusMap, setModStatusMap] = useState<Record<string, string>>({});
 
   const fetchGrades = async (showLoading = true) => {
     if (!user?.schoolId || !user?.id) return;
@@ -29,6 +41,17 @@ export default function StudentGrades() {
       if (!res.ok) throw new Error();
       const data = await res.json();
       setGrades(Array.isArray(data.grades) ? data.grades : []);
+      // statut des demandes en cours pour ces notes
+      try {
+        const modRes = await fetch(`/api/note-modifications?schoolId=${user.schoolId}&studentId=${user.id}`);
+        const modData = await modRes.json();
+        const map: Record<string, string> = {};
+        const mods = Array.isArray(modData.noteModifications) ? modData.noteModifications : [];
+        for (const m of mods) {
+          if (!map[m.noteId] || m.requestStatus === 'PENDING') map[m.noteId] = m.requestStatus;
+        }
+        setModStatusMap(map);
+      } catch { /* silencieux */ }
     } catch {
       if (!showLoading) {
         toast.error('Erreur lors de l\'actualisation des notes');
@@ -46,6 +69,51 @@ export default function StudentGrades() {
     setRefreshing(true);
     await fetchGrades(false);
     setRefreshing(false);
+  };
+
+  const sendModification = async () => {
+    if (!modTarget) return;
+    const newValue = parseFloat(modNewScore);
+    if (isNaN(newValue) || newValue < 0 || newValue > modTarget.maxScore) {
+      toast.error(`La nouvelle note doit être entre 0 et ${modTarget.maxScore}`);
+      return;
+    }
+    if (!modReason.trim()) {
+      toast.error('Veuillez expliquer le motif de la demande');
+      return;
+    }
+    setModSending(true);
+    try {
+      const res = await fetch('/api/note-modifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          noteId: modTarget.id,
+          oldValue: modTarget.score,
+          newValue,
+          oldMax: modTarget.maxScore,
+          newMax: modTarget.maxScore,
+          reason: modReason.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erreur');
+      toast.success('Demande envoyée. Le directeur sera notifié pour validation.');
+      setModStatusMap((prev) => ({ ...prev, [modTarget.id]: 'PENDING' }));
+      setModTarget(null); setModReason(''); setModNewScore('');
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Erreur lors de l\'envoi');
+    } finally {
+      setModSending(false);
+    }
+  };
+
+  const modBadge = (gradeId: string) => {
+    const status = modStatusMap[gradeId];
+    if (!status) return null;
+    if (status === 'PENDING') return <Badge className="text-[9px] bg-amber-100 text-amber-700 border-amber-200">Demande en attente</Badge>;
+    if (status === 'APPROVED') return <Badge className="text-[9px] bg-emerald-100 text-emerald-700 border-emerald-200">Corrigé</Badge>;
+    return <Badge className="text-[9px] bg-red-100 text-red-700 border-red-200">Refusé</Badge>;
   };
 
   const trimesterLabels: Record<string, string> = {
@@ -68,7 +136,7 @@ export default function StudentGrades() {
       return {
         courseId,
         courseName: course?.name || '—',
-        coeff: course?.coefficient ?? 1,
+        coeff: list[0]?.effectiveCoefficient ?? course?.coefficient ?? 1,
         grades: list,
         average: Math.round(avg * 100) / 100,
       };
@@ -251,13 +319,22 @@ export default function StudentGrades() {
                             <TableCell className="text-center">
                               <div className="flex flex-wrap justify-center gap-1">
                                 {entry.grades.map((g) => (
-                                  <span
-                                    key={g.id}
-                                    title={`${trimesterLabels[g.trimester] || g.trimester} : ${g.score}/${g.maxScore}`}
-                                    className={`inline-flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold ${getGradeBg(g.score, g.maxScore)}`}
-                                  >
-                                    {g.score}
-                                  </span>
+                                  <div key={g.id} className="inline-flex flex-col items-center gap-0.5">
+                                    <span
+                                      title={`${trimesterLabels[g.trimester] || g.trimester} : ${g.score}/${g.maxScore}`}
+                                      className={`inline-flex items-center justify-center rounded-lg px-2 py-1 text-xs font-bold ${getGradeBg(g.score, g.maxScore)}`}
+                                    >
+                                      {g.score}
+                                    </span>
+                                    {modBadge(g.id)}
+                                    <button
+                                      type="button"
+                                      onClick={() => { setModTarget(g as GradeWithMod); setModReason(''); setModNewScore(''); }}
+                                      className="text-[9px] text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-0.5"
+                                    >
+                                      <PenLine className="h-2.5 w-2.5" /> Signal erreur
+                                    </button>
+                                  </div>
                                 ))}
                               </div>
                             </TableCell>
@@ -301,6 +378,35 @@ export default function StudentGrades() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Demande de correction de note */}
+      <Dialog open={!!modTarget} onOpenChange={(o) => { if (!o) { setModTarget(null); setModReason(''); setModNewScore(''); } }}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><PenLine className="w-5 h-5 text-blue-600" /> Demander une correction de note</DialogTitle>
+            <DialogDescription>
+              {modTarget ? `${modTarget.course?.name || 'Cette matière'} — note actuelle : ${modTarget.score}/${modTarget.maxScore}` : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Nouvelle note (sur {modTarget?.maxScore ?? 20})</Label>
+              <Input type="number" min={0} max={modTarget?.maxScore ?? 20} step={0.01} value={modNewScore} onChange={(e) => setModNewScore(e.target.value)} placeholder="Ex : 15" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Motif de la demande *</Label>
+              <Textarea value={modReason} onChange={(e) => setModReason(e.target.value)} placeholder="Expliquez pourquoi la note vous semble erronée (relecture, oubli, calcul…)…" className="min-h-[90px]" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setModTarget(null)}>Annuler</Button>
+            <Button onClick={sendModification} disabled={modSending} className="bg-blue-600 hover:bg-blue-700 text-white">
+              {modSending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Envoyer la demande
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

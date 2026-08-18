@@ -11,6 +11,7 @@
  */
 
 import { db } from '@/lib/db';
+import { resolveClassCoefficients } from '@/lib/coefficient-resolver';
 
 export interface SyncResult {
   reportCardId: string;
@@ -59,6 +60,9 @@ export async function syncStudentReport(
     // ── 2. Find the student's class ─────────────────────────────────────────
     const classId = grades[0]?.course?.classId;
     if (!classId) return null;
+
+    // ── 2b. Résoudre les coefficients effectifs (table Coefficient prioritaire)
+    const { byCourse: effectiveCoefficients } = await resolveClassCoefficients(schoolId, classId, grades.map((g) => g.course));
 
     // ── 3. Fetch student info ───────────────────────────────────────────────
     const student = await db.user.findUnique({
@@ -117,7 +121,7 @@ export async function syncStudentReport(
 
     const serializedGrades = Object.keys(courseGradesMap).map((courseId) => {
       const item = courseGradesMap[courseId];
-      const coeff = item.course?.coefficient ?? 1;
+      const coeff = effectiveCoefficients[courseId] ?? item.course?.coefficient ?? 1;
 
       let scoreSum = 0;
       let maxScoreSum = 0;
@@ -174,7 +178,7 @@ export async function syncStudentReport(
     // ── 7. Build bulletin rawRows ───────────────────────────────────────────
     const rawRows = Object.keys(courseGradesMap).map((courseId) => {
       const item = courseGradesMap[courseId];
-      const coeff = item.course?.coefficient ?? 1;
+      const coeff = effectiveCoefficients[courseId] ?? item.course?.coefficient ?? 1;
       const maxTJ = Math.round((20 * coeff) * 0.25);
       const maxExam = 20 * coeff;
 

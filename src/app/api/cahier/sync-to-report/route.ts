@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 import { getCurrentAcademicYear } from '@/lib/grade-sync';
+import { resolveClassCoefficients } from '@/lib/coefficient-resolver';
 
 export async function POST(request: NextRequest) {
   try {
@@ -55,9 +56,17 @@ export async function POST(request: NextRequest) {
     const courseCoeffMap: Record<string, number> = {};
     const studentCourseData: Record<string, Record<string, { scoreSum: number; maxSum: number; coeff: number }>> = {};
 
+    // Résolution des coefficients effectifs via la table Coefficient (priorité),
+    // fallback sur le coefficient de l'évaluation / du cours.
+    const { byCourse: effectiveCoefficients } = await resolveClassCoefficients(
+      schoolId,
+      classId,
+      evaluations.flatMap((e) => (e.course ? [{ id: e.courseId, coefficient: e.course.coefficient ?? 1 }] : []))
+    );
+
     for (const evaluation of evaluations) {
       const { courseId, coefficient, maxScore } = evaluation;
-      const coeff = coefficient ?? 1;
+      const coeff = effectiveCoefficients[courseId] ?? coefficient ?? 1;
       const evalMax = maxScore > 0 ? maxScore : 20;
 
       // Track the coefficient for each course (use latest evaluation's coeff)

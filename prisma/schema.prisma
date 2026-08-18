@@ -53,6 +53,10 @@ model School {
   teacherDocuments     TeacherDocument[]
   timeSlots            SchoolTimeSlot[]
   bulletins            Bulletin[]
+  calendrier           CalendrierScolaire[]
+  coefficients         Coefficient[]
+  passages             PassageHistorique[]
+  noteModifications    NoteModification[]
 
   @@index([subscriptionStatus])
   @@index([inviteCode])
@@ -71,6 +75,7 @@ model SchoolYear {
   deletedAt      DateTime?
 
   school         School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  calendrier     CalendrierScolaire[]
 
   @@unique([schoolId, year])
   @@index([schoolId, status])
@@ -155,6 +160,9 @@ model User {
   bulletins               Bulletin[] @relation("BulletinStudent")
   validatedBulletinsAsTitulaire Bulletin[] @relation("BulletinTitulaireValidator")
   validatedBulletinsAsAdmin     Bulletin[] @relation("BulletinAdminValidator")
+  passageHistoriques       PassageHistorique[] @relation("PassageStudent")
+  noteModifications        NoteModification[] @relation("NoteModificationStudent")
+  noteModificationsFaites   NoteModification[] @relation("NoteModificationModifier")
 
   @@unique([schoolId, fullName, role])
   @@index([schoolId, role, active])
@@ -168,6 +176,8 @@ model SchoolClass {
   schoolId         String
   name             String
   level            String    @default("Primaire")
+  cycle            String    @default("Primaire")
+  section          String    @default("")
   fees             Float     @default(0)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
@@ -179,12 +189,16 @@ model SchoolClass {
   reportCards      ReportCard[]
   transmissions    CotationTransmission[]
   bulletins        Bulletin[]
+  coefficients     Coefficient[]
+  passageSource    PassageHistorique[] @relation("PassageSource")
+  passageTarget    PassageHistorique[] @relation("PassageTarget")
   school           School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   titulaire        User?     @relation("TitulaireClasses", fields: [titulaireId], references: [id], onDelete: SetNull)
   titulaireId      String?
 
   @@unique([schoolId, name])
   @@index([schoolId, level])
+  @@index([schoolId, cycle])
   @@index([titulaireId])
 }
 
@@ -211,6 +225,7 @@ model Course {
   coefficient Int       @default(1)
   description String    @default("")
   status      String    @default("ACTIVE")
+  isPublished Boolean   @default(true)
   weight      Float     @default(1.0)
   points      Int       @default(100)
   createdAt   DateTime  @default(now())
@@ -228,6 +243,8 @@ model Course {
   schedules   CourseSchedule[]
   transmissions CotationTransmission[]
   attendanceCourse Attendance[]
+  coefficients Coefficient[]
+  noteModifications NoteModification[]
 
   @@unique([schoolId, classId, name])
   @@index([schoolId, classId, status])
@@ -235,49 +252,61 @@ model Course {
 }
 
 model Lesson {
-  id        String   @id @default(cuid())
-  schoolId  String
-  courseId  String
-  teacherId String
-  title     String
-  content   String   @default("")
-  fileUrl   String   @default("")
-  fileName  String   @default("")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt DateTime?
+  id          String   @id @default(cuid())
+  schoolId    String
+  courseId    String
+  teacherId   String
+  title       String
+  content     String   @default("")
+  fileUrl     String   @default("")
+  fileName    String   @default("")
+  isPublished Boolean  @default(true)
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
   course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   teacher   User     @relation(fields: [teacherId], references: [id], onDelete: Restrict)
 
   @@index([courseId, createdAt])
-  @@index([schoolId, teacherId])
+  @@index([schoolId, teacherId, isPublished])
 }
 
 model Grade {
-  id        String   @id @default(cuid())
-  schoolId  String
-  courseId  String
-  studentId String
-  teacherId String
-  score     Float
-  maxScore  Float    @default(20)
-  trimester String   @default("1")
-  comment   String   @default("")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt DateTime?
+  id                String   @id @default(cuid())
+  schoolId          String
+  courseId          String
+  studentId         String
+  teacherId         String
+  score             Float
+  maxScore          Float    @default(20)
+  trimester         String   @default("1")
+  semester          Int?
+  period            String   @default("")
+  month             Int?
+  typeEvaluation    String   @default("Interrogation")
+  dateEncodage      String   @default("")
+  heureEncodage     String   @default("")
+  schoolYearId      String   @default("")
+  comment           String   @default("")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
 
   course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   student   User     @relation("GradeStudent", fields: [studentId], references: [id], onDelete: Cascade)
   teacher   User     @relation("GradeTeacher", fields: [teacherId], references: [id], onDelete: Restrict)
   history   GradeHistory[]
+  modifications NoteModification[]
 
   @@index([schoolId, courseId, studentId, trimester])
   @@index([studentId, trimester])
   @@index([courseId, trimester])
   @@index([teacherId, trimester])
+  @@index([studentId, period])
+  @@index([schoolId, schoolYearId])
 }
 
 model Homework {
@@ -288,6 +317,7 @@ model Homework {
   title       String
   description String   @default("")
   dueDate     String   @default("")
+  isPublished Boolean  @default(true)
   gradingType String   @default("manual")
   fileUrl     String   @default("")
   fileName    String   @default("")
@@ -301,7 +331,7 @@ model Homework {
   submissions Submission[]
 
   @@index([courseId, dueDate])
-  @@index([schoolId, teacherId])
+  @@index([schoolId, teacherId, isPublished])
 }
 
 model Attendance {
@@ -604,11 +634,13 @@ model Ressource {
   category      String   @default("Général")
   matiere       String   @default("")
   niveau        String   @default("")
+  cycle         String   @default("ALL")
   author        String   @default("")
   url           String   @default("")
   fileUrl       String   @default("")
   type          String   @default("LIEN")
   visibility    String   @default("PUBLIC")
+  isPublished   Boolean  @default(true)
   targetRole    String   @default("ALL")
   targetClassId String   @default("")
   createdById   String   @default("")
@@ -620,6 +652,7 @@ model Ressource {
 
   @@index([schoolId, category])
   @@index([createdById, createdAt])
+  @@index([schoolId, cycle, isPublished])
 }
 
 model Favori {
@@ -777,6 +810,101 @@ model DeliberationDecision {
 
   @@index([schoolId, classId, academicYear])
   @@index([studentId, academicYear])
+}
+
+model CalendrierScolaire {
+  id              String   @id @default(cuid())
+  schoolId        String
+  schoolYearId    String
+  month           Int
+  monthName       String
+  trimester       Int?
+  semester        Int?
+  period          String
+  dateStart       DateTime?
+  dateEnd         DateTime?
+  cycle           String   @default("ALL")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  school          School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolYear      SchoolYear @relation(fields: [schoolYearId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, schoolYearId, month, cycle])
+  @@index([schoolId, schoolYearId, cycle])
+  @@index([schoolId, period])
+}
+
+model Coefficient {
+  id              String   @id @default(cuid())
+  schoolId        String
+  classId         String
+  section         String   @default("")
+  courseId        String
+  coefficient     Int      @default(1)
+  schoolYearId    String
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  school          School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class           SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  course          Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, classId, courseId, schoolYearId])
+  @@index([schoolId, classId, schoolYearId])
+  @@index([schoolId, section, isActive])
+}
+
+model PassageHistorique {
+  id               String   @id @default(cuid())
+  schoolId         String
+  studentId        String
+  sourceClassId    String
+  targetClassId    String
+  sourceYear       String
+  targetYear       String
+  result           String
+  datePassage      DateTime @default(now())
+  verified         Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  student          User         @relation("PassageStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  school           School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  sourceClass      SchoolClass  @relation("PassageSource", fields: [sourceClassId], references: [id], onDelete: Restrict)
+  targetClass      SchoolClass  @relation("PassageTarget", fields: [targetClassId], references: [id], onDelete: Restrict)
+
+  @@index([schoolId, studentId])
+  @@index([schoolId, sourceClassId, targetYear])
+  @@index([schoolId, result])
+}
+
+model NoteModification {
+  id                String   @id @default(cuid())
+  noteId            String
+  schoolId          String
+  studentId         String
+  courseId          String
+  modifierId        String
+  oldValue          Float
+  newValue          Float
+  oldMax            Float
+  newMax            Float
+  reason            String
+  requestStatus     String   @default("PENDING")
+  ipAddress         String   @default("")
+  createdAt         DateTime @default(now())
+
+  note              Grade    @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  school            School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student           User     @relation("NoteModificationStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  course            Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  modifier          User     @relation("NoteModificationModifier", fields: [modifierId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, requestStatus])
+  @@index([studentId, courseId])
+  @@index([modifierId, createdAt])
+  @@index([schoolId, createdAt])
 }
 
 model EPSTCurriculum {

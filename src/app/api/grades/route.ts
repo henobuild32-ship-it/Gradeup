@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 import { syncStudentReport } from '@/lib/grade-sync';
 import { assertYearOpen } from '@/lib/year-status';
+import { resolveClassCoefficients } from '@/lib/coefficient-resolver';
 
 export async function GET(request: NextRequest) {
   try {
@@ -59,7 +60,26 @@ export async function GET(request: NextRequest) {
       orderBy: [{ courseId: 'asc' }, { createdAt: 'asc' }],
     });
 
-    return NextResponse.json({ grades });
+    // Coefficients effectifs par classe (table Coefficient prioritaire)
+    const byClass = new Map<string, Record<string, number>>();
+    const coursesForClass = new Map<string, { id: string; coefficient: number }[]>();
+    for (const g of grades) {
+      const cid = g.course.classId || '';
+      if (!cid) continue;
+      if (!coursesForClass.has(cid)) coursesForClass.set(cid, []);
+      coursesForClass.get(cid)!.push({ id: g.courseId, coefficient: g.course.coefficient });
+    }
+    for (const [cid, list] of coursesForClass) {
+      const { byCourse } = await resolveClassCoefficients(schoolId, cid, list);
+      byClass.set(cid, byCourse);
+    }
+
+    const enriched = grades.map((g) => ({
+      ...g,
+      effectiveCoefficient: (byClass.get(g.course.classId || '') || {})[g.courseId] ?? g.course.coefficient ?? 1,
+    }));
+
+    return NextResponse.json({ grades: enriched });
   } catch (err: unknown) {
     if (err instanceof AuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });

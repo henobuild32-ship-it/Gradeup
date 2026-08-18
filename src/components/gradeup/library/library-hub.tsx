@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Library, Search, Plus, Star, ExternalLink, FileText, Video, Link2, Pencil, Trash2, Clock, Download, CheckCircle2 } from 'lucide-react';
+import { Library, Search, Plus, Star, ExternalLink, FileText, Video, Link2, Pencil, Trash2, Clock, Download, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 
 type ResType = 'LIEN' | 'VIDEO' | 'PDF' | 'FICHIER';
 
@@ -63,6 +63,7 @@ export default function LibraryHub() {
       if (category) params.set('category', category);
       if (type) params.set('type', type);
       if (extra?.favorites || tab === 'favoris') params.set('favorites', '1');
+      if (user.role === 'ADMIN' || user.role === 'TEACHER') params.set('includeDrafts', '1');
       const res = await fetch(`/api/resources?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
@@ -220,6 +221,25 @@ export default function LibraryHub() {
     }
   };
 
+  const togglePublish = async (r: RessourceInfo) => {
+    try {
+      const next = !r.isPublished;
+      const res = await fetch(`/api/resources/${r.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPublished: next }),
+      });
+      if (res.ok) {
+        setResources((prev) => prev.map((x) => (x.id === r.id ? { ...x, isPublished: next } : x)));
+        toast.success(next ? 'Ressource publiée.' : 'Ressource passée en brouillon.');
+      } else {
+        toast.error('Erreur de mise à jour.');
+      }
+    } catch {
+      toast.error('Erreur de connexion.');
+    }
+  };
+
   const openEdit = (r: RessourceInfo) => {
     setForm({
       title: r.title, description: r.description, matiere: r.matiere, niveau: r.niveau,
@@ -305,6 +325,9 @@ export default function LibraryHub() {
             </div>
             {isManager && (
               <div className="flex gap-1 flex-shrink-0">
+                <Button size="icon" variant="ghost" className="h-7 w-7" title={r.isPublished ? 'Mettre en brouillon' : 'Publier'} onClick={() => togglePublish(r)}>
+                  {r.isPublished ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                </Button>
                 <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(r)}><Pencil className="w-3.5 h-3.5" /></Button>
                 <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500" onClick={() => removeRes(r.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
               </div>
@@ -315,6 +338,9 @@ export default function LibraryHub() {
             {r.matiere && <Badge variant="secondary" className="text-[10px] font-normal">{r.matiere}</Badge>}
             {r.niveau && <Badge variant="outline" className="text-[10px] font-normal">{r.niveau}</Badge>}
             {r.category && <Badge variant="outline" className="text-[10px] font-normal">{r.category}</Badge>}
+            {isManager && r.isPublished === false && (
+              <Badge className="text-[10px] font-normal bg-amber-100 text-amber-700 border-amber-200">Brouillon</Badge>
+            )}
           </div>
           <div className="flex items-center gap-2 mt-auto pt-1">
             <Button size="sm" className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={() => openResource(r)}>

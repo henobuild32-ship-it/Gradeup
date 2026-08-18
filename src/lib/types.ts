@@ -110,6 +110,7 @@ export interface GradeInfo {
   course?: CourseInfo;
   student?: UserInfo;
   teacher?: UserInfo;
+  effectiveCoefficient?: number;
 }
 
 export interface HomeworkInfo {
@@ -245,6 +246,7 @@ export interface RessourceInfo {
   createdById: string;
   createdAt: string;
   isFavorite?: boolean;
+  isPublished?: boolean;
 }
 
 export interface TeacherDocumentVersionInfo {
@@ -333,6 +335,10 @@ export type PageView =
   | 'parent-ai'
   | 'admin-presence'
   | 'admin-schedules'
+  | 'admin-school-calendar'
+  | 'admin-coefficients'
+  | 'admin-passages'
+  | 'admin-note-modifications'
   | 'auto-report-sync'
   | 'cahier-cotation'
   | 'profile'

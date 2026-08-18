@@ -161,13 +161,26 @@ export default function StudentDashboard() {
     return () => clearInterval(interval);
   }, [user?.id, user?.role]);
 
+  // Moyenne générale pondérée par cours avec coefficients effectifs (cohérente avec le bulletin)
+  const courseMap = new Map<string, { coeff: number; sum: number; count: number }>();
+  for (const g of grades) {
+    const coeff = g.effectiveCoefficient ?? g.course?.coefficient ?? 1;
+    const entry = courseMap.get(g.courseId) || { coeff, sum: 0, count: 0 };
+    entry.sum += (g.score / g.maxScore) * 20;
+    entry.count += 1;
+    entry.coeff = coeff;
+    courseMap.set(g.courseId, entry);
+  }
+  const courseAverages = [...courseMap.values()].map((e) => ({ avg: e.sum / e.count, coeff: e.coeff }));
+  const totalWeight = courseAverages.reduce((s, e) => s + e.coeff, 0);
+
   const generalAverage =
-    grades.length > 0
-      ? grades.reduce((sum, g) => sum + (g.score / g.maxScore) * 100, 0) / grades.length
+    grades.length > 0 && totalWeight > 0
+      ? (courseAverages.reduce((s, e) => s + e.avg * e.coeff, 0) / totalWeight) * 5
       : 0;
 
-  const generalAverage20 = grades.length > 0
-    ? grades.reduce((sum, g) => sum + (g.score / g.maxScore) * 20, 0) / grades.length
+  const generalAverage20 = grades.length > 0 && totalWeight > 0
+    ? courseAverages.reduce((s, e) => s + e.avg * e.coeff, 0) / totalWeight
     : 0;
 
   const pendingPayments = payments.filter((p) => p.status !== 'paid').length;

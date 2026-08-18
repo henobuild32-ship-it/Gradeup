@@ -264,8 +264,21 @@ export default function ParentDashboard() {
   const safePayments = Array.isArray(payments) ? payments : [];
   const safeNotifications = Array.isArray(notifications) ? notifications : [];
 
-  const average = safeGrades.length > 0
-    ? safeGrades.reduce((acc, g) => acc + (g.maxScore > 0 ? (g.score / g.maxScore) * 20 : 0), 0) / safeGrades.length
+  // Moyenne générale pondérée par cours avec coefficients effectifs (cohérente avec le bulletin)
+  const courseMap = new Map<string, { coeff: number; sum: number; count: number }>();
+  for (const g of safeGrades) {
+    const coeff = g.effectiveCoefficient ?? g.course?.coefficient ?? 1;
+    const entry = courseMap.get(g.courseId) || { coeff, sum: 0, count: 0 };
+    entry.sum += g.maxScore > 0 ? (g.score / g.maxScore) * 20 : 0;
+    entry.count += 1;
+    entry.coeff = coeff;
+    courseMap.set(g.courseId, entry);
+  }
+  const courseEntries = [...courseMap.values()].map((e) => ({ avg: e.sum / e.count, coeff: e.coeff }));
+  const totalWeight = courseEntries.reduce((s, e) => s + e.coeff, 0);
+
+  const average = safeGrades.length > 0 && totalWeight > 0
+    ? courseEntries.reduce((s, e) => s + e.avg * e.coeff, 0) / totalWeight
     : 0;
 
   const absences = safeAttendance.filter(a => a.status === 'absent').length;
