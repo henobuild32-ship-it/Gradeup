@@ -55,7 +55,7 @@ export default function AdminPassages() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [yearFilter, setYearFilter] = useState('');
-  const [resultFilter, setResultFilter] = useState('');
+  const [resultFilter, setResultFilter] = useState('all');
   const [studentQuery, setStudentQuery] = useState('');
 
   const [form, setForm] = useState({ studentId: '', sourceClassId: '', targetClassId: '', result: 'PASSE' });
@@ -69,7 +69,7 @@ export default function AdminPassages() {
     try {
       const params = new URLSearchParams({ schoolId: user.schoolId });
       if (yearFilter) params.set('year', yearFilter);
-      if (resultFilter) params.set('result', resultFilter);
+      if (resultFilter && resultFilter !== 'all') params.set('result', resultFilter);
       const res = await fetch(`/api/passages?${params}`);
       const data = await res.json();
       setRows(Array.isArray(data.passages) ? data.passages : []);
@@ -154,7 +154,7 @@ export default function AdminPassages() {
               <Select value={resultFilter} onValueChange={setResultFilter}>
                 <SelectTrigger className="sm:w-44"><SelectValue placeholder="Tous" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Tous</SelectItem>
+                  <SelectItem value="all">Tous</SelectItem>
                   {RESULTS.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -242,10 +242,10 @@ export default function AdminPassages() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-muted-foreground">Classe source (facultatif)</label>
-                <Select value={form.sourceClassId} onValueChange={(v) => setForm({ ...form, sourceClassId: v })}>
+                <Select value={form.sourceClassId || 'none'} onValueChange={(v) => setForm({ ...form, sourceClassId: v === 'none' ? '' : v })}>
                   <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">—</SelectItem>
+                    <SelectItem value="none">—</SelectItem>
                     {classes.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                   </SelectContent>
                 </Select>

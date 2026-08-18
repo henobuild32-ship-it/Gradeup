@@ -265,24 +265,24 @@ export default function AdminSchoolCalendar() {
                     <div className="space-y-1">
                       <label className="text-[10px] text-muted-foreground">Trimestre</label>
                       <Select
-                        value={cur.trimester?.toString() ?? ''}
-                        onValueChange={(v) => setEdit(key, { trimester: v ? parseInt(v, 10) : null })}
+                        value={cur.trimester?.toString() ?? 'none'}
+                        onValueChange={(v) => setEdit(key, { trimester: v && v !== 'none' ? parseInt(v, 10) : null })}
                       >
                         <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
                         <SelectContent>
-                          {['', '1', '2', '3'].map((t) => <SelectItem key={t || 'none'} value={t}>{t || '—'}</SelectItem>)}
+                          {['none', '1', '2', '3'].map((t) => <SelectItem key={t} value={t}>{t === 'none' ? '—' : t}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] text-muted-foreground">Semestre</label>
                       <Select
-                        value={cur.semester?.toString() ?? ''}
-                        onValueChange={(v) => setEdit(key, { semester: v ? parseInt(v, 10) : null })}
+                        value={cur.semester?.toString() ?? 'none'}
+                        onValueChange={(v) => setEdit(key, { semester: v && v !== 'none' ? parseInt(v, 10) : null })}
                       >
                         <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="—" /></SelectTrigger>
                         <SelectContent>
-                          {['', '1', '2'].map((s) => <SelectItem key={s || 'none'} value={s}>{s || '—'}</SelectItem>)}
+                          {['none', '1', '2'].map((s) => <SelectItem key={s} value={s}>{s === 'none' ? '—' : s}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>

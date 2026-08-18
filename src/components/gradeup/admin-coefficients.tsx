@@ -44,14 +44,14 @@ export default function AdminCoefficients() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [fClass, setFClass] = useState('');
+  const [fClass, setFClass] = useState('all');
   const [form, setForm] = useState({ classId: '', section: '', courseId: '', coefficient: 1 });
 
   const load = useCallback(async () => {
     if (!user?.schoolId) return;
     try {
       const params = new URLSearchParams({ schoolId: user.schoolId });
-      if (fClass) params.set('classId', fClass);
+      if (fClass && fClass !== 'all') params.set('classId', fClass);
       const res = await fetch(`/api/coefficients?${params}`);
       const data = await res.json();
       setRows(Array.isArray(data.coefficients) ? data.coefficients : []);
@@ -77,7 +77,7 @@ export default function AdminCoefficients() {
 
   const openAdd = () => {
     setForm({ classId: '', section: '', courseId: '', coefficient: 1 });
-    if (fClass) setForm((f) => ({ ...f, classId: fClass }));
+    if (fClass && fClass !== 'all') setForm((f) => ({ ...f, classId: fClass }));
     setDialogOpen(true);
   };
 
@@ -142,7 +142,7 @@ export default function AdminCoefficients() {
             <Select value={fClass} onValueChange={(v) => { setFClass(v); }}>
               <SelectTrigger className="w-full sm:w-64"><SelectValue placeholder="Toutes les classes" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Toutes les classes</SelectItem>
+                <SelectItem value="all">Toutes les classes</SelectItem>
                 {classes.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>

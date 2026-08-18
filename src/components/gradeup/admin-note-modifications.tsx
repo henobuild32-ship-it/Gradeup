@@ -48,7 +48,7 @@ export default function AdminNoteModifications() {
   const { user } = useAppStore();
   const [rows, setRows] = useState<ModRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [review, setReview] = useState<{ id: string; comment: string } | null>(null);
 
@@ -56,7 +56,7 @@ export default function AdminNoteModifications() {
     if (!user?.schoolId) return;
     try {
       const params = new URLSearchParams({ schoolId: user.schoolId });
-      if (statusFilter) params.set('status', statusFilter);
+      if (statusFilter && statusFilter !== 'all') params.set('status', statusFilter);
       const res = await fetch(`/api/note-modifications?${params}`);
       const data = await res.json();
       setRows(Array.isArray(data.noteModifications) ? data.noteModifications : []);
@@ -143,7 +143,7 @@ export default function AdminNoteModifications() {
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger><SelectValue placeholder="Tous" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Tous</SelectItem>
+                <SelectItem value="all">Tous</SelectItem>
                 <SelectItem value="PENDING">En attente</SelectItem>
                 <SelectItem value="APPROVED">Approuvées</SelectItem>
                 <SelectItem value="REJECTED">Rejetées</SelectItem>
