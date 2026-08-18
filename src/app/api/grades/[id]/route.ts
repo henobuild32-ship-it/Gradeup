@@ -3,6 +3,14 @@ import { db } from '@/lib/db';
 import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 import { syncStudentReport } from '@/lib/grade-sync';
 import { assertYearOpen } from '@/lib/year-status';
+import {
+  QUICK_EVALUATION_TITLE,
+  ensureQuickEvaluation,
+  isPeriodKey,
+  periodToTrimester,
+  recomputeStudentPeriodGrade,
+  upsertCahierMark,
+} from '@/lib/grade-service';
 
 export async function GET(
   request: NextRequest,
@@ -47,6 +55,9 @@ export async function PUT(
 ) {
   try {
     const auth = authenticateRequest(request);
+    if (auth.role === 'PARENT' || auth.role === 'STUDENT') {
+      return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
+    }
     const { id } = await params;
     const body = await request.json();
     const { score, maxScore, trimester, comment, reason } = body;
@@ -55,6 +66,10 @@ export async function PUT(
     const existing = await db.grade.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: 'Grade not found' }, { status: 404 });
+    }
+
+    if (auth.role === 'TEACHER' && existing.teacherId !== auth.userId) {
+      return NextResponse.json({ error: "Vous n'êtes pas le professeur de ce cours" }, { status: 403 });
     }
 
     try {
@@ -70,6 +85,66 @@ export async function PUT(
         { error: `La note doit être comprise entre 0 et ${newMax}` },
         { status: 400 }
       );
+    }
+
+    // ── Note de période (P1..EX2) : modifier la note dans le cahier (source unique) ──
+    if (isPeriodKey(existing.trimester)) {
+      const course = await db.course.findUnique({
+        where: { id: existing.courseId },
+        select: { classId: true, teacherId: true, name: true },
+      });
+      const teacherId = course?.teacherId ?? existing.teacherId;
+      const courseId = existing.courseId;
+      const studentId = existing.studentId;
+      const period = existing.trimester;
+
+      if (course?.classId) {
+        const evaluation = await ensureQuickEvaluation({
+          schoolId: existing.schoolId,
+          classId: course.classId,
+          courseId,
+          teacherId,
+          period,
+        });
+        await upsertCahierMark({ evaluationId: evaluation.id, studentId, score: newScore });
+        await recomputeStudentPeriodGrade({
+          schoolId: existing.schoolId,
+          courseId,
+          studentId,
+          period,
+          teacherId,
+          comment: comment ?? undefined,
+        });
+      } else {
+        await db.grade.update({
+          where: { id },
+          data: { score: newScore, maxScore: newMax },
+        });
+      }
+
+      // Audit history if score actually changed
+      if (score !== undefined && parseFloat(score) !== existing.score && modifiedBy) {
+        await db.gradeHistory.create({
+          data: {
+            gradeId: id,
+            schoolId: existing.schoolId,
+            oldScore: existing.score,
+            newScore: parseFloat(score),
+            modifiedBy,
+            reason: reason || '',
+          },
+        });
+      }
+
+      const grade = await db.grade.findUnique({
+        where: { id },
+        include: {
+          course: { select: { id: true, name: true } },
+          student: { select: { id: true, fullName: true, role: true } },
+          teacher: { select: { id: true, fullName: true, role: true } },
+        },
+      });
+      return NextResponse.json({ grade, fromCahier: true });
     }
 
     const updatedTrimester = trimester !== undefined ? trimester : existing.trimester;
@@ -128,11 +203,57 @@ export async function DELETE(
 ) {
   try {
     const auth = authenticateRequest(request);
+    if (auth.role === 'PARENT' || auth.role === 'STUDENT') {
+      return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
+    }
     const { id } = await params;
 
     const existing = await db.grade.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: 'Grade not found' }, { status: 404 });
+    }
+
+    if (auth.role === 'TEACHER' && existing.teacherId !== auth.userId) {
+      return NextResponse.json({ error: "Vous n'êtes pas le professeur de ce cours" }, { status: 403 });
+    }
+
+    // ── Note de période (P1..EX2) : retirer la cotation du cahier (source unique) ──
+    if (isPeriodKey(existing.trimester)) {
+      const course = await db.course.findUnique({
+        where: { id: existing.courseId },
+        select: { classId: true, teacherId: true },
+      });
+      const teacherId = course?.teacherId ?? existing.teacherId;
+      const courseId = existing.courseId;
+      const studentId = existing.studentId;
+      const period = existing.trimester;
+
+      if (course?.classId) {
+        // Supprime la cotation de la colonne "Saisie rapide" de l'élève.
+        await db.cahierMark.deleteMany({
+          where: {
+            studentId,
+            evaluation: {
+              courseId,
+              trimester: period,
+              title: QUICK_EVALUATION_TITLE,
+              deletedAt: null,
+            },
+          },
+        });
+        // Recalcul : si aucune cotation ne subsiste pour la période, la Grade
+        // disparaît ; sinon elle est réévaluée à partir des cotations restantes.
+        await recomputeStudentPeriodGrade({
+          schoolId: existing.schoolId,
+          courseId,
+          studentId,
+          period,
+          teacherId,
+        });
+      }
+
+      syncStudentReport(existing.schoolId, existing.studentId, periodToTrimester(period)).catch(() => {});
+      return NextResponse.json({ message: 'Grade deleted successfully', fromCahier: true });
     }
 
     await db.grade.delete({ where: { id } });

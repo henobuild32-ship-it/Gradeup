@@ -4,6 +4,13 @@ import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 import { syncStudentReport } from '@/lib/grade-sync';
 import { assertYearOpen } from '@/lib/year-status';
 import { resolveClassCoefficients } from '@/lib/coefficient-resolver';
+import {
+  ensureQuickEvaluation,
+  isPeriodKey,
+  periodToTrimester,
+  recomputeStudentPeriodGrade,
+  upsertCahierMark,
+} from '@/lib/grade-service';
 
 export async function GET(request: NextRequest) {
   try {
@@ -92,12 +99,12 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const auth = authenticateRequest(request);
-    if (auth.role === 'PARENT') {
+    if (auth.role === 'PARENT' || auth.role === 'STUDENT') {
       return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
     }
 
     const body = await request.json();
-    const { schoolId, courseId, studentId, teacherId, score, maxScore, trimester, comment } = body;
+    const { schoolId, courseId, studentId, teacherId, score, maxScore, trimester, period, comment } = body;
 
     if (!schoolId || !courseId || !studentId || !teacherId || score === undefined) {
       return NextResponse.json(
@@ -112,6 +119,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: e.message }, { status: 403 });
     }
 
+    // Permission : seuls le professeur titulaire du cours (ou un admin) notent.
+    const course = await db.course.findUnique({
+      where: { id: courseId },
+      select: {
+        id: true,
+        classId: true,
+        teacherId: true,
+        coefficient: true,
+        maxScore: true,
+        name: true,
+      },
+    });
+    if (!course) {
+      return NextResponse.json({ error: 'Cours introuvable' }, { status: 404 });
+    }
+    if (auth.role === 'TEACHER' && course.teacherId !== auth.userId) {
+      return NextResponse.json({ error: "Vous n'êtes pas le professeur de ce cours" }, { status: 403 });
+    }
+
     const parsedScore = parseFloat(score);
     const parsedMax = maxScore ? parseFloat(maxScore) : 20;
     if (isNaN(parsedScore) || parsedScore < 0 || parsedScore > parsedMax) {
@@ -121,6 +147,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ── Saisie rapide via période RDC (P1..EX2) : alimente le cahier ──
+    if (isPeriodKey(period ?? trimester)) {
+      const evalPeriod = (period ?? trimester) as string;
+      const evaluation = await ensureQuickEvaluation({
+        schoolId,
+        classId: course.classId,
+        courseId,
+        teacherId,
+        period: evalPeriod,
+      });
+      await upsertCahierMark({ evaluationId: evaluation.id, studentId, score: parsedScore });
+      await recomputeStudentPeriodGrade({
+        schoolId,
+        courseId,
+        studentId,
+        period: evalPeriod,
+        teacherId,
+        comment: comment ?? undefined,
+      });
+
+      // Recharger la note périodique produite pour la retourner au client.
+      const grade = await db.grade.findFirst({
+        where: { schoolId, courseId, studentId, trimester: evalPeriod },
+        include: {
+          course: { select: { id: true, name: true } },
+          student: { select: { id: true, fullName: true, parentId: true } },
+          teacher: { select: { id: true, fullName: true, role: true } },
+        },
+      });
+
+      if (grade) {
+        void notifyGrade(grade.id, schoolId, studentId, teacherId, courseId, grade.score, 20, course.name || 'Matière', grade.comment).catch(() => {});
+      }
+      return NextResponse.json({ grade: grade ?? undefined, fromCahier: true }, { status: 201 });
+    }
+
+    // ── Notes directes (trimestres Maternelle/Primaire : T1, T2, T3) ──
     const grade = await db.grade.create({
       data: {
         schoolId,
@@ -181,5 +244,52 @@ export async function POST(request: NextRequest) {
     }
     const message = err instanceof Error ? err.message : 'Erreur serveur';
     return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+/**
+ * Notification commune élève + parent après une note (qu'elle vienne de la
+ * saisie rapide ou du cahier).
+ */
+async function notifyGrade(
+  gradeId: string,
+  schoolId: string,
+  studentId: string,
+  senderId: string,
+  courseId: string,
+  score: number,
+  maxScore: number,
+  courseName: string,
+  comment?: string
+) {
+  const { notifyUser } = await import('@/services/notifications/notificationEngine');
+  const student = await db.user.findUnique({
+    where: { id: studentId },
+    select: { fullName: true, parentId: true },
+  });
+  const scoreStr = `${score}/${maxScore}`;
+
+  notifyUser({
+    schoolId,
+    userId: studentId,
+    senderId,
+    title: `📊 Nouvelle note : ${courseName}`,
+    message: `Note obtenue : ${scoreStr}${comment ? ' — ' + comment : ''}`,
+    type: 'GRADE',
+    priority: 'HIGH',
+    metadata: { gradeId, courseId },
+  }).catch((e) => console.error('[Grade] Student notification error:', e));
+
+  if (student?.parentId) {
+    notifyUser({
+      schoolId,
+      userId: student.parentId,
+      senderId,
+      title: `📊 Note pour ${student.fullName} (${courseName})`,
+      message: `Note : ${scoreStr}`,
+      type: 'GRADE',
+      priority: 'HIGH',
+      metadata: { gradeId, courseId },
+    }).catch((e) => console.error('[Grade] Parent notification error:', e));
   }
 }

@@ -18,6 +18,29 @@ import { Plus, Edit, Trash2, GraduationCap, Filter, Calculator, Sparkles, Check,
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { CourseInfo, GradeInfo, UserInfo } from '@/lib/types';
+import { isSecondaryClass } from '@/lib/grade-service';
+
+const SECONDARY_PERIODS: { value: string; label: string }[] = [
+  { value: 'P1', label: 'P1 — 1ère période (S1)' },
+  { value: 'P2', label: 'P2 — 2ème période (S1)' },
+  { value: 'EX1', label: 'Examen 1er semestre (EX1)' },
+  { value: 'P3', label: 'P3 — 1ère période (S2)' },
+  { value: 'P4', label: 'P4 — 2ème période (S2)' },
+  { value: 'EX2', label: 'Examen 2ème semestre (EX2)' },
+];
+
+const PRIMARY_TRIMESTERS: { value: string; label: string }[] = [
+  { value: '1', label: 'Trimestre 1' },
+  { value: '2', label: 'Trimestre 2' },
+  { value: '3', label: 'Trimestre 3' },
+];
+
+function gradePeriodLabel(key: string): string {
+  const found = SECONDARY_PERIODS.find((p) => p.value === key);
+  if (found) return found.label;
+  if (key === '1' || key === '2' || key === '3') return `Trimestre ${key}`;
+  return key;
+}
 
 export default function TeacherGrades() {
   const { user } = useAppStore();
@@ -102,6 +125,34 @@ export default function TeacherGrades() {
     }
   }, [user, courses]);
 
+  // Cycle RDC : secondaire → périodes P1..EX2 ; Maternelle/Primaire → trimestres.
+  const selectedCourse = courses.find((c) => c.id === filterCourseId) || null;
+  const selectedIsSecondary = selectedCourse ? isSecondaryClass(selectedCourse.class ?? null) : false;
+  const periodOptions = selectedIsSecondary ? SECONDARY_PERIODS : PRIMARY_TRIMESTERS;
+
+  // Cycle du cours sélectionné dans le dialog d'ajout/modification.
+  const dialogCourse = courses.find((c) => c.id === formCourseId) || null;
+  const dialogIsSecondary = dialogCourse ? isSecondaryClass(dialogCourse.class ?? null) : false;
+  const dialogPeriodOptions = dialogIsSecondary ? SECONDARY_PERIODS : PRIMARY_TRIMESTERS;
+
+  // Quand un cours du secondaire est choisi, basculer sur une période RDC.
+  useEffect(() => {
+    if (!selectedCourse || !selectedIsSecondary) {
+      if (!filterCourseId && !['1', '2', '3'].includes(filterTrimester)) {
+        setFilterTrimester('1');
+      }
+      return;
+    }
+    const isSecondaryKey = SECONDARY_PERIODS.some((p) => p.value === filterTrimester);
+    if (!isSecondaryKey) {
+      const now = new Date();
+      const month = now.getMonth() + 1; // 1-12
+      // Sept-Juin : S1 = P1/P2 (examens EX1), S2 = P3/P4 (examens EX2).
+      const defaultPeriod = month >= 3 && month <= 6 ? 'P3' : 'P1';
+      setFilterTrimester(defaultPeriod);
+    }
+  }, [selectedCourse, selectedIsSecondary, filterTrimester]);
+
   useEffect(() => {
     if (!user) return;
     fetchCourses();
@@ -114,6 +165,16 @@ export default function TeacherGrades() {
   useEffect(() => {
     if (formCourseId) fetchStudents(formCourseId);
   }, [formCourseId, fetchStudents]);
+
+  // Dans le dialog, basculer sur une période RDC quand le cours est secondaire.
+  useEffect(() => {
+    if (!dialogCourse || !dialogIsSecondary) return;
+    const isSecondaryKey = SECONDARY_PERIODS.some((p) => p.value === formTrimester);
+    if (!isSecondaryKey) {
+      const now = new Date();
+      setFormTrimester(now.getMonth() < 2 || now.getMonth() > 7 ? 'P1' : 'P3');
+    }
+  }, [dialogCourse, dialogIsSecondary, formTrimester]);
 
   // Load students for grid mode when course/trimester changes
   useEffect(() => {
@@ -248,6 +309,7 @@ export default function TeacherGrades() {
         score,
         maxScore,
         trimester: formTrimester,
+        period: formTrimester,
         comment: formComment.trim(),
         modifiedBy: user.id,
         reason: formReason.trim(),
@@ -305,6 +367,7 @@ export default function TeacherGrades() {
         score,
         maxScore: 20,
         trimester: filterTrimester,
+        period: filterTrimester,
         comment: commentStr.trim(),
       };
 
@@ -410,7 +473,7 @@ export default function TeacherGrades() {
             <div>
               <p className="text-sm font-bold leading-tight">Bulletin mis à jour automatiquement</p>
               <p className="text-xs text-emerald-100 mt-0.5">
-                {lastSyncInfo.student} · T{lastSyncInfo.trimester} · Moy. {lastSyncInfo.average.toFixed(1)}/20
+                {lastSyncInfo.student} · {gradePeriodLabel(lastSyncInfo.trimester)} · Moy. {lastSyncInfo.average.toFixed(1)}/20
               </p>
             </div>
             <button
@@ -467,15 +530,15 @@ export default function TeacherGrades() {
             ))}
           </select>
 
-          {/* iOS native style select menu for Trimester */}
+          {/* iOS native style select menu for Période / Trimestre */}
           <select
             value={filterTrimester}
             onChange={(e) => setFilterTrimester(e.target.value)}
-            className="w-full sm:w-40 h-10 border border-input rounded-lg px-3 bg-background text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer font-medium"
+            className="w-full sm:w-52 h-10 border border-input rounded-lg px-3 bg-background text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer font-medium"
           >
-            <option value="1">Trimestre 1</option>
-            <option value="2">Trimestre 2</option>
-            <option value="3">Trimestre 3</option>
+            {periodOptions.map((p) => (
+              <option key={p.value} value={p.value}>{p.label}</option>
+            ))}
           </select>
 
           {!filterCourseId && (
@@ -693,7 +756,7 @@ export default function TeacherGrades() {
                             </TableCell>
                             <TableCell className="text-center text-muted-foreground">{grade.maxScore}</TableCell>
                             <TableCell>
-                              <Badge variant="outline" className="text-xs border-blue-200 text-blue-600 bg-blue-50">T{grade.trimester}</Badge>
+                              <Badge variant="outline" className="text-xs border-blue-200 text-blue-600 bg-blue-50">{grade.trimester && gradePeriodLabel(grade.trimester)}</Badge>
                             </TableCell>
                             <TableCell className="hidden sm:table-cell max-w-[200px] truncate text-muted-foreground text-xs">
                               {grade.comment || '—'}
@@ -734,7 +797,7 @@ export default function TeacherGrades() {
                             <p className="font-semibold text-sm">{grade.student?.fullName || getStudentName(grade.studentId)}</p>
                             <p className="text-xs text-muted-foreground">{grade.course?.name || getCourseName(grade.courseId)}</p>
                           </div>
-                          <Badge variant="outline" className="text-xs border-blue-200 text-blue-600 bg-blue-50">T{grade.trimester}</Badge>
+                          <Badge variant="outline" className="text-xs border-blue-200 text-blue-600 bg-blue-50">{grade.trimester && gradePeriodLabel(grade.trimester)}</Badge>
                         </div>
                         <div className="mt-3 flex items-center justify-between gap-2">
                           <span className={`inline-flex items-center justify-center rounded-lg px-2.5 py-1 text-sm font-bold shadow-sm ${
@@ -821,15 +884,15 @@ export default function TeacherGrades() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Trimestre *</Label>
+              <Label>{dialogIsSecondary ? 'Période *' : 'Trimestre *'}</Label>
               <select
                 value={formTrimester}
                 onChange={(e) => setFormTrimester(e.target.value)}
                 className="w-full h-10 border border-input rounded-lg px-3 bg-background text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
               >
-                <option value="1">Trimestre 1</option>
-                <option value="2">Trimestre 2</option>
-                <option value="3">Trimestre 3</option>
+                {dialogPeriodOptions.map((p) => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
               </select>
             </div>
              <div className="space-y-2">
