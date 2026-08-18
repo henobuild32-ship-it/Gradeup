@@ -51,6 +51,7 @@ export default function AdminCourses() {
   const [showCreate, setShowCreate] = useState(false);
   const [newCourseName, setNewCourseName] = useState('');
   const [newCourseDesc, setNewCourseDesc] = useState('');
+  const [newCourseCoefficient, setNewCourseCoefficient] = useState('1');
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedTeacherId, setSelectedTeacherId] = useState('');
   const [creating, setCreating] = useState(false);
@@ -65,6 +66,11 @@ export default function AdminCourses() {
   const [newEndTime, setNewEndTime] = useState('09:30');
   const [newRoom, setNewRoom] = useState('');
   const [savingSchedule, setSavingSchedule] = useState(false);
+
+  // Coefficient edit state
+  const [coefCourse, setCoefCourse] = useState<CourseInfo | null>(null);
+  const [coefValue, setCoefValue] = useState('1');
+  const [savingCoef, setSavingCoef] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!user?.schoolId) return;
@@ -174,6 +180,7 @@ export default function AdminCourses() {
           teacherId: selectedTeacherId,
           name: newCourseName.trim(),
           description: newCourseDesc.trim(),
+          coefficient: Math.max(1, parseInt(newCourseCoefficient) || 1),
         }),
       });
       if (!res.ok) throw new Error('Erreur lors de la création');
@@ -181,6 +188,7 @@ export default function AdminCourses() {
       setShowCreate(false);
       setNewCourseName('');
       setNewCourseDesc('');
+      setNewCourseCoefficient('1');
       setSelectedClassId('');
       setSelectedTeacherId('');
       fetchData();
@@ -200,6 +208,27 @@ export default function AdminCourses() {
       fetchData();
     } catch {
       toast.error('Erreur lors de la suppression');
+    }
+  };
+
+  const handleUpdateCoefficient = async () => {
+    if (!coefCourse) return;
+    const value = Math.max(1, Math.min(10, parseInt(coefValue) || 1));
+    setSavingCoef(true);
+    try {
+      const res = await fetch('/api/courses', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: coefCourse.id, coefficient: value }),
+      });
+      if (!res.ok) throw new Error('Erreur de mise à jour');
+      setCourses((prev) => prev.map((c) => (c.id === coefCourse.id ? { ...c, coefficient: value } : c)));
+      setCoefCourse(null);
+      toast.success(`Coefficient de ${coefCourse.name} défini sur ${value}`);
+    } catch {
+      toast.error('Erreur lors de la mise à jour du coefficient');
+    } finally {
+      setSavingCoef(false);
     }
   };
 
@@ -323,6 +352,9 @@ export default function AdminCourses() {
                       <div className="flex items-center gap-3 flex-wrap">
                         <h3 className="font-semibold text-lg truncate">{course.name}</h3>
                         <Badge className="bg-blue-100 text-blue-700">{getClassName(course.classId)}</Badge>
+                        <Badge className="bg-amber-100 text-amber-800 border-amber-200 gap-1" title="Coefficient utilisé dans les moyennes">
+                          Coef {course.coefficient ?? 1}
+                        </Badge>
                       </div>
                       {course.description && (
                         <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{course.description}</p>
@@ -348,6 +380,16 @@ export default function AdminCourses() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => { setCoefCourse(course); setCoefValue(String(course.coefficient ?? 1)); }}
+                      className="gap-1.5 text-xs font-semibold"
+                      title="Modifier le coefficient de la matière"
+                    >
+                      <BarChart3 className="h-3.5 w-3.5 text-amber-600" />
+                      Coef
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -441,6 +483,21 @@ export default function AdminCourses() {
                 placeholder="Description du cours..."
                 rows={3}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="course-coef">Coefficient</Label>
+              <Input
+                id="course-coef"
+                type="number"
+                min={1}
+                max={10}
+                value={newCourseCoefficient}
+                onChange={(e) => setNewCourseCoefficient(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Utilisé automatiquement dans les moyennes, le cahier de cotation et les bulletins.
+              </p>
             </div>
           </div>
 
@@ -591,6 +648,47 @@ export default function AdminCourses() {
 
           <DialogFooter>
             <Button onClick={() => setShowSchedules(false)}>Fermer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Coefficient Edit Dialog */}
+      <Dialog open={!!coefCourse} onOpenChange={(o) => !o && setCoefCourse(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <div className="p-1.5 rounded-lg bg-amber-50">
+                <BarChart3 className="h-5 w-5 text-amber-600" />
+              </div>
+              Coefficient — {coefCourse?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="coef-value">Valeur du coefficient</Label>
+              <Input
+                id="coef-value"
+                type="number"
+                min={1}
+                max={10}
+                value={coefValue}
+                onChange={(e) => setCoefValue(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Ce coefficient est appliqué automatiquement dans le cahier de cotation, les moyennes
+                par matière, la moyenne générale et les bulletins.
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setCoefCourse(null)}>Annuler</Button>
+            <Button
+              onClick={handleUpdateCoefficient}
+              disabled={savingCoef}
+              className="bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 text-white shadow-md"
+            >
+              {savingCoef ? 'Enregistrement...' : 'Enregistrer'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

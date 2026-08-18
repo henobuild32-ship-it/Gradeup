@@ -61,9 +61,6 @@ export default function TeacherLessons() {
 
   const today = new Date().toISOString().split('T')[0];
   const todayLessons = Array.isArray(lessons) ? lessons.filter((l) => l.createdAt?.startsWith(today)) : [];
-  const lessonsRemaining = 3 - todayLessons.length;
-  const isNearLimit = lessonsRemaining === 1;
-  const isAtLimit = lessonsRemaining <= 0;
 
   const resetForm = () => {
     setFormCourseId('');
@@ -77,10 +74,6 @@ export default function TeacherLessons() {
   const handleCreate = async () => {
     if (!user || !formCourseId || !formTitle.trim()) {
       toast.error('Veuillez remplir le titre et sélectionner un cours');
-      return;
-    }
-    if (isAtLimit) {
-      toast.error('Limite de 3 leçons par jour atteinte');
       return;
     }
 
@@ -171,28 +164,13 @@ export default function TeacherLessons() {
           <Button
             className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:scale-[1.02] active:scale-[0.98] transition-transform gap-2"
             onClick={() => setDialogOpen(true)}
-            disabled={isAtLimit || courses.length === 0}
+            disabled={courses.length === 0}
           >
             <Plus className="h-4 w-4" />
             Publier une leçon
           </Button>
         </div>
       </div>
-
-      {/* Limit Warning */}
-      {(isNearLimit || isAtLimit) && (
-        <Alert
-          variant={isAtLimit ? 'destructive' : 'default'}
-          className={isAtLimit ? '' : 'border-yellow-300 bg-yellow-50 text-yellow-800'}
-        >
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            {isAtLimit
-              ? 'Vous avez atteint la limite de 3 leçons pour aujourd\'hui.'
-              : `Attention : il ne vous reste plus qu'une seule leçon pour aujourd'hui.`}
-          </AlertDescription>
-        </Alert>
-      )}
 
       {/* No courses assigned */}
       {!loading && courses.length === 0 && (
@@ -308,11 +286,6 @@ export default function TeacherLessons() {
             </DialogTitle>
             <DialogDescription>
               Partagez du contenu avec vos élèves
-              {lessonsRemaining > 0 && (
-                <span className="block mt-1 text-xs">
-                  {lessonsRemaining} leçon(s) restante(s) aujourd&apos;hui
-                </span>
-              )}
             </DialogDescription>
           </DialogHeader>
 
@@ -360,6 +333,7 @@ export default function TeacherLessons() {
               <input
                 ref={fileInputRef}
                 type="file"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.md,.json,.zip,.jpg,.jpeg,.png,.webp,.gif,.svg"
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];

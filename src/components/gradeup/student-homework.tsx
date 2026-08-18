@@ -174,7 +174,7 @@ export default function StudentHomework() {
             </div>
             <div className="space-y-2">
               <Label>Fichier (optionnel)</Label>
-              <input ref={submitFileInputRef} type="file" className="hidden" onChange={(e) => {
+              <input ref={submitFileInputRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.md,.json,.zip,.jpg,.jpeg,.png,.webp,.gif,.svg" className="hidden" onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) { setSubmitFileName(file.name); submitFileRef.current = file; }
               }} />

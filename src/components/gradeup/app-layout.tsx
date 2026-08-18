@@ -110,7 +110,6 @@ const navItemsByRole: Record<UserRole, NavItem[]> = {
     { label: 'Bulletins Sync', page: 'auto-report-sync', icon: Zap, emoji: '⚡' },
     { label: 'Cahier de Cotation', page: 'cahier-cotation', icon: ClipboardList, emoji: '📖' },
     { label: 'Calendrier des périodes', page: 'admin-school-calendar', icon: CalendarDays, emoji: '🗓️' },
-    { label: 'Coefficients', page: 'admin-coefficients', icon: SlidersHorizontal, emoji: '⚖️' },
     { label: 'Passages', page: 'admin-passages', icon: GraduationCap, emoji: '🎓' },
     { label: 'Demandes de notes', page: 'admin-note-modifications', icon: PenLine, emoji: '✍️' },
     { label: 'IA Gradie', page: 'admin-ai', icon: Bot, emoji: '🤖' },

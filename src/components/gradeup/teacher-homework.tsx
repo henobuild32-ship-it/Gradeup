@@ -376,7 +376,7 @@ export default function TeacherHomework() {
             </div>
             <div className="space-y-2">
               <Label>Fichier joint (optionnel)</Label>
-              <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => {
+              <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.md,.json,.zip,.jpg,.jpeg,.png,.webp,.gif,.svg" className="hidden" onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) { setFormFileName(file.name); formFileRef.current = file; }
               }} />

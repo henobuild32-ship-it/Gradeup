@@ -81,28 +81,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const today = new Date();
-    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const endOfDay = new Date(startOfDay);
-    endOfDay.setDate(endOfDay.getDate() + 1);
-
-    const lessonsToday = await db.lesson.count({
-      where: {
-        teacherId,
-        createdAt: {
-          gte: startOfDay,
-          lt: endOfDay,
-        },
-      },
-    });
-
-    if (lessonsToday >= 3) {
-      return NextResponse.json(
-        { error: 'Teacher has reached the maximum limit of 3 lessons per day' },
-        { status: 429 }
-      );
-    }
-
     const lesson = await db.lesson.create({
       data: {
         schoolId,

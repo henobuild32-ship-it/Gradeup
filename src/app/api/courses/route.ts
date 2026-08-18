@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await authenticateRequestActive(request);
     const body = await request.json();
-    const { schoolId, classId, teacherId, name, description } = body;
+    const { schoolId, classId, teacherId, name, description, coefficient, maxScore } = body;
 
     if (!schoolId || !classId || !teacherId || !name) {
       return NextResponse.json(
@@ -83,6 +83,8 @@ export async function POST(request: NextRequest) {
         teacherId,
         name,
         description: description || '',
+        ...(coefficient !== undefined && coefficient > 0 ? { coefficient: Math.min(parseInt(String(coefficient), 10) || 1, 10) } : {}),
+        ...(maxScore !== undefined && maxScore > 0 ? { maxScore: parseFloat(String(maxScore)) } : {}),
       },
       include: {
         class: true,
