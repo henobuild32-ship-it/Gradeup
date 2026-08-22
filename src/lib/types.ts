@@ -341,6 +341,7 @@ export type PageView =
   | 'admin-note-modifications'
   | 'auto-report-sync'
   | 'cahier-cotation'
+  | 'admin-cotation-rules'
   | 'profile'
   | 'messages'
   | 'calendar'

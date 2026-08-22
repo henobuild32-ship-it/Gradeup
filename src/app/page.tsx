@@ -50,6 +50,7 @@ const AdminCoefficients = dynamic(() => import('@/components/gradeup/admin-coeff
 const AdminPassages = dynamic(() => import('@/components/gradeup/admin-passages'), { ssr: false, loading: () => <PageSkeleton /> });
 const AdminNoteModifications = dynamic(() => import('@/components/gradeup/admin-note-modifications'), { ssr: false, loading: () => <PageSkeleton /> });
 const CahierCotation = dynamic(() => import('@/components/gradeup/cahier-cotation'), { ssr: false, loading: () => <PageSkeleton /> });
+const AdminCotationRules = dynamic(() => import('@/components/gradeup/admin-cotation-rules'), { ssr: false, loading: () => <PageSkeleton /> });
 const TeacherDashboard = dynamic(() => import('@/components/gradeup/teacher-dashboard'), { ssr: false, loading: () => <PageSkeleton /> });
 const TeacherCourses = dynamic(() => import('@/components/gradeup/teacher-courses'), { ssr: false, loading: () => <PageSkeleton /> });
 const TeacherClasses = dynamic(() => import('@/components/gradeup/teacher-classes'), { ssr: false, loading: () => <PageSkeleton /> });
@@ -112,6 +113,7 @@ function PageRouter({ page }: { page: PageView }) {
   if (page === 'admin-note-modifications') return <AdminNoteModifications />;
   if (page === 'auto-report-sync') return <AutoReportSyncPanel />;
   if (page === 'cahier-cotation') return <CahierCotation />;
+  if (page === 'admin-cotation-rules') return <AdminCotationRules />;
   if (page === 'admin-tuition') return <TuitionTracking />;
   if (page === 'admin-end-of-year') return <EndOfYear />;
   if (page === 'admin-ai') return <AdminAi />;

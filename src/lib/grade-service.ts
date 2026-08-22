@@ -134,18 +134,34 @@ export async function recomputeStudentPeriodGrade(params: {
     return;
   }
 
-  let totalNormalizedScore = 0;
-  for (const m of studentMarks) {
-    const max = m.evaluation.maxScore > 0 ? m.evaluation.maxScore : 20;
-    totalNormalizedScore += (m.score / max) * 20;
-  }
-  const averagePeriodScore = Math.round((totalNormalizedScore / studentMarks.length) * 10) / 10;
-
+  // Récupérer le cours et la règle de cotation pour déterminer le maximum exact
   const course = await db.course.findUnique({
     where: { id: courseId },
-    select: { teacherId: true },
+    select: { teacherId: true, classId: true, maxScore: true },
   });
   const teacherId = params.teacherId ?? course?.teacherId ?? '';
+
+  let periodMaxScore = 20;
+  if (course) {
+    const subjectRule = await db.subjectRule.findFirst({
+      where: { schoolId, classId: course.classId, courseId, isActive: true },
+    });
+
+    if (period === 'EX1' || period === 'EX2') {
+      periodMaxScore = subjectRule?.examMaximum ?? course.maxScore ?? 60;
+    } else if (period === 'P1' || period === 'P2' || period === 'P3' || period === 'P4') {
+      periodMaxScore = subjectRule?.dailyWorkMaximum ? Math.round(subjectRule.dailyWorkMaximum / 2) : 20;
+    } else {
+      periodMaxScore = subjectRule?.maximumPoints ?? course.maxScore ?? 20;
+    }
+  }
+
+  let totalNormalizedScore = 0;
+  for (const m of studentMarks) {
+    const max = m.evaluation.maxScore > 0 ? m.evaluation.maxScore : periodMaxScore;
+    totalNormalizedScore += (m.score / max) * periodMaxScore;
+  }
+  const averagePeriodScore = Math.round((totalNormalizedScore / studentMarks.length) * 10) / 10;
 
   const existingGrade = await db.grade.findFirst({
     where: { schoolId, courseId, studentId, trimester: period },
@@ -154,7 +170,7 @@ export async function recomputeStudentPeriodGrade(params: {
   if (existingGrade) {
     await db.grade.update({
       where: { id: existingGrade.id },
-      data: { score: averagePeriodScore, maxScore: 20, teacherId, ...(comment !== undefined && { comment }) },
+      data: { score: averagePeriodScore, maxScore: periodMaxScore, teacherId, ...(comment !== undefined && { comment }) },
     });
   } else {
     await db.grade.create({
@@ -164,7 +180,7 @@ export async function recomputeStudentPeriodGrade(params: {
         studentId,
         teacherId,
         score: averagePeriodScore,
-        maxScore: 20,
+        maxScore: periodMaxScore,
         trimester: period,
         comment: comment ?? `Moyenne automatique - ${period}`,
       },

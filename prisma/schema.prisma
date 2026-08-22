@@ -57,6 +57,8 @@ model School {
   coefficients         Coefficient[]
   passages             PassageHistorique[]
   noteModifications    NoteModification[]
+  subjectRules         SubjectRule[]
+  gradingDecisionRules GradingDecisionRule[]
 
   @@index([subscriptionStatus])
   @@index([inviteCode])
@@ -192,6 +194,8 @@ model SchoolClass {
   coefficients     Coefficient[]
   passageSource    PassageHistorique[] @relation("PassageSource")
   passageTarget    PassageHistorique[] @relation("PassageTarget")
+  subjectRules     SubjectRule[]
+  gradingDecisionRules GradingDecisionRule[]
   school           School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   titulaire        User?     @relation("TitulaireClasses", fields: [titulaireId], references: [id], onDelete: SetNull)
   titulaireId      String?
@@ -245,6 +249,7 @@ model Course {
   attendanceCourse Attendance[]
   coefficients Coefficient[]
   noteModifications NoteModification[]
+  subjectRules SubjectRule[]
 
   @@unique([schoolId, classId, name])
   @@index([schoolId, classId, status])
@@ -1143,4 +1148,52 @@ enum BulletinStatus {
   VALIDATED_ADMIN
   PUBLISHED
 }
+
+model SubjectRule {
+  id                String      @id @default(cuid())
+  schoolId          String
+  classId           String
+  courseId          String
+  academicYear      String      @default("2025-2026")
+  semester          Int?
+  maximumPoints     Float       @default(100)
+  coefficient       Int?
+  dailyWorkMaximum  Float       @default(40)
+  examMaximum       Float       @default(60)
+  isQualitative     Boolean     @default(false)
+  isActive          Boolean     @default(true)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  school            School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class             SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  course            Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, classId, courseId, academicYear, semester])
+  @@index([schoolId, classId, academicYear])
+  @@index([courseId])
+}
+
+model GradingDecisionRule {
+  id                    String       @id @default(cuid())
+  schoolId              String
+  classId               String?
+  cycle                 String       @default("ALL")
+  academicYear          String       @default("2025-2026")
+  passPercentage        Float        @default(50.0)
+  retakeMinPercentage   Float        @default(45.0)
+  maxFailedCourses      Int          @default(2)
+  eliminationPercentage Float?
+  maternelleMode        String       @default("QUALITATIF")
+  isActive              Boolean      @default(true)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  school                School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class                 SchoolClass? @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, classId, cycle, academicYear])
+  @@index([schoolId, cycle, academicYear])
+}
+
 
