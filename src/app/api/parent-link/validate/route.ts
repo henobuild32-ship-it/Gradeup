@@ -38,12 +38,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ valid: false });
     }
 
-    const student = await db.user.findFirst({
-      where: { parentCode: code, role: 'STUDENT', schoolId: auth.schoolId }
-    });
+    const student = await db.user.findFirst({ where: { parentCode: code, role: 'STUDENT', active: true }, include: { school: { select: { name: true } } } });
 
     if (student) {
-      return NextResponse.json({ valid: true, studentName: student.fullName });
+      return NextResponse.json({ valid: true, studentName: student.fullName, schoolName: student.school.name });
     }
 
     return NextResponse.json({ valid: false });

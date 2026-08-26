@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     const month = searchParams.get('month');
     const classId = searchParams.get('classId');
 
-    if (!schoolId || schoolId !== auth.schoolId) {
+    if (!schoolId || (schoolId !== auth.schoolId && auth.role !== 'PARENT')) {
       return NextResponse.json({ error: 'schoolId invalide' }, { status: 400 });
     }
 

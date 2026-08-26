@@ -19,10 +19,12 @@ import {
   Upload,
   Trash2,
   CheckCircle2,
+  Smartphone,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import PWAInstallDialog from './pwa-install-dialog';
 
 interface ConfigData {
   id: string;
@@ -362,6 +364,22 @@ export default function AdminConfig() {
           </Card>
         </>
       )}
+
+      {/* PWA Install Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Smartphone className="w-5 h-5 text-blue-600" />
+            Application Mobile
+          </CardTitle>
+          <CardDescription>
+            Installez GradeUp sur votre appareil mobile ou bureau pour un accès rapide
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PWAInstallDialog placement="settings" />
+        </CardContent>
+      </Card>
     </div>
   );
 }

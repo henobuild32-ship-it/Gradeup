@@ -4,6 +4,7 @@ import { createNotification } from '@/services/notifications/createNotification'
 import { sendOneSignalBroadcast } from '@/services/onesignal/sender';
 import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 import webpush from 'web-push';
+import { APP_VERSION, APP_VERSION_LABEL } from '@/lib/app-version';
 
 const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
 const privateKey = process.env.VAPID_PRIVATE_KEY || '';
@@ -30,8 +31,8 @@ export async function POST(request: NextRequest) {
       select: { id: true },
     });
 
-    const title = "Mbote ! 🚀 Nouvelles fonctionnalités";
-    const message = "Mbote Il'y a une nouvelle mise à jour de GradeUp. Profitez de l'interface modernisée, de la correction des sélecteurs de classe et des optimisations de connexion !";
+    const title = `🚀 GradeUp ${APP_VERSION_LABEL} est disponible !`;
+    const message = "Une nouvelle mise à jour est disponible. Profitez des dernières améliorations et corrections. Mettez à jour maintenant !";
 
     const createdNotifications: any[] = [];
 
@@ -45,9 +46,10 @@ export async function POST(request: NextRequest) {
         title,
         message,
         type: 'SYSTEM',
-        priority: 'HIGH',
+        priority: 'URGENT',
         metadata: {
-          updateVersion: '0.2.1',
+          updateVersion: APP_VERSION,
+          updateVersionLabel: APP_VERSION_LABEL,
           feature: 'Global Update',
         },
       });
@@ -62,9 +64,11 @@ export async function POST(request: NextRequest) {
       const pushPayload = JSON.stringify({
         title,
         body: message,
-        icon: '/icons/icon-192x192.png',
-        badge: '/icons/icon-72x72.png',
-        data: { url: '/' },
+        icon: '/icon-192x192.png',
+        badge: '/icon-192x192.png',
+        tag: 'gradeup-update',
+        requireInteraction: true,
+        data: { url: '/', type: 'APP_UPDATE', version: APP_VERSION },
       });
 
       const pushPromises = subscriptions.map(async (sub) => {
@@ -95,12 +99,12 @@ export async function POST(request: NextRequest) {
       title,
       message,
       url: '/',
-      data: { updateVersion: '0.2.1' },
+      data: { updateVersion: APP_VERSION, type: 'APP_UPDATE' },
     });
 
     return NextResponse.json({
       success: true,
-      message: 'Notification de mise à jour Mbote diffusée avec succès.',
+      message: `Notification de mise à jour ${APP_VERSION_LABEL} diffusée avec succès.`,
       notificationsCreated: createdNotifications.length,
       pushSentCount,
     });

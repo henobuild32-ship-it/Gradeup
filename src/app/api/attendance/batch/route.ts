@@ -11,14 +11,17 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { schoolId, courseId, teacherId, date, records } = body;
+    const { courseId, date, records } = body;
+    const schoolId = auth.schoolId;
+    const teacherId = auth.userId;
 
-    if (!schoolId || !teacherId || !date || !records || !Array.isArray(records)) {
+    if ((auth.role !== 'TEACHER' && auth.role !== 'ADMIN') || !date || !records || !Array.isArray(records)) {
       return NextResponse.json(
         { error: 'Champs requis manquants: schoolId, teacherId, date, records' },
         { status: 400 }
       );
     }
+    if (auth.role === 'TEACHER' && !(await db.course.findFirst({ where: { id: courseId || undefined, schoolId, teacherId } }))) return NextResponse.json({ error: 'Matière non affectée.' }, { status: 403 });
 
     try {
       await assertYearOpen(schoolId);

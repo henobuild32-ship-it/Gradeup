@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { notifyUser } from '@/services/notifications/notificationEngine';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await authenticateRequest(request);
+    if (auth.role !== 'ADMIN' && auth.role !== 'TEACHER') return NextResponse.json({ error: 'Accès refusé.' }, { status: 403 });
     const { searchParams } = new URL(request.url);
-    const schoolId = searchParams.get('schoolId');
+    const schoolId = auth.schoolId;
     const classId = searchParams.get('classId');
-    const teacherId = searchParams.get('teacherId');
+    const teacherId = auth.role === 'TEACHER' ? auth.userId : searchParams.get('teacherId');
     const scope = searchParams.get('scope'); // 'global' pour le récapitulatif consolidé
 
-    if (!schoolId) {
-      return NextResponse.json({ error: 'schoolId is required' }, { status: 400 });
-    }
+    if (!schoolId) return NextResponse.json({ error: 'École introuvable' }, { status: 400 });
 
     const classes = await db.schoolClass.findMany({
       where: { schoolId },
@@ -151,6 +152,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ classes: classAnalysis });
   } catch (error: unknown) {
+    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -308,8 +310,12 @@ function normalizeDecision(decision: string): 'promoted' | 'redoubling' | 'leavi
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await authenticateRequest(request);
+    if (auth.role !== 'ADMIN') return NextResponse.json({ error: 'Action réservée aux administrateurs.' }, { status: 403 });
     const body = await request.json();
-    const { action, schoolId, adminId, classId, decisions, newAcademicYear } = body;
+    const { action, classId, decisions, newAcademicYear } = body;
+    const schoolId = auth.schoolId;
+    const adminId = auth.userId;
 
     if (!action || !schoolId || !adminId) {
       return NextResponse.json({ error: 'Missing fields: action, schoolId, adminId' }, { status: 400 });
@@ -402,6 +408,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   } catch (error: unknown) {
+    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }

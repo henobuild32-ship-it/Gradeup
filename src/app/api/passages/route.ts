@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   try {
     const auth = authenticateRequest(req);
     const { searchParams } = new URL(req.url);
-    const schoolId = searchParams.get('schoolId') || auth.schoolId;
+    const schoolId = auth.schoolId;
     const studentId = searchParams.get('studentId') || '';
     const sourceClassId = searchParams.get('classId') || '';
     const year = searchParams.get('year') || '';
@@ -23,6 +23,13 @@ export async function GET(req: NextRequest) {
 
     // Sécurité : un élève ne voit que son propre parcours
     if (auth.role === 'STUDENT') where.studentId = auth.userId;
+    if (auth.role === 'PARENT') {
+      const children = await db.user.findMany({ where: { schoolId, parentId: auth.userId, role: 'STUDENT' }, select: { id: true } });
+      where.studentId = { in: children.map(child => child.id) };
+    }
+    if (auth.role !== 'ADMIN' && auth.role !== 'TEACHER' && auth.role !== 'STUDENT' && auth.role !== 'PARENT') {
+      return NextResponse.json({ error: 'Accès refusé.' }, { status: 403 });
+    }
 
     const passages = await db.passageHistorique.findMany({
       where,
@@ -69,6 +76,11 @@ export async function POST(req: NextRequest) {
     const sourceClass = sourceClassId
       ? await db.schoolClass.findFirst({ where: { id: sourceClassId, schoolId: auth.schoolId, deletedAt: null } })
       : null;
+    const currentEnrollment = await db.enrolledClass.findFirst({ where: { userId: studentId }, select: { classId: true } });
+    const effectiveSourceClassId = sourceClass?.id || currentEnrollment?.classId;
+    if (!effectiveSourceClassId) return NextResponse.json({ error: 'Classe source introuvable pour cet élève.' }, { status: 400 });
+    const effectiveSourceClass = sourceClass || await db.schoolClass.findFirst({ where: { id: effectiveSourceClassId, schoolId: auth.schoolId, deletedAt: null } });
+    if (!effectiveSourceClass) return NextResponse.json({ error: 'Classe source invalide.' }, { status: 400 });
 
     // SourceYear par défaut = année scolaire actuelle
     const activeYear = await db.schoolYear.findFirst({
@@ -77,15 +89,17 @@ export async function POST(req: NextRequest) {
       select: { year: true },
     });
     const sourceYearFinal = sourceYear || activeYear?.year || '';
-    const targetYearFinal = targetYear || sourceYearFinal;
+    const targetYearFinal = targetYear || nextAcademicYear(sourceYearFinal);
 
     const passage = await db.$transaction(async (tx) => {
+      const duplicate = await tx.passageHistorique.findFirst({ where: { schoolId: auth.schoolId, studentId, sourceClassId: effectiveSourceClass.id, targetClassId: targetClass.id, sourceYear: sourceYearFinal, targetYear: targetYearFinal } });
+      if (duplicate) return duplicate;
       // 1) archive passage
       const record = await tx.passageHistorique.create({
         data: {
           schoolId: auth.schoolId,
           studentId,
-          sourceClassId: sourceClass?.id || '',
+          sourceClassId: effectiveSourceClass.id,
           targetClassId: targetClass.id,
           sourceYear: sourceYearFinal,
           targetYear: targetYearFinal,
@@ -95,8 +109,8 @@ export async function POST(req: NextRequest) {
       });
 
       // 2) Si classe source fournie et différente : retirer l'élève de l'ancienne classe et l'ajouter à la nouvelle
-      if (sourceClass && sourceClass.id !== targetClass.id) {
-        await tx.enrolledClass.deleteMany({ where: { userId: studentId, classId: sourceClass.id } });
+      if (effectiveSourceClass.id !== targetClass.id) {
+        await tx.enrolledClass.deleteMany({ where: { userId: studentId, classId: effectiveSourceClass.id } });
         await tx.enrolledClass.upsert({
           where: { userId_classId: { userId: studentId, classId: targetClass.id } },
           update: {},
@@ -120,4 +134,10 @@ export async function POST(req: NextRequest) {
     console.error('[POST /api/passages]', error);
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }
+}
+
+function nextAcademicYear(year: string): string {
+  const match = year.match(/^(\d{4})-(\d{4})$/);
+  if (!match) return year;
+  return `${Number(match[1]) + 1}-${Number(match[2]) + 1}`;
 }

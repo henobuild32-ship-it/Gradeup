@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const trimester = searchParams.get('trimester');
     const teacherId = searchParams.get('teacherId');
 
-    if (!schoolId || schoolId !== auth.schoolId) {
+    if (!schoolId || (schoolId !== auth.schoolId && auth.role !== 'PARENT')) {
       return NextResponse.json({ error: 'schoolId invalide' }, { status: 400 });
     }
 

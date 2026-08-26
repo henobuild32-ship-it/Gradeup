@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequestActive, AuthError } from '@/lib/auth/authenticate';
 
 // GET /api/deliberation?schoolId=...&classId=...&studentId=...&academicYear=...
 export async function GET(request: NextRequest) {
   try {
+    const auth = await authenticateRequestActive(request);
     const { searchParams } = new URL(request.url);
-    const schoolId = searchParams.get('schoolId');
+    const schoolId = auth.schoolId;
     const classId = searchParams.get('classId');
     const studentId = searchParams.get('studentId');
     const academicYear = searchParams.get('academicYear');
@@ -30,6 +32,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(decisions);
   } catch (error) {
+    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error('[GET /api/deliberation]', error);
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }
@@ -40,8 +43,12 @@ export async function GET(request: NextRequest) {
 // decision: "passage" | "redoublement" | "en_deliberation" | "admis_apres_deliberation" | "non_admis"
 export async function POST(request: NextRequest) {
   try {
+    const auth = await authenticateRequestActive(request);
+    if (auth.role !== 'ADMIN') return NextResponse.json({ error: 'Seul un administrateur peut valider une délibération.' }, { status: 403 });
     const body = await request.json();
-    const { schoolId, studentId, classId, academicYear, decision, validatedBy, comment } = body;
+    const { studentId, classId, academicYear, decision, comment } = body;
+    const schoolId = auth.schoolId;
+    const validatedBy = auth.userId;
 
     if (!schoolId || !studentId || !classId || !academicYear || !decision || !validatedBy) {
       return NextResponse.json(
@@ -64,6 +71,12 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const [validatedStudent, schoolClass] = await Promise.all([
+      db.user.findFirst({ where: { id: studentId, schoolId, role: 'STUDENT' }, select: { id: true } }),
+      db.schoolClass.findFirst({ where: { id: classId, schoolId, deletedAt: null }, select: { id: true } }),
+    ]);
+    if (!validatedStudent || !schoolClass) return NextResponse.json({ error: 'Élève ou classe introuvable dans cette école.' }, { status: 404 });
 
     // Verify admin exists
     const admin = await db.user.findFirst({
@@ -117,16 +130,16 @@ export async function POST(request: NextRequest) {
     });
 
     // Notify parent if exists
-    const student = await db.user.findUnique({
+    const studentParent = await db.user.findUnique({
       where: { id: studentId },
       select: { parentId: true },
     });
 
-    if (student?.parentId) {
+    if (studentParent?.parentId) {
       await db.notification.create({
         data: {
           schoolId,
-          userId: student.parentId,
+          userId: studentParent.parentId,
           senderId: validatedBy,
           title: "Résultat de fin d'année de votre enfant",
           message: `Le résultat de fin d'année scolaire ${academicYear} de votre enfant : ${label}. ${comment ? `Commentaire : ${comment}` : ''}`,
@@ -138,6 +151,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(deliberation, { status: 201 });
   } catch (error) {
+    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error('[POST /api/deliberation]', error);
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }

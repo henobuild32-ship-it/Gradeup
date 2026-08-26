@@ -37,13 +37,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (student.schoolId !== parentUser.schoolId) {
-      return NextResponse.json(
-        { error: 'Cet enfant n\'appartient pas à la même école.' },
-        { status: 400 }
-      );
-    }
-
     const updated = await db.user.update({
       where: { id: student.id },
       data: { parentId: auth.userId },

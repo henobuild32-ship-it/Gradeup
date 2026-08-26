@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getCurrentAcademicYear } from '@/lib/grade-sync';
+import { authenticateRequestActive, AuthError } from '@/lib/auth/authenticate';
 
 // GET: Récupérer les règles de délibération et de passage (par école / cycle / classe)
 export async function GET(req: NextRequest) {
   try {
+    const auth = await authenticateRequestActive(req);
     const { searchParams } = new URL(req.url);
-    const schoolId = searchParams.get('schoolId');
+    const schoolId = auth.schoolId;
     const classId = searchParams.get('classId');
     const cycle = searchParams.get('cycle');
     const academicYear = searchParams.get('academicYear') || getCurrentAcademicYear();
@@ -49,6 +51,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ rules, isDefault: false });
   } catch (error: any) {
+    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error('[GET /api/grading-rules] Error:', error);
     return NextResponse.json({ error: error.message || 'Erreur serveur' }, { status: 500 });
   }
@@ -57,9 +60,9 @@ export async function GET(req: NextRequest) {
 // POST/PUT: Enregistrer ou modifier les règles de délibération
 export async function POST(req: NextRequest) {
   try {
+    const auth = await authenticateRequestActive(req);
     const body = await req.json();
     const {
-      schoolId,
       classId = null,
       cycle = 'ALL',
       academicYear = getCurrentAcademicYear(),
@@ -69,9 +72,16 @@ export async function POST(req: NextRequest) {
       eliminationPercentage = null,
       maternelleMode = 'QUALITATIF',
     } = body;
+    const schoolId = auth.schoolId;
 
-    if (!schoolId) {
-      return NextResponse.json({ error: 'schoolId requis' }, { status: 400 });
+    if (auth.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Accès réservé à l’administration.' }, { status: 403 });
+    }
+    const pass = Number(passPercentage);
+    const retake = Number(retakeMinPercentage);
+    const failedLimit = Number(maxFailedCourses);
+    if (![pass, retake, failedLimit].every(Number.isFinite) || pass < 0 || pass > 100 || retake < 0 || retake > pass || failedLimit < 0) {
+      return NextResponse.json({ error: 'Règles de délibération invalides.' }, { status: 400 });
     }
 
     const rule = await db.gradingDecisionRule.upsert({
@@ -107,6 +117,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, rule });
   } catch (error: any) {
+    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error('[POST /api/grading-rules] Error:', error);
     return NextResponse.json({ error: error.message || 'Erreur serveur' }, { status: 500 });
   }

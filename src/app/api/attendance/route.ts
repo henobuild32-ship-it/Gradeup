@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get('date');
     const courseId = searchParams.get('courseId');
 
-    if (!schoolId || schoolId !== auth.schoolId) {
+    if (!schoolId || (schoolId !== auth.schoolId && auth.role !== 'PARENT')) {
       return NextResponse.json({ error: 'schoolId invalide' }, { status: 400 });
     }
 
@@ -63,14 +63,18 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { schoolId, studentId, teacherId, courseId, date, status, reason } = body;
+    const { studentId, courseId, date, status, reason } = body;
+    const schoolId = auth.schoolId;
+    const teacherId = auth.userId;
 
-    if (!schoolId || !studentId || !teacherId || !date) {
+    if (auth.role !== 'TEACHER' && auth.role !== 'ADMIN') return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
+    if (!studentId || !date) {
       return NextResponse.json(
         { error: 'Champs requis manquants: schoolId, studentId, teacherId, date' },
         { status: 400 }
       );
     }
+    if (auth.role === 'TEACHER' && !(await db.course.findFirst({ where: { id: courseId || undefined, schoolId, teacherId } }))) return NextResponse.json({ error: 'Matière non affectée.' }, { status: 403 });
 
     try {
       await assertYearOpen(schoolId);

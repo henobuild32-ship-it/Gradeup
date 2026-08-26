@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequestActive, AuthError } from '@/lib/auth/authenticate';
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await authenticateRequestActive(request);
     const { searchParams } = new URL(request.url);
-    const schoolId = searchParams.get('schoolId');
+    const schoolId = auth.schoolId;
 
     if (!schoolId) {
       return NextResponse.json({ error: 'schoolId is required' }, { status: 400 });
@@ -74,6 +76,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error: unknown) {
+    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }

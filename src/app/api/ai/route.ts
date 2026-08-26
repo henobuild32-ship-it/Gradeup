@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { generateGLMResponse } from '@/lib/ai/glm-provider';
 import { generateOpenRouterResponse } from '@/lib/ai/openrouter-provider';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 
 export const runtime = 'nodejs';
 export const maxDuration = 55; // Vercel Pro : 60s max, on laisse 5s de marge
@@ -450,6 +451,11 @@ ${schedules.map(s => `  - ${DAYS[s.dayOfWeek] || '?'} ${s.startTime}-${s.endTime
 // ─── Route POST principale ────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
+  let auth;
+  try { auth = authenticateRequest(request); } catch (error) {
+    if (error instanceof AuthError) return new Response(JSON.stringify({ error: error.message }), { status: error.status, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ error: 'Non authentifié.' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+  }
   let body: { message?: string; schoolId?: string; userId?: string; context?: string; conversationId?: string; model?: string };
   try {
     body = await request.json();
@@ -460,7 +466,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { message, schoolId, userId, conversationId, model: requestedModel } = body;
+  const { message, conversationId, model: requestedModel } = body;
+  const schoolId = auth.schoolId;
+  const userId = auth.userId;
 
   if (!message || !schoolId || !userId) {
     return new Response(

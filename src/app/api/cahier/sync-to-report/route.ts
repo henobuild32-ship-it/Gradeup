@@ -19,15 +19,21 @@ import { resolveClassCoefficients } from '@/lib/coefficient-resolver';
 
 export async function POST(request: NextRequest) {
   try {
-    authenticateRequest(request);
+    const auth = authenticateRequest(request);
     const body = await request.json();
-    const { schoolId, classId, trimester } = body;
+    const { classId, trimester } = body;
+    const schoolId = auth.schoolId;
 
     if (!schoolId || !classId || !trimester) {
       return NextResponse.json(
         { error: 'schoolId, classId, and trimester are required' },
         { status: 400 }
       );
+    }
+    if (auth.role !== 'ADMIN' && auth.role !== 'TEACHER') return NextResponse.json({ error: 'Accès refusé.' }, { status: 403 });
+    if (auth.role === 'TEACHER') {
+      const assigned = await db.course.findFirst({ where: { schoolId, classId, teacherId: auth.userId } });
+      if (!assigned) return NextResponse.json({ error: 'Vous n’êtes pas affecté à cette classe.' }, { status: 403 });
     }
 
     // 1. Fetch all students enrolled in the class

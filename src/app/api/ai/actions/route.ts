@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { notifyUser } from '@/services/notifications/notificationEngine';
+import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 
 export const runtime = 'nodejs';
 
@@ -8,7 +9,11 @@ export const runtime = 'nodejs';
 // Body: { action: string, params: object, userId: string, schoolId: string }
 export async function POST(request: NextRequest) {
   try {
-    const { action, params, userId, schoolId } = await request.json();
+    const auth = authenticateRequest(request);
+    if (auth.role !== 'ADMIN') return NextResponse.json({ error: 'Actions IA réservées à l’administration.' }, { status: 403 });
+    const { action, params } = await request.json();
+    const userId = auth.userId;
+    const schoolId = auth.schoolId;
 
     if (!action || !userId || !schoolId) {
       return NextResponse.json({ error: 'action, userId, schoolId requis' }, { status: 400 });
@@ -254,6 +259,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, result });
   } catch (error) {
+    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error('[AI Actions] Error:', error);
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }

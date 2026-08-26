@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { authenticateRequestActive, AuthError } from '@/lib/auth/authenticate';
 
 export async function GET(request: NextRequest) {
   try {
+    const auth = await authenticateRequestActive(request);
+    if (auth.role !== 'ADMIN') return NextResponse.json({ error: 'Accès réservé à l’administration.' }, { status: 403 });
     const { searchParams } = new URL(request.url);
-    const schoolId = searchParams.get('schoolId');
+    const schoolId = auth.schoolId;
     const status = searchParams.get('status');
     const classId = searchParams.get('classId');
     const search = searchParams.get('search');
@@ -70,6 +73,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ students: result, classes });
   } catch (error: unknown) {
+    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -77,14 +81,17 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await authenticateRequestActive(request);
+    if (auth.role !== 'ADMIN') return NextResponse.json({ error: 'Accès réservé à l’administration.' }, { status: 403 });
     const body = await request.json();
-    const { studentId, action, adminId, amount } = body;
+    const { studentId, action, amount } = body;
+    const adminId = auth.userId;
 
     if (!studentId || !action || !adminId) {
       return NextResponse.json({ error: 'Missing required fields: studentId, action, adminId' }, { status: 400 });
     }
 
-    const student = await db.user.findUnique({ where: { id: studentId } });
+    const student = await db.user.findFirst({ where: { id: studentId, schoolId: auth.schoolId, role: 'STUDENT' } });
     if (!student) {
       return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
@@ -134,6 +141,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
+    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }

@@ -12,12 +12,13 @@ import {
 } from '@/components/ui/dialog';
 import { Smartphone, Apple, X, Download, CheckCircle2, Share, Plus } from 'lucide-react';
 
-export default function PWAInstallDialog() {
+export default function PWAInstallDialog({ placement = 'sidebar' }: { placement?: 'sidebar' | 'welcome' | 'settings' }) {
   const { isInstallable, isAppInstalled, isIOS, installPWA } = usePWAInstall();
   const [showDialog, setShowDialog] = useState(false);
   const [installStep, setInstallStep] = useState<'idle' | 'installing' | 'done'>('idle');
   const [dismissed, setDismissed] = useState(false);
   const [isAndroid, setIsAndroid] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -34,8 +35,18 @@ export default function PWAInstallDialog() {
   };
 
   const handleInstall = async () => {
+    setInstallStep('installing');
+    setProgress(0);
+    await new Promise<void>((resolve) => {
+      const started = Date.now();
+      const timer = window.setInterval(() => {
+        const next = Math.min(100, Math.round(((Date.now() - started) / 3000) * 100));
+        setProgress(next);
+        if (next >= 100) { window.clearInterval(timer); resolve(); }
+      }, 60);
+    });
+    if (isIOS) { setInstallStep('idle'); return; }
     if (isInstallable) {
-      setInstallStep('installing');
       const success = await installPWA();
       if (success) {
         setInstallStep('done');
@@ -43,7 +54,7 @@ export default function PWAInstallDialog() {
       } else {
         setInstallStep('idle');
       }
-    }
+    } else setInstallStep('idle');
   };
 
   if (isAppInstalled || dismissed) return null;
@@ -53,7 +64,7 @@ export default function PWAInstallDialog() {
       <Button
         variant="outline"
         size="sm"
-        className="w-full justify-start gap-2 text-xs bg-sidebar-accent/30 border-sidebar-border hover:bg-sidebar-accent/50"
+        className={placement === 'sidebar' ? 'w-full justify-start gap-2 text-xs bg-sidebar-accent/30 border-sidebar-border hover:bg-sidebar-accent/50' : 'gap-2 rounded-full'}
         onClick={() => {
           setInstallStep('idle');
           setShowDialog(true);
@@ -64,7 +75,7 @@ export default function PWAInstallDialog() {
         ) : (
           <Smartphone className="w-3.5 h-3.5 text-green-500" />
         )}
-        Installer l&apos;application
+        Télécharger l&apos;application
       </Button>
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
@@ -96,8 +107,22 @@ export default function PWAInstallDialog() {
           </div>
 
           <div className="p-6">
+            {installStep === 'installing' && (
+              <div className="space-y-3 py-5" aria-live="polite">
+                <div className="flex items-center justify-center gap-2">
+                  <span className="animate-spin text-blue-600">
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" /></svg>
+                  </span>
+                  <p className="text-sm font-semibold">Téléchargement en cours...</p>
+                </div>
+                <p className="text-xs text-muted-foreground text-center">{progress}%</p>
+                <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 transition-[width] duration-75 rounded-full" style={{ width: `${progress}%` }} />
+                </div>
+              </div>
+            )}
             {/* ===== iOS ===== */}
-            {isIOS ? (
+            {installStep !== 'installing' && isIOS ? (
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground font-medium">
                   Sur iPhone/iPad, ouvrez cette page dans <strong>Safari</strong> puis suivez les étapes :
@@ -126,11 +151,11 @@ export default function PWAInstallDialog() {
                     <span className="text-green-600 font-medium">GradeUp apparaîtra sur votre écran d&apos;accueil !</span>
                   </li>
                 </ol>
-                <Button onClick={handleDismiss} className="w-full" size="lg">
-                  J&apos;ai compris
+                <Button onClick={handleInstall} className="w-full" size="lg">
+                  Préparer l&apos;ajout à l&apos;écran d&apos;accueil
                 </Button>
               </div>
-            ) : (
+            ) : installStep !== 'installing' ? (
               /* ===== Android / Desktop ===== */
               <div className="space-y-4">
                 {installStep === 'done' ? (
@@ -147,21 +172,13 @@ export default function PWAInstallDialog() {
                         </p>
                         <Button
                           onClick={handleInstall}
-                          disabled={installStep === 'installing'}
                           className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
                           size="lg"
                         >
-                          {installStep === 'installing' ? (
-                            <span className="flex items-center gap-2">
-                              <span className="animate-spin">⏳</span>
-                              Installation en cours...
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-2">
-                              <Download className="w-4 h-4" />
-                              Installer maintenant
-                            </span>
-                          )}
+                          <span className="flex items-center gap-2">
+                            <Download className="w-4 h-4" />
+                            Installer maintenant
+                          </span>
                         </Button>
                       </>
                     ) : (
@@ -201,7 +218,7 @@ export default function PWAInstallDialog() {
                   Plus tard
                 </Button>
               </div>
-            )}
+            ) : null}
           </div>
         </DialogContent>
       </Dialog>

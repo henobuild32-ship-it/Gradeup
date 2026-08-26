@@ -52,13 +52,36 @@ export const useAppStore = create<AppState>()(
             const data = await res.json();
             if (data.user) {
               set({ user: data.user });
+              // Restore user's last page instead of showing auth screen
+              const stored = useAppStore.getState().currentPage;
+              if (!stored || stored === 'auth') {
+                const dashMap: Record<string, string> = {
+                  ADMIN: 'admin-dashboard',
+                  TEACHER: 'teacher-dashboard',
+                  STUDENT: 'student-dashboard',
+                  PARENT: 'parent-dashboard',
+                };
+                set({ currentPage: (dashMap[data.user.role] || 'admin-dashboard') as any });
+              }
               return;
             }
           }
           const refreshed = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' });
           if (refreshed.ok) {
             const data = await refreshed.json();
-            if (data.user) set({ user: data.user });
+            if (data.user) {
+              set({ user: data.user });
+              const stored = useAppStore.getState().currentPage;
+              if (!stored || stored === 'auth') {
+                const dashMap: Record<string, string> = {
+                  ADMIN: 'admin-dashboard',
+                  TEACHER: 'teacher-dashboard',
+                  STUDENT: 'student-dashboard',
+                  PARENT: 'parent-dashboard',
+                };
+                set({ currentPage: (dashMap[data.user.role] || 'admin-dashboard') as any });
+              }
+            }
           }
         } catch {
           /* session absente ou réseau indisponible */

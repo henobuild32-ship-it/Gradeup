@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getCurrentAcademicYear } from '@/lib/grade-sync';
+import { authenticateRequestActive, AuthError } from '@/lib/auth/authenticate';
 
 // GET: Lister les règles de cotation par école et optionnellement par classe
 export async function GET(req: NextRequest) {
   try {
+    const auth = await authenticateRequestActive(req);
     const { searchParams } = new URL(req.url);
-    const schoolId = searchParams.get('schoolId');
+    const schoolId = auth.schoolId;
     const classId = searchParams.get('classId');
     const academicYear = searchParams.get('academicYear') || getCurrentAcademicYear();
 
@@ -31,6 +33,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ rules });
   } catch (error: any) {
+    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error('[GET /api/subject-rules] Error:', error);
     return NextResponse.json({ error: error.message || 'Erreur serveur' }, { status: 500 });
   }
@@ -39,9 +42,9 @@ export async function GET(req: NextRequest) {
 // POST: Créer ou mettre à jour (upsert) les règles d'une ou plusieurs matières
 export async function POST(req: NextRequest) {
   try {
+    const auth = await authenticateRequestActive(req);
     const body = await req.json();
     const {
-      schoolId,
       classId,
       courseId,
       academicYear = getCurrentAcademicYear(),
@@ -53,9 +56,16 @@ export async function POST(req: NextRequest) {
       isQualitative = false,
       batchRules, // Optionnel : mise à jour groupée pour toute une classe
     } = body;
+    const schoolId = auth.schoolId;
 
-    if (!schoolId) {
-      return NextResponse.json({ error: 'schoolId requis' }, { status: 400 });
+    if (auth.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Accès réservé à l’administration.' }, { status: 403 });
+    }
+    if (!Array.isArray(batchRules)) {
+      const values = [maximumPoints, dailyWorkMaximum, examMaximum].map(Number);
+      if (values.some(value => !Number.isFinite(value) || value <= 0) || (coefficient != null && (!Number.isFinite(Number(coefficient)) || Number(coefficient) <= 0))) {
+        return NextResponse.json({ error: 'Maximum ou coefficient invalide.' }, { status: 400 });
+      }
     }
 
     // Gestion du traitement par lot (ex: configuration de toute une classe en une seule requête)
@@ -143,6 +153,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, rule });
   } catch (error: any) {
+    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
     console.error('[POST /api/subject-rules] Error:', error);
     return NextResponse.json({ error: error.message || 'Erreur serveur' }, { status: 500 });
   }

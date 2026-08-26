@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import { useToast } from '@/hooks/use-toast';
 import { usePWAInstall } from '@/hooks/use-pwa-install';
+import PWAInstallDialog from './pwa-install-dialog';
 import type { UserRole, PageView } from '@/lib/types';
 import { useTheme } from 'next-themes';
 import { Input } from '@/components/ui/input';
@@ -706,17 +707,7 @@ export default function AuthPage() {
           </Button>
         )}
 
-        {isInstallable && (
-          <Button
-            onClick={installPWA}
-            variant="outline"
-            size="sm"
-            className="hidden md:inline-flex gap-1.5 rounded-full text-xs font-semibold border-primary/30 text-primary hover:bg-primary/5"
-          >
-            <Smartphone className="w-3.5 h-3.5" />
-            Installer l'App
-          </Button>
-        )}
+        <PWAInstallDialog placement="welcome" />
 
         {view !== 'welcome' ? (
           <Button
@@ -814,6 +805,9 @@ export default function AuthPage() {
                 >
                   Se connecter
                 </Button>
+                <div className="w-full sm:w-auto">
+                  <PWAInstallDialog placement="welcome" />
+                </div>
               </div>
 
               {/* Trust & Spec pills */}

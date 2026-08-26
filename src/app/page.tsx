@@ -2,7 +2,7 @@
 
 import { useAppStore } from '@/lib/store';
 import type { PageView } from '@/lib/types';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 
 import AuthPage from '@/components/gradeup/auth-page';
@@ -87,6 +87,16 @@ const HelpPage = dynamic(() => import('@/components/gradeup/help-page'), { ssr: 
 function PageRouter({ page }: { page: PageView }) {
   const { user } = useAppStore();
 
+  // Navigation is not an authorization boundary, but never render a role-specific
+  // screen when a stale client state points at another user's module.
+  if (user) {
+    const prefix = user.role === 'ADMIN' ? 'admin-' : user.role === 'TEACHER' ? 'teacher-' : user.role === 'STUDENT' ? 'student-' : 'parent-';
+    const shared = new Set<PageView>(['meetings', 'meeting-room', 'library', 'messages', 'calendar', 'profile', 'help']);
+    const roleShared = (user.role === 'ADMIN' || user.role === 'TEACHER') && new Set<PageView>(['cahier-cotation', 'auto-report-sync', 'admin-note-modifications']).has(page);
+    const allowed = page === 'auth' || page === 'register' || shared.has(page) || roleShared || page === `${prefix}dashboard` || page.startsWith(prefix);
+    if (!allowed) return <AuthPage />;
+  }
+
   if (page === 'student-payments') {
     return <StudentDashboard />;
   }
@@ -155,9 +165,10 @@ function PageRouter({ page }: { page: PageView }) {
 
 export default function HomePage() {
   const { currentPage, user, setCurrentPage, hydrateSession } = useAppStore();
+  const [hydrating, setHydrating] = useState(true);
 
   useEffect(() => {
-    void hydrateSession();
+    hydrateSession().finally(() => setHydrating(false));
   }, [hydrateSession]);
 
   // Reset unauthorized pages for student users after session restoration
@@ -166,6 +177,18 @@ export default function HomePage() {
       setCurrentPage('student-dashboard');
     }
   }, [user, currentPage, setCurrentPage]);
+
+  // Show nothing while hydrating to prevent auth page flash
+  if (hydrating) {
+    return (
+      <div className="flex h-dvh items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3 animate-pulse">
+          <img src="/logo-gradeup.png" alt="GradeUp" className="w-12 h-12 rounded-xl object-contain" />
+          <div className="h-2 w-24 rounded-full bg-muted" />
+        </div>
+      </div>
+    );
+  }
 
   if (!user) {
     return <AuthPage />;
@@ -177,4 +200,3 @@ export default function HomePage() {
     </AppLayout>
   );
 }
-

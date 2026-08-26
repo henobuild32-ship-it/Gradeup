@@ -94,10 +94,10 @@ export default function ParentDashboard() {
   const fetchChildren = async () => {
     if (!user?.id || !schoolId) return;
     try {
-      const res = await fetch(`/api/users?schoolId=${schoolId}&role=STUDENT&parentId=${user.id}`);
+      const res = await fetch('/api/parent/children');
       if (res.ok) {
         const data = await res.json();
-        const list = Array.isArray(data.users) ? data.users : [];
+        const list = Array.isArray(data.children) ? data.children : [];
         setChildren(list);
         // Fetch presence for all children
         fetchAllPresence(list);
@@ -107,11 +107,12 @@ export default function ParentDashboard() {
     }
   };
 
-  const fetchAllPresence = async (childrenList: { id: string }[]) => {
+  const fetchAllPresence = async (childrenList: Array<{ id: string; school?: { id: string } }>) => {
     const results: Record<string, boolean> = {};
     for (const child of childrenList) {
       try {
-        const res = await fetch(`/api/presence/aujourdhui?schoolId=${schoolId}&userId=${child.id}`);
+        const childSchoolId = child.school?.id || schoolId;
+        const res = await fetch(`/api/presence/aujourdhui?schoolId=${childSchoolId}&userId=${child.id}`);
         if (res.ok) {
           const data = await res.json();
           results[child.id] = data.presence?.statut === 'PRESENT';
@@ -125,12 +126,13 @@ export default function ParentDashboard() {
     setLoading(true);
     try {
       const child = safeChildren.find(c => c.id === childId);
+      const childSchoolId = (child as UserInfo & { school?: { id: string } })?.school?.id || schoolId;
       const classId = child?.classEnrollments?.[0]?.classId;
 
       const [gradesRes, attendanceRes, paymentsRes] = await Promise.all([
-        fetch(`/api/grades?schoolId=${schoolId}&studentId=${childId}`),
-        fetch(`/api/attendance?schoolId=${schoolId}&studentId=${childId}`),
-        fetch(`/api/payments?schoolId=${schoolId}&studentId=${childId}`),
+        fetch(`/api/grades?schoolId=${childSchoolId}&studentId=${childId}`),
+        fetch(`/api/attendance?schoolId=${childSchoolId}&studentId=${childId}`),
+        fetch(`/api/payments?schoolId=${childSchoolId}&studentId=${childId}`),
       ]);
 
       if (gradesRes.ok) {
@@ -147,7 +149,7 @@ export default function ParentDashboard() {
       }
 
       if (classId) {
-        const hwRes = await fetch(`/api/homework?schoolId=${schoolId}&classId=${classId}`);
+        const hwRes = await fetch(`/api/homework?schoolId=${childSchoolId}&classId=${classId}`);
         if (hwRes.ok) {
           const hwData = await hwRes.json();
           setChildHomework(Array.isArray(hwData.homework) ? hwData.homework : []);
