@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const STUDENT_CARD_PRICE_USD = 10;
+const STUDENT_CARD_PRICE_USD = Number(process.env.STUDENT_CARD_PRICE_USD || 10);
 
 /**
  * GeniusPay payment initiation endpoint.
