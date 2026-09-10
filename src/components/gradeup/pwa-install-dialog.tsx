@@ -16,16 +16,17 @@ export default function PWAInstallDialog({ placement = 'sidebar' }: { placement?
   const { isInstallable, isAppInstalled, isIOS, installPWA } = usePWAInstall();
   const [showDialog, setShowDialog] = useState(false);
   const [installStep, setInstallStep] = useState<'idle' | 'installing' | 'done'>('idle');
-  const [dismissed, setDismissed] = useState(false);
-  const [isAndroid, setIsAndroid] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [isAndroid, setIsAndroid] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return /android/.test(navigator.userAgent.toLowerCase());
+  });
+  const [dismissed, setDismissed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return Boolean(localStorage.getItem('pwa-install-dismissed'));
+  });
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const ua = navigator.userAgent.toLowerCase();
-    setIsAndroid(/android/.test(ua));
-    const wasDismissed = localStorage.getItem('pwa-install-dismissed');
-    if (wasDismissed) setDismissed(true);
+    // No-op or external listeners if needed
   }, []);
 
   const handleDismiss = () => {

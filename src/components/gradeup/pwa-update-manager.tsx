@@ -15,6 +15,22 @@ export default function PWAUpdateManager() {
   const [progress, setProgress] = useState(0);
   const [applied, setApplied] = useState(false);
 
+  const showUpdateNotification = useCallback(() => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification('🚀 Nouvelle mise à jour GradeUp', {
+          body: `GradeUp ${APP_VERSION_LABEL} est disponible ! Cliquez pour mettre à jour.`,
+          icon: '/icon-192x192.png',
+          badge: '/icon-192x192.png',
+          tag: 'gradeup-update',
+          requireInteraction: true,
+        });
+      } catch {
+        // Notification API may not be available
+      }
+    }
+  }, []);
+
   // Check if a new version is available by comparing SW version
   const checkForUpdate = useCallback(async () => {
     if (!('serviceWorker' in navigator)) return;
@@ -49,30 +65,16 @@ export default function PWAUpdateManager() {
     } catch {
       // SW not supported
     }
-  }, []);
+  }, [showUpdateNotification]);
 
   useEffect(() => {
-    checkForUpdate();
-    // Check for updates every 30 minutes
-    const timer = window.setInterval(checkForUpdate, 30 * 60 * 1000);
-    return () => window.clearInterval(timer);
+    const initialCheck = window.setTimeout(() => void checkForUpdate(), 0);
+    const timer = window.setInterval(() => void checkForUpdate(), 30 * 60 * 1000);
+    return () => {
+      window.clearTimeout(initialCheck);
+      window.clearInterval(timer);
+    };
   }, [checkForUpdate]);
-
-  const showUpdateNotification = () => {
-    if ('Notification' in window && Notification.permission === 'granted') {
-      try {
-        new Notification('🚀 Nouvelle mise à jour GradeUp', {
-          body: `GradeUp ${APP_VERSION_LABEL} est disponible ! Cliquez pour mettre à jour.`,
-          icon: '/icon-192x192.png',
-          badge: '/icon-192x192.png',
-          tag: 'gradeup-update',
-          requireInteraction: true,
-        });
-      } catch {
-        // Notification API may not be available
-      }
-    }
-  };
 
   const applyUpdate = async () => {
     setUpdating(true);
