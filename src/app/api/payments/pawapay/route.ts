@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+const STUDENT_CARD_PRICE_USD = 10;
+
 /**
  * GeniusPay payment initiation endpoint.
  * NOTE: kept under /pawapay path for backward compatibility.
@@ -11,9 +13,9 @@ export async function POST(request: NextRequest) {
     const { amount, currency, description, successUrl, cancelUrl } = body;
 
     const parsedAmount = Number(amount);
-    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0 || !currency || !successUrl || !cancelUrl) {
+    if (!Number.isFinite(parsedAmount) || parsedAmount !== STUDENT_CARD_PRICE_USD || currency !== 'USD' || !successUrl || !cancelUrl) {
       return NextResponse.json(
-        { error: 'Missing required fields: amount, currency, successUrl, cancelUrl' },
+        { error: 'Le prix de la carte scolaire est fixé à 10 USD.' },
         { status: 400 }
       );
     }
@@ -49,6 +51,7 @@ export async function POST(request: NextRequest) {
         metadata: {
           source: 'gradeup',
           module: 'student-card',
+          price_usd: String(STUDENT_CARD_PRICE_USD),
         },
       }),
     });

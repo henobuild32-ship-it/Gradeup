@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    authenticateRequest(request);
+    const auth = authenticateRequest(request);
     const body = await request.json();
     const { evaluationId, marks } = body;
 
@@ -155,6 +155,20 @@ export async function PUT(request: NextRequest) {
 
     if (!evaluation) {
       return NextResponse.json({ error: 'Evaluation not found' }, { status: 404 });
+    }
+
+    if (auth.schoolId !== evaluation.schoolId) {
+      return NextResponse.json({ error: 'Évaluation hors de votre établissement' }, { status: 403 });
+    }
+
+    // Les enseignants saisissent les notes initiales depuis le module Notes.
+    // Toute modification d'une cotation déjà présente dans le cahier exige
+    // toutefois une validation administrative.
+    if (auth.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'La modification d’une cotation existante est réservée à l’administrateur.' },
+        { status: 403 }
+      );
     }
 
 const { schoolId, courseId, trimester } = evaluation;
@@ -276,7 +290,7 @@ export async function PATCH(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    authenticateRequest(request);
+    const auth = authenticateRequest(request);
     const { searchParams } = new URL(request.url);
     const evaluationId = searchParams.get('evaluationId');
 
@@ -289,6 +303,10 @@ export async function DELETE(request: NextRequest) {
     });
     if (!evaluation) {
       return NextResponse.json({ error: 'Evaluation not found' }, { status: 404 });
+    }
+
+    if (auth.role !== 'ADMIN' || auth.schoolId !== evaluation.schoolId) {
+      return NextResponse.json({ error: 'Suppression réservée à l’administrateur de l’établissement.' }, { status: 403 });
     }
 
     await db.cahierEvaluation.delete({
