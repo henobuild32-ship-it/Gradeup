@@ -64,12 +64,23 @@ export async function POST(request: NextRequest) {
     const auth = authenticateRequest(request);
     const body = await request.json();
     const { schoolId, courseId, teacherId, title, description, dueDate, gradingType, fileUrl, fileName } = body;
+    const operationId = request.headers.get('x-idempotency-key') || body.operationId;
 
     if (!schoolId || !courseId || !teacherId || !title) {
       return NextResponse.json(
         { error: 'Missing required fields: schoolId, courseId, teacherId, title' },
         { status: 400 }
       );
+    }
+
+    if (operationId) {
+      const previous = await db.syncOperation.findUnique({ where: { operationId } });
+      if (previous) {
+        if (previous.userId !== auth.userId || previous.schoolId !== schoolId) {
+          return NextResponse.json({ error: 'Clé de synchronisation invalide' }, { status: 403 });
+        }
+        return NextResponse.json(previous.response, { status: previous.statusCode });
+      }
     }
 
     const homework = await db.homework.create({
@@ -113,7 +124,20 @@ export async function POST(request: NextRequest) {
       }).catch((err) => console.error('[Homework] Notification trigger error:', err));
     }
 
-    return NextResponse.json({ homework }, { status: 201 });
+    const responseBody = { homework };
+    if (operationId) {
+      await db.syncOperation.create({
+        data: {
+          operationId,
+          userId: auth.userId,
+          schoolId,
+          operationType: 'CREATE_HOMEWORK',
+          statusCode: 201,
+          response: responseBody,
+        },
+      });
+    }
+    return NextResponse.json(responseBody, { status: 201 });
   } catch (error: unknown) {
     if (error instanceof AuthError) {
       return NextResponse.json({ error: error.message }, { status: error.status });

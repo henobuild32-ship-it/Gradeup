@@ -16,6 +16,7 @@ import {
   Clock,
   Calendar as CalendarIcon,
 } from 'lucide-react';
+import { fetchJsonWithCache } from '@/lib/offline-sync';
 
 interface CalendarEvent {
   id: string;
@@ -75,8 +76,8 @@ export default function SchoolCalendar() {
       try {
         const params = new URLSearchParams({ schoolId: user.schoolId });
         const [hwRes, payRes] = await Promise.all([
-          fetch(`/api/homework?${params}`).then((r) => r.json()).catch(() => []),
-          fetch(`/api/payments?${params}`).then((r) => r.json()).catch(() => []),
+          fetchJsonWithCache(`/api/homework?${params}`, { homework: [] }),
+          fetchJsonWithCache(`/api/payments?${params}`, { payments: [] }),
         ]);
 
         const homeworks: HomeworkInfo[] = Array.isArray(hwRes) ? hwRes : Array.isArray((hwRes as any)?.homework) ? (hwRes as any).homework : [];

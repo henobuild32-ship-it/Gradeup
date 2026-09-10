@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { CourseInfo, HomeworkInfo, SubmissionInfo } from '@/lib/types';
 import { publishToLibrary } from '@/lib/publishToLibrary';
+import { fetchJsonWithCache, queueOrFetch } from '@/lib/offline-sync';
 
 export default function TeacherHomework() {
   const { user } = useAppStore();
@@ -49,8 +50,7 @@ export default function TeacherHomework() {
     setSubmissionsOpen(true);
     setLoadingSubmissions(true);
     try {
-      const res = await fetch(`/api/submissions?homeworkId=${hw.id}&schoolId=${user?.schoolId}`);
-      const data = await res.json();
+      const data = await fetchJsonWithCache(`/api/submissions?homeworkId=${hw.id}&schoolId=${user?.schoolId}`, { submissions: [] });
       setSubmissions(Array.isArray(data.submissions) ? data.submissions : []);
     } catch { toast.error('Erreur chargement soumissions'); setSubmissions([]); } finally { setLoadingSubmissions(false); }
   };
@@ -79,12 +79,10 @@ export default function TeacherHomework() {
     if (!user) return;
     setLoading(true);
     try {
-      const [homeworkRes, coursesRes] = await Promise.all([
-        fetch(`/api/homework?schoolId=${user.schoolId}&teacherId=${user.id}`),
-        fetch(`/api/courses?schoolId=${user.schoolId}&teacherId=${user.id}`),
+      const [homeworkData, coursesData] = await Promise.all([
+        fetchJsonWithCache(`/api/homework?schoolId=${user.schoolId}&teacherId=${user.id}`, { homework: [] }),
+        fetchJsonWithCache(`/api/courses?schoolId=${user.schoolId}&teacherId=${user.id}`, { courses: [] }),
       ]);
-      const homeworkData = await homeworkRes.json();
-      const coursesData = await coursesRes.json();
       setHomeworkList(Array.isArray(homeworkData) ? homeworkData : (Array.isArray(homeworkData.homework) ? homeworkData.homework : []));
       setCourses(Array.isArray(coursesData.courses) ? coursesData.courses : []);
     } catch {
@@ -164,7 +162,14 @@ export default function TeacherHomework() {
       };
       const url = editingHomework ? `/api/homework/${editingHomework.id}` : '/api/homework';
       const method = editingHomework ? 'PUT' : 'POST';
-      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const res = !editingHomework && !fileUrl
+        ? await queueOrFetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        : await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!res) {
+        toast.info('Devoir enregistré hors ligne. Il sera synchronisé au retour du réseau.');
+        resetForm();
+        return;
+      }
       if (!res.ok) { const err = await res.json(); toast.error(err.error || "Erreur lors de l'enregistrement"); return; }
       toast.success(editingHomework ? 'Devoir modifié avec succès' : 'Devoir créé avec succès');
 

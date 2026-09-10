@@ -46,6 +46,7 @@ export const useAppStore = create<AppState>()(
 
       // Session
       hydrateSession: async () => {
+        const storedUser = useAppStore.getState().user;
         try {
           const res = await fetch('/api/auth/me', { credentials: 'include' });
           if (res.ok) {
@@ -84,7 +85,11 @@ export const useAppStore = create<AppState>()(
             }
           }
         } catch {
-          /* session absente ou réseau indisponible */
+          // En mode hors ligne, conserver la dernière session locale et la
+          // dernière page autorisée. La session sera revérifiée au retour réseau.
+          if (typeof navigator !== 'undefined' && !navigator.onLine && storedUser) {
+            set({ user: storedUser });
+          }
         }
       },
       logout: async () => {
@@ -125,6 +130,7 @@ export const useAppStore = create<AppState>()(
     {
       name: 'gradeup-storage',
       partialize: (state) => ({
+        user: state.user,
         currentPage: state.currentPage,
         sidebarOpen: state.sidebarOpen,
       }),

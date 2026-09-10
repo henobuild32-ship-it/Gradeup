@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import Script from "next/script";
 import PWAUpdateManager from "@/components/gradeup/pwa-update-manager";
+import OfflineSyncManager from "@/components/gradeup/offline-sync-manager";
 
 // Local fallback variables to guarantee 100% offline build capability without network dependencies
 const geistSans = {
@@ -43,6 +44,7 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           {children}
           <PWAUpdateManager />
+          <OfflineSyncManager />
           <Toaster />
           <Script
             id="sw-register"

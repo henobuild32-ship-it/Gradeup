@@ -32,6 +32,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { fetchJsonWithCache, queueOrFetch } from '@/lib/offline-sync';
 
 export default function MessageCenter() {
   const { user } = useAppStore();
@@ -58,8 +59,7 @@ export default function MessageCenter() {
         const params = new URLSearchParams({ schoolId: user.schoolId });
 
         // Fetch messages/notifications
-        const notifsRes = await fetch(`/api/notifications?${params}`);
-        const notifsData = await notifsRes.json();
+        const notifsData = await fetchJsonWithCache(`/api/notifications?${params}`, { notifications: [] });
         const allNotifs: NotificationInfo[] = Array.isArray(notifsData) ? notifsData : notifsData?.notifications || [];
         // Sort by date descending
         allNotifs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -67,8 +67,7 @@ export default function MessageCenter() {
 
         // Fetch classes for admin compose
         if (isAdmin) {
-          const classesRes = await fetch(`/api/classes?${params}`);
-          const classesData = await classesRes.json();
+          const classesData = await fetchJsonWithCache(`/api/classes?${params}`, { classes: [] });
           setClasses(Array.isArray(classesData) ? classesData : classesData?.classes || []);
         }
       } catch {
@@ -83,7 +82,7 @@ export default function MessageCenter() {
 
   const handleMarkAsRead = async (notifId: string) => {
     try {
-      await fetch(`/api/notifications/${notifId}`, {
+      await queueOrFetch(`/api/notifications/${notifId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ read: true }),
@@ -101,7 +100,7 @@ export default function MessageCenter() {
       const unread = messages.filter((m) => !m.read);
       await Promise.all(
         unread.map((m) =>
-          fetch(`/api/notifications/${m.id}`, {
+          queueOrFetch(`/api/notifications/${m.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ read: true }),

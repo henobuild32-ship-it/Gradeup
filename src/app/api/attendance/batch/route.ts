@@ -12,6 +12,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { courseId, date, records } = body;
+    const operationId = request.headers.get('x-idempotency-key') || body.operationId;
     const schoolId = auth.schoolId;
     const teacherId = auth.userId;
 
@@ -20,6 +21,15 @@ export async function POST(request: NextRequest) {
         { error: 'Champs requis manquants: schoolId, teacherId, date, records' },
         { status: 400 }
       );
+    }
+    if (operationId) {
+      const previous = await db.syncOperation.findUnique({ where: { operationId } });
+      if (previous) {
+        if (previous.userId !== auth.userId || previous.schoolId !== schoolId) {
+          return NextResponse.json({ error: 'Clé de synchronisation invalide' }, { status: 403 });
+        }
+        return NextResponse.json(previous.response, { status: previous.statusCode });
+      }
     }
     if (auth.role === 'TEACHER' && !(await db.course.findFirst({ where: { id: courseId || undefined, schoolId, teacherId } }))) return NextResponse.json({ error: 'Matière non affectée.' }, { status: 403 });
 
@@ -110,7 +120,20 @@ export async function POST(request: NextRequest) {
       }
     })();
 
-    return NextResponse.json({ success: true, count: results.length }, { status: 200 });
+    const responseBody = { success: true, count: results.length };
+    if (operationId) {
+      await db.syncOperation.create({
+        data: {
+          operationId,
+          userId: auth.userId,
+          schoolId,
+          operationType: 'BATCH_ATTENDANCE',
+          statusCode: 200,
+          response: responseBody,
+        },
+      });
+    }
+    return NextResponse.json(responseBody, { status: 200 });
   } catch (err: unknown) {
     if (err instanceof AuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });

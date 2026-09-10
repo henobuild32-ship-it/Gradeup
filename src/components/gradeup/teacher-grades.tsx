@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { CourseInfo, GradeInfo, UserInfo } from '@/lib/types';
 import { isSecondaryClass } from '@/lib/grade-service';
+import { cacheJson, queueOrFetch, readCachedJson } from '@/lib/offline-sync';
 
 const SECONDARY_PERIODS: { value: string; label: string }[] = [
   { value: 'P1', label: 'P1 — 1ère période (S1)' },
@@ -85,11 +86,16 @@ export default function TeacherGrades() {
 
   const fetchCourses = useCallback(async () => {
     if (!user) return;
+    const cacheKey = `/api/courses?schoolId=${user.schoolId}&teacherId=${user.id}`;
     try {
-      const res = await fetch(`/api/courses?schoolId=${user.schoolId}&teacherId=${user.id}`);
+      const res = await fetch(cacheKey);
       const data = await res.json();
+      await cacheJson(cacheKey, data);
       setCourses(Array.isArray(data.courses) ? data.courses : []);
-    } catch { /* silent */ }
+    } catch {
+      const data = await readCachedJson<{ courses?: CourseInfo[] }>(cacheKey);
+      setCourses(Array.isArray(data?.courses) ? data.courses : []);
+    }
   }, [user]);
 
   const fetchGrades = useCallback(async () => {
@@ -101,9 +107,13 @@ export default function TeacherGrades() {
       if (filterTrimester) url += `&trimester=${filterTrimester}`;
       const res = await fetch(url);
       const data = await res.json();
+      await cacheJson(url, data);
       setGrades(Array.isArray(data.grades) ? data.grades : []);
     } catch {
-      toast.error('Erreur lors du chargement des notes');
+      const url = `/api/grades?schoolId=${user.schoolId}&teacherId=${user.id}${filterCourseId ? `&courseId=${filterCourseId}` : ''}${filterTrimester ? `&trimester=${filterTrimester}` : ''}`;
+      const data = await readCachedJson<{ grades?: GradeInfo[] }>(url);
+      if (Array.isArray(data?.grades)) setGrades(data.grades);
+      else toast.error('Aucune donnée de notes disponible hors ligne');
     } finally {
       setLoading(false);
     }
@@ -317,11 +327,26 @@ export default function TeacherGrades() {
 
       const url = editingGrade ? `/api/grades/${editingGrade.id}` : '/api/grades';
       const method = editingGrade ? 'PUT' : 'POST';
-      const res = await fetch(url, {
+      const res = editingGrade
+        ? await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          })
+        : await queueOrFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
+
+      if (!res) {
+        const studentName = students.find(s => s.id === formStudentId)?.fullName || 'Élève';
+        toast.info('Note enregistrée hors ligne. Elle sera synchronisée au retour du réseau.');
+        setDialogOpen(false);
+        resetForm();
+        showSyncBanner(studentName, formTrimester, parseFloat(formScore) / parseFloat(formMaxScore) * 20);
+        return;
+      }
 
       if (!res.ok) {
         const err = await res.json();
@@ -374,11 +399,24 @@ export default function TeacherGrades() {
       const url = matchingGrade ? `/api/grades/${matchingGrade.id}` : '/api/grades';
       const method = matchingGrade ? 'PUT' : 'POST';
       
-      const res = await fetch(url, {
+      const res = matchingGrade
+        ? await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          })
+        : await queueOrFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
+
+      if (!res) {
+        lastSaved.current[key] = scoreStr;
+        const studentName = gridStudents.find(s => s.id === studentId)?.fullName || 'Élève';
+        toast.info(`Note de ${studentName} mise en attente hors ligne`);
+        return;
+      }
 
       if (res.ok) {
         lastSaved.current[key] = scoreStr;

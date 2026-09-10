@@ -105,12 +105,23 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { schoolId, courseId, studentId, teacherId, score, maxScore, trimester, period, comment } = body;
+    const operationId = request.headers.get('x-idempotency-key') || body.operationId;
 
     if (!schoolId || !courseId || !studentId || !teacherId || score === undefined) {
       return NextResponse.json(
         { error: 'Champs requis manquants: schoolId, courseId, studentId, teacherId, score' },
         { status: 400 }
       );
+    }
+
+    if (operationId) {
+      const previous = await db.syncOperation.findUnique({ where: { operationId } });
+      if (previous) {
+        if (previous.userId !== auth.userId || previous.schoolId !== schoolId) {
+          return NextResponse.json({ error: 'Clé de synchronisation invalide' }, { status: 403 });
+        }
+        return NextResponse.json(previous.response, { status: previous.statusCode });
+      }
     }
 
     try {
@@ -180,7 +191,20 @@ export async function POST(request: NextRequest) {
       if (grade) {
         void notifyGrade(grade.id, schoolId, studentId, teacherId, courseId, grade.score, 20, course.name || 'Matière', grade.comment).catch(() => {});
       }
-      return NextResponse.json({ grade: grade ?? undefined, fromCahier: true }, { status: 201 });
+      const responseBody = { grade: grade ?? null, fromCahier: true };
+      if (operationId) {
+        await db.syncOperation.create({
+          data: {
+            operationId,
+            userId: auth.userId,
+            schoolId,
+            operationType: 'CREATE_GRADE',
+            statusCode: 201,
+            response: responseBody,
+          },
+        });
+      }
+      return NextResponse.json(responseBody, { status: 201 });
     }
 
     // ── Notes directes (trimestres Maternelle/Primaire : T1, T2, T3) ──
@@ -237,7 +261,20 @@ export async function POST(request: NextRequest) {
       }
     } catch (e) { console.error('[Grade] Notification setup error:', e); }
 
-    return NextResponse.json({ grade }, { status: 201 });
+    const responseBody = { grade };
+    if (operationId) {
+      await db.syncOperation.create({
+        data: {
+          operationId,
+          userId: auth.userId,
+          schoolId,
+          operationType: 'CREATE_GRADE',
+          statusCode: 201,
+          response: responseBody,
+        },
+      });
+    }
+    return NextResponse.json(responseBody, { status: 201 });
   } catch (err: unknown) {
     if (err instanceof AuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });

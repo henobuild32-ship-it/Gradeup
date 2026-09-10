@@ -14,6 +14,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CheckCircle2, XCircle, Clock, Save, Users, Calendar, History, UserCheck, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
+import { fetchJsonWithCache, queueOrFetch } from '@/lib/offline-sync';
 import type { UserInfo, AttendanceInfo, CourseInfo, AttendanceStatus } from '@/lib/types';
 
 interface StudentAttendance {
@@ -40,8 +41,7 @@ export default function TeacherAttendance() {
   const fetchCourses = async () => {
     if (!user) return;
     try {
-      const res = await fetch(`/api/courses?schoolId=${user.schoolId}&teacherId=${user.id}`);
-      const data = await res.json();
+      const data = await fetchJsonWithCache(`/api/courses?schoolId=${user.schoolId}&teacherId=${user.id}`, { courses: [] });
       setCourses(Array.isArray(data.courses) ? data.courses : []);
     } catch { /* silent */ }
   };
@@ -54,10 +54,8 @@ export default function TeacherAttendance() {
     try {
       const course = courses.find((c) => c.id === selectedCourseId);
       if (!course) return;
-      const studentsRes = await fetch(`/api/users?schoolId=${user.schoolId}&role=STUDENT&classId=${course.classId}`);
-      const studentsData = await studentsRes.json();
-      const attendanceRes = await fetch(`/api/attendance?schoolId=${user.schoolId}&date=${selectedDate}&courseId=${selectedCourseId}`);
-      const attendanceData = await attendanceRes.json();
+      const studentsData = await fetchJsonWithCache(`/api/users?schoolId=${user.schoolId}&role=STUDENT&classId=${course.classId}`, { users: [] });
+      const attendanceData = await fetchJsonWithCache(`/api/attendance?schoolId=${user.schoolId}&date=${selectedDate}&courseId=${selectedCourseId}`, { attendance: [] });
       const studentsList = Array.isArray(studentsData.users) ? studentsData.users : (Array.isArray(studentsData) ? studentsData : []);
       const attendanceList = Array.isArray(attendanceData.attendance) ? attendanceData.attendance : (Array.isArray(attendanceData) ? attendanceData : []);
       const mergedAttendance: StudentAttendance[] = studentsList.map((student: UserInfo) => {
@@ -82,11 +80,15 @@ export default function TeacherAttendance() {
     setSaving(true);
     try {
       const records = attendance.map((r) => ({ studentId: r.studentId, status: r.status, reason: r.reason }));
-      const res = await fetch('/api/attendance/batch', {
+      const res = await queueOrFetch('/api/attendance/batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ schoolId: user.schoolId, courseId: selectedCourseId, teacherId: user.id, date: selectedDate, records }),
       });
+      if (!res) {
+        toast.info('Présences enregistrées hors ligne. Synchronisation au retour du réseau.');
+        return;
+      }
       if (!res.ok) { toast.error("Erreur lors de l'enregistrement"); return; }
       toast.success('Appel enregistré avec succès');
       fetchStudentsAndAttendance();

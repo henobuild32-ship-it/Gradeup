@@ -59,6 +59,7 @@ import {
   Pencil,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { fetchJsonWithCache } from '@/lib/offline-sync';
 
 interface Student {
   id: string;
@@ -184,8 +185,7 @@ export default function CahierCotation() {
   // Fetch classes appropriate for secondary level
   useEffect(() => {
     if (!user?.schoolId) return;
-    fetch(`/api/classes?schoolId=${user.schoolId}`)
-      .then((r) => r.json())
+    fetchJsonWithCache(`/api/classes?schoolId=${user.schoolId}`, { classes: [] })
       .then((d) => {
         const all = d.classes || [];
         // Filter to secondary education classes (RDC Levels: 7e EB, 8e EB, 1-4e Humanités, or Secondaire)
@@ -216,8 +216,7 @@ export default function CahierCotation() {
       return;
     }
     const teacherParam = user.role === 'TEACHER' ? `&teacherId=${user.id}` : '';
-    fetch(`/api/courses?schoolId=${user.schoolId}&classId=${selectedClassId}${teacherParam}`)
-      .then((r) => r.json())
+    fetchJsonWithCache(`/api/courses?schoolId=${user.schoolId}&classId=${selectedClassId}${teacherParam}`, { courses: [] })
       .then((d) => {
         const list = Array.isArray(d.courses) ? d.courses : Array.isArray(d) ? d : [];
         setCourses(list);
@@ -237,8 +236,7 @@ export default function CahierCotation() {
     setLoading(true);
     try {
       const url = `/api/cahier/evaluations?schoolId=${user?.schoolId}&classId=${selectedClassId}&courseId=${selectedCourseId}&period=${selectedPeriod}`;
-      const res = await fetch(url);
-      const data = await res.json();
+      const data = await fetchJsonWithCache(url, { students: [], evaluations: [] });
       setStudents(data.students || []);
       setEvaluations(data.evaluations || []);
     } catch {
