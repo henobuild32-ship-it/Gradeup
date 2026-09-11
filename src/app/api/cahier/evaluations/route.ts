@@ -26,6 +26,16 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       );
     }
+    if (schoolId !== auth.schoolId) {
+      return NextResponse.json({ error: 'Établissement invalide.' }, { status: 403 });
+    }
+    const course = await db.course.findFirst({
+      where: { id: courseId, schoolId, classId, deletedAt: null },
+      select: { teacherId: true },
+    });
+    if (!course || (auth.role === 'TEACHER' && course.teacherId !== auth.userId)) {
+      return NextResponse.json({ error: 'Vous n’êtes pas autorisé à consulter ce cahier.' }, { status: 403 });
+    }
 
     // 1. Fetch all students enrolled in the class
     const enrollments = await db.enrolledClass.findMany({
@@ -44,7 +54,10 @@ export async function GET(request: NextRequest) {
 
     const students = enrollments
       .map((e) => e.user)
-      .filter((u) => u !== null);
+      .filter((u) => u !== null)
+      .sort((a, b) =>
+        `${a.fullName} ${a.postName}`.localeCompare(`${b.fullName} ${b.postName}`, 'fr', { sensitivity: 'base' })
+      );
 
     // 2. Fetch all evaluations for this course (optionally filtered by period)
     const evaluationWhere: Record<string, unknown> = { schoolId, classId, courseId };
@@ -84,11 +97,21 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { schoolId, classId, courseId, title, maxScore, period, date, teacherId } = body;
 
-    if (!schoolId || !classId || !courseId || !title || !period || !teacherId) {
+    if (!schoolId || !classId || !courseId || !title || !period) {
       return NextResponse.json(
-        { error: 'Missing required fields: schoolId, classId, courseId, title, period, teacherId' },
+        { error: 'Missing required fields: schoolId, classId, courseId, title, period' },
         { status: 400 }
       );
+    }
+    if (schoolId !== auth.schoolId) {
+      return NextResponse.json({ error: 'Établissement invalide.' }, { status: 403 });
+    }
+    const course = await db.course.findFirst({
+      where: { id: courseId, schoolId, classId, deletedAt: null },
+      select: { teacherId: true },
+    });
+    if (!course || (auth.role === 'TEACHER' && course.teacherId !== auth.userId)) {
+      return NextResponse.json({ error: 'Vous n’êtes pas autorisé à créer cette évaluation.' }, { status: 403 });
     }
 
     const evaluation = await db.cahierEvaluation.create({
@@ -99,27 +122,10 @@ export async function POST(request: NextRequest) {
         title,
         maxScore: maxScore ? parseFloat(maxScore) : 20,
         trimester: period,
-        teacherId,
+        teacherId: auth.role === 'TEACHER' ? auth.userId : (teacherId || course.teacherId),
         date: date ? new Date(date) : new Date(),
       },
     });
-
-    // Fetch all students in class to initialize empty marks for them
-    const enrollments = await db.enrolledClass.findMany({
-      where: { classId },
-      select: { userId: true },
-    });
-
-    if (enrollments.length > 0) {
-      await db.cahierMark.createMany({
-        data: enrollments.map((e) => ({
-          evaluationId: evaluation.id,
-          studentId: e.userId,
-          score: 0,
-        })),
-        skipDuplicates: true,
-      });
-    }
 
     return NextResponse.json({ evaluation }, { status: 201 });
   } catch (error: unknown) {

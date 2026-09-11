@@ -104,14 +104,21 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { schoolId, courseId, studentId, teacherId, score, maxScore, trimester, period, comment } = body;
+    const { schoolId, courseId, studentId, teacherId, score, maxScore, trimester, period, comment, evaluationTitle, evaluationDate } = body;
     const operationId = request.headers.get('x-idempotency-key') || body.operationId;
 
-    if (!schoolId || !courseId || !studentId || !teacherId || score === undefined) {
+    if (!schoolId || !courseId || !studentId || score === undefined) {
       return NextResponse.json(
-        { error: 'Champs requis manquants: schoolId, courseId, studentId, teacherId, score' },
+        { error: 'Champs requis manquants: schoolId, courseId, studentId, score' },
         { status: 400 }
       );
+    }
+    if (schoolId !== auth.schoolId) {
+      return NextResponse.json({ error: 'Établissement invalide' }, { status: 403 });
+    }
+    const effectiveTeacherId = auth.role === 'TEACHER' ? auth.userId : teacherId;
+    if (!effectiveTeacherId) {
+      return NextResponse.json({ error: 'Professeur responsable requis' }, { status: 400 });
     }
 
     if (operationId) {
@@ -132,7 +139,7 @@ export async function POST(request: NextRequest) {
 
     // Permission : seuls le professeur titulaire du cours (ou un admin) notent.
     const course = await db.course.findUnique({
-      where: { id: courseId },
+      where: { id: courseId, schoolId, deletedAt: null },
       select: {
         id: true,
         classId: true,
@@ -165,8 +172,11 @@ export async function POST(request: NextRequest) {
         schoolId,
         classId: course.classId,
         courseId,
-        teacherId,
+        teacherId: effectiveTeacherId,
         period: evalPeriod,
+        title: typeof evaluationTitle === 'string' ? evaluationTitle : undefined,
+        maxScore: parsedMax,
+        date: evaluationDate ? new Date(evaluationDate) : undefined,
       });
       await upsertCahierMark({ evaluationId: evaluation.id, studentId, score: parsedScore });
       await recomputeStudentPeriodGrade({
@@ -174,7 +184,7 @@ export async function POST(request: NextRequest) {
         courseId,
         studentId,
         period: evalPeriod,
-        teacherId,
+        teacherId: effectiveTeacherId,
         comment: comment ?? undefined,
       });
 
@@ -189,7 +199,7 @@ export async function POST(request: NextRequest) {
       });
 
       if (grade) {
-        void notifyGrade(grade.id, schoolId, studentId, teacherId, courseId, grade.score, 20, course.name || 'Matière', grade.comment).catch(() => {});
+        void notifyGrade(grade.id, schoolId, studentId, effectiveTeacherId, courseId, grade.score, 20, course.name || 'Matière', grade.comment).catch(() => {});
       }
       const responseBody = { grade: grade ?? null, fromCahier: true };
       if (operationId) {
@@ -213,7 +223,7 @@ export async function POST(request: NextRequest) {
         schoolId,
         courseId,
         studentId,
-        teacherId,
+        teacherId: effectiveTeacherId,
         score: parsedScore,
         maxScore: parsedMax,
         trimester: trimester || '1',
@@ -238,7 +248,7 @@ export async function POST(request: NextRequest) {
       notifyUser({
         schoolId,
         userId: studentId,
-        senderId: teacherId,
+        senderId: effectiveTeacherId,
         title: `📊 Nouvelle note : ${courseName}`,
         message: `Note obtenue : ${scoreStr} (Trimestre ${grade.trimester})${grade.comment ? ' — ' + grade.comment : ''}`,
         type: 'GRADE',
@@ -251,7 +261,7 @@ export async function POST(request: NextRequest) {
         notifyUser({
           schoolId,
           userId: grade.student.parentId,
-          senderId: teacherId,
+          senderId: effectiveTeacherId,
           title: `📊 Note pour ${grade.student.fullName} (${courseName})`,
           message: `Note : ${scoreStr} (Trimestre ${grade.trimester})`,
           type: 'GRADE',

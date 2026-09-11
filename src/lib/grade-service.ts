@@ -40,9 +40,9 @@ export function periodToTrimester(period: string): string {
 }
 
 /**
- * Trouve (ou crée) la colonne d'évaluation "Saisie rapide" du cahier pour un
- * cours + période donnés. Réutilisée par le module Notes afin que tout ce qui
- * est saisi en saisie rapide apparaisse dans le cahier de cotation.
+ * Trouve (ou crée) la colonne d'évaluation du cahier correspondant à une
+ * saisie depuis le module Notes. Sans métadonnée, la colonne "Saisie rapide"
+ * historique est conservée pour la grille rapide.
  */
 export async function ensureQuickEvaluation(params: {
   schoolId: string;
@@ -50,8 +50,13 @@ export async function ensureQuickEvaluation(params: {
   courseId: string;
   teacherId: string;
   period: string;
+  title?: string;
+  maxScore?: number;
+  date?: Date;
 }) {
   const { schoolId, classId, courseId, teacherId, period } = params;
+  const title = params.title?.trim() || QUICK_EVALUATION_TITLE;
+  const maxScore = params.maxScore && params.maxScore > 0 ? params.maxScore : 20;
 
   const existing = await db.cahierEvaluation.findFirst({
     where: {
@@ -60,7 +65,7 @@ export async function ensureQuickEvaluation(params: {
       courseId,
       teacherId,
       trimester: period,
-      title: QUICK_EVALUATION_TITLE,
+      title,
       deletedAt: null,
     },
     orderBy: { createdAt: 'desc' },
@@ -74,10 +79,10 @@ export async function ensureQuickEvaluation(params: {
       classId,
       courseId,
       teacherId,
-      title: QUICK_EVALUATION_TITLE,
-      maxScore: 20,
+      title,
+      maxScore,
       trimester: period,
-      date: new Date(),
+      date: params.date ?? new Date(),
     },
   });
 }

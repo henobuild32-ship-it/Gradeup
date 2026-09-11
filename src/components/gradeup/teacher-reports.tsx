@@ -149,42 +149,20 @@ export default function TeacherReports() {
     if (!wizStudentId || !schoolId || !user) return;
     setSubmittingWiz(true);
     try {
-      const student = students.find((s) => s.id === wizStudentId);
-      const reportNumber = `RPT-${Date.now()}`;
-
-      // Calculate mention
-      let mention = 'À déterminer';
-      if (wizAverage >= 16) mention = 'Félicitations';
-      else if (wizAverage >= 14) mention = 'Tableau d\'honneur';
-      else if (wizAverage >= 12) mention = 'Encouragements';
-      else if (wizAverage >= 10) mention = 'Passable';
-      else mention = 'Insuffisant';
-
-      const res = await fetch('/api/report-cards', {
+      const res = await fetch('/api/grades/sync-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          reportNumber,
           schoolId,
           classId: wizClassId,
           studentId: wizStudentId,
-          teacherId: user.id,
           trimester: wizTrimester,
-          studentName: student?.fullName || 'Élève',
-          studentGender: student?.gender || 'M',
-          studentBirthDate: student?.birthDate || '',
-          totalPointsObtained: wizAverage * Object.keys(wizGrades).length,
-          totalPointsPossible: Object.keys(wizGrades).length * 20,
-          overallPercentage: (wizAverage / 20) * 100,
-          averageGrade: wizAverage,
-          classRank: 0,
-          mention,
-          gradesData: { grades: wizGrades, appreciation: wizAppreciation },
         }),
       });
 
-      if (!res.ok) throw new Error();
-      toast({ title: 'Succès', description: 'Bulletin créé avec succès' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Échec de synchronisation');
+      toast({ title: 'Succès', description: 'Bulletin généré à partir des cotations enregistrées.' });
       setWizardOpen(false);
       // Reset wizard
       setWizClassId('');
@@ -194,8 +172,8 @@ export default function TeacherReports() {
       setWizAverage(0);
       setWizardStep(1);
       fetchData();
-    } catch {
-      toast({ title: 'Erreur', description: 'Échec de création du bulletin', variant: 'destructive' });
+    } catch (error: unknown) {
+      toast({ title: 'Erreur', description: error instanceof Error ? error.message : 'Échec de génération du bulletin', variant: 'destructive' });
     } finally {
       setSubmittingWiz(false);
     }

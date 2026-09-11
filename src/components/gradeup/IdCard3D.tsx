@@ -208,19 +208,6 @@ export default function IdCard3D({ user, school, role }: IdCard3DProps) {
                 </div>
               </div>
 
-              {/* QR Code column */}
-              <div className="flex flex-col items-center justify-center gap-1 shrink-0 self-center">
-                <div className="bg-white p-1 rounded-lg shadow-md border border-slate-200">
-                  {user.matricule || user.id ? (
-                    <QRCodeSVG value={qrUrl} size={64} level="M" />
-                  ) : (
-                    <div className="w-16 h-16 bg-slate-100 flex items-center justify-center rounded">
-                      <span className="text-[6px] text-slate-400 text-center leading-tight">QR</span>
-                    </div>
-                  )}
-                </div>
-                <span className="text-[6px] text-slate-400 text-center leading-tight max-w-[80px]">Scannez pour vérifier</span>
-              </div>
             </div>
 
             {/* Footer */}
@@ -239,26 +226,31 @@ export default function IdCard3D({ user, school, role }: IdCard3DProps) {
 
           {/* ────────── VERSO ────────── */}
           <div
-            className="absolute inset-0 rounded-xl overflow-hidden shadow-2xl bg-white border border-slate-200 flex flex-col items-center justify-center"
+            className="absolute inset-0 rounded-xl overflow-hidden shadow-2xl bg-white border border-slate-200 flex flex-col"
             style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
           >
             <div className="shrink-0 w-full" style={{ height: BAND_H, backgroundColor: color }} />
 
-            {validLogo ? (
-              <div className="flex-1 flex flex-col items-center justify-center gap-3 p-5 sm:p-8">
-                <div className="w-24 h-24 sm:w-36 sm:h-36 rounded-2xl border border-slate-200 bg-white flex items-center justify-center p-3 shadow-lg">
+            <div className="flex-1 grid grid-cols-[auto_1fr] items-center gap-4 p-5 sm:p-8">
+              <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-2xl border border-slate-200 bg-white flex items-center justify-center p-3 shadow-lg">
+                {validLogo ? (
                   <img src={school.logoUrl!} alt={school.name} className="max-w-full max-h-full object-contain" />
+                ) : <School className="w-16 h-16 text-slate-300" />}
+              </div>
+              <div className="min-w-0 space-y-2 text-[10px] sm:text-[11px] text-slate-600">
+                <h3 className="text-sm sm:text-lg font-black text-slate-800 uppercase tracking-wide">{school.name}</h3>
+                <p>{[school.commune, school.city, school.province].filter(Boolean).join(', ') || 'Coordonnées de l’établissement disponibles auprès de l’administration.'}</p>
+                {school.email && <p className="flex items-center gap-1.5"><Mail className="w-3 h-3" style={{ color }} />{school.email}</p>}
+                <p className="flex items-center gap-1.5"><Shield className="w-3 h-3" style={{ color }} />Valide : {user.cardExpiryDate || school.academicYear || user.academicYear || 'année scolaire en cours'}</p>
+                <p className="font-semibold text-slate-700">Vérification : {user.matricule || user.cardId || user.id}</p>
+              </div>
+              <div className="hidden sm:flex flex-col items-center gap-1">
+                <div className="bg-white p-1 rounded-lg shadow-md border border-slate-200">
+                  <QRCodeSVG value={qrUrl} size={70} level="M" />
                 </div>
-                <h3 className="text-sm sm:text-lg font-black text-slate-800 text-center uppercase tracking-wide">{school.name}</h3>
-                <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium">Carte officielle · GradeUp Platform</p>
+                <span className="text-[7px] text-slate-400 text-center">Scanner pour vérifier</span>
               </div>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center gap-3 p-5 sm:p-8">
-                <School className="w-20 h-20 text-slate-200" />
-                <p className="text-sm text-slate-300 font-medium">{school.name}</p>
-                <p className="text-[11px] text-slate-300">Carte Officielle • GradeUp Platform</p>
-              </div>
-            )}
+            </div>
 
             <div className="shrink-0 w-full" style={{ height: BAND_H, backgroundColor: color }} />
           </div>

@@ -77,6 +77,8 @@ export default function TeacherGrades() {
   const [formStudentId, setFormStudentId] = useState('');
   const [formScore, setFormScore] = useState('');
   const [formMaxScore, setFormMaxScore] = useState('20');
+  const [formEvaluationTitle, setFormEvaluationTitle] = useState('');
+  const [formEvaluationDate, setFormEvaluationDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [formTrimester, setFormTrimester] = useState('1');
   const [formComment, setFormComment] = useState('');
   const [formReason, setFormReason] = useState('');
@@ -267,6 +269,8 @@ export default function TeacherGrades() {
     setFormStudentId('');
     setFormScore('');
     setFormMaxScore('20');
+    setFormEvaluationTitle('');
+    setFormEvaluationDate(new Date().toISOString().slice(0, 10));
     setFormTrimester('1');
     setFormComment('');
     setFormReason('');
@@ -343,6 +347,8 @@ export default function TeacherGrades() {
         teacherId: user.id,
         score,
         maxScore,
+        evaluationTitle: formEvaluationTitle.trim() || undefined,
+        evaluationDate: formEvaluationDate || undefined,
         trimester: formTrimester,
         period: formTrimester,
         comment: formComment.trim(),
@@ -1041,6 +1047,28 @@ export default function TeacherGrades() {
                 <Input type="number" placeholder="20" min="1" value={formMaxScore} onChange={(e) => setFormMaxScore(e.target.value)} className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" />
               </div>
             </div>
+            {!editingGrade && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Évaluation</Label>
+                  <Input
+                    placeholder="Ex. Interrogation 1"
+                    value={formEvaluationTitle}
+                    onChange={(e) => setFormEvaluationTitle(e.target.value)}
+                    className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Date de l'évaluation</Label>
+                  <Input
+                    type="date"
+                    value={formEvaluationDate}
+                    onChange={(e) => setFormEvaluationDate(e.target.value)}
+                    className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  />
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>{dialogIsSecondary ? 'Période *' : 'Trimestre *'}</Label>
               <select

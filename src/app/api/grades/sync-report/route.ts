@@ -15,7 +15,7 @@ import { syncStudentReport, type SyncResult } from '@/lib/grade-sync';
 
 export async function POST(request: NextRequest) {
   try {
-    authenticateRequest(request);
+    const auth = authenticateRequest(request);
     const body = await request.json();
     const { schoolId, classId, trimester, studentId } = body;
 
@@ -24,6 +24,24 @@ export async function POST(request: NextRequest) {
         { error: 'schoolId and trimester are required' },
         { status: 400 }
       );
+    }
+    if (schoolId !== auth.schoolId) {
+      return NextResponse.json({ error: 'schoolId invalide' }, { status: 400 });
+    }
+    if (auth.role === 'STUDENT' || auth.role === 'PARENT') {
+      return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
+    }
+    if (auth.role === 'TEACHER') {
+      if (!classId) {
+        return NextResponse.json({ error: 'Sélectionnez une de vos classes pour synchroniser les bulletins.' }, { status: 400 });
+      }
+      const course = await db.course.findFirst({
+        where: { schoolId, classId, teacherId: auth.userId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!course) {
+        return NextResponse.json({ error: 'Cette classe ne vous est pas attribuée.' }, { status: 403 });
+      }
     }
 
     // Determine which students to sync
@@ -92,7 +110,7 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    authenticateRequest(request);
+    const auth = authenticateRequest(request);
     const { searchParams } = new URL(request.url);
     const schoolId = searchParams.get('schoolId');
     const studentId = searchParams.get('studentId');
@@ -101,6 +119,9 @@ export async function GET(request: NextRequest) {
 
     if (!schoolId) {
       return NextResponse.json({ error: 'schoolId is required' }, { status: 400 });
+    }
+    if (schoolId !== auth.schoolId) {
+      return NextResponse.json({ error: 'schoolId invalide' }, { status: 400 });
     }
 
     const where: Record<string, unknown> = {
@@ -111,6 +132,23 @@ export async function GET(request: NextRequest) {
     if (studentId) where.studentId = studentId;
     if (trimester) where.trimester = trimester;
     if (classId) where.classId = classId;
+    if (auth.role === 'STUDENT') {
+      where.studentId = auth.userId;
+    } else if (auth.role === 'PARENT') {
+      const children = await db.user.findMany({
+        where: { schoolId, parentId: auth.userId },
+        select: { id: true },
+      });
+      where.studentId = { in: children.map((child) => child.id) };
+    } else if (auth.role === 'TEACHER') {
+      const courses = await db.course.findMany({
+        where: { schoolId, teacherId: auth.userId, deletedAt: null },
+        select: { classId: true },
+        distinct: ['classId'],
+      });
+      const classIds = courses.map((course) => course.classId);
+      where.classId = classId && classIds.includes(classId) ? classId : { in: classIds };
+    }
 
     const reportCards = await db.reportCard.findMany({
       where,
