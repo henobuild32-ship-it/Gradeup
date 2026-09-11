@@ -62,12 +62,13 @@ interface PaymentItem {
   month: string;
   method: string;
   createdAt: string;
-  student?: { id: string; fullName: string };
+  student?: { id: string; fullName: string; classEnrollments?: Array<{ class: { id: string; name: string } }> };
 }
 
 interface StudentItem {
   id: string;
   fullName: string;
+  classEnrollments?: Array<{ class: { id: string; name: string } }>;
 }
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof CheckCircle }> = {
@@ -95,6 +96,7 @@ export default function AdminPayments() {
   const [submitting, setSubmitting] = useState(false);
 
   const [formStudentId, setFormStudentId] = useState('');
+  const [formClassName, setFormClassName] = useState('');
   const [formAmount, setFormAmount] = useState('');
   const [formMonth, setFormMonth] = useState('');
   const [formStatus, setFormStatus] = useState('pending');
@@ -150,10 +152,17 @@ export default function AdminPayments() {
 
   const resetForm = () => {
     setFormStudentId('');
+    setFormClassName('');
     setFormAmount('');
     setFormMonth('');
     setFormStatus('pending');
     setFormMethod('cash');
+  };
+
+  const selectStudent = (studentId: string) => {
+    setFormStudentId(studentId);
+    const selectedStudent = students.find((student) => student.id === studentId);
+    setFormClassName(selectedStudent?.classEnrollments?.[0]?.class.name || 'Aucune classe attribuée');
   };
 
   const handleSubmit = async () => {
@@ -388,7 +397,12 @@ export default function AdminPayments() {
                     return (
                       <TableRow key={p.id} className="hover:bg-blue-50/50 dark:hover:bg-blue-950/20 transition-colors">
                         <TableCell className="font-medium">
-                          {p.student?.fullName || 'Inconnu'}
+                          <div>{p.student?.fullName || 'Inconnu'}</div>
+                          {p.student?.classEnrollments?.[0]?.class.name && (
+                            <div className="text-xs font-normal text-muted-foreground">
+                              {p.student.classEnrollments[0].class.name}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell className="font-bold">
                           {Number(p.amount).toLocaleString()} <span className="text-muted-foreground font-normal">USD</span>
@@ -450,7 +464,7 @@ export default function AdminPayments() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="pay-student">Élève *</Label>
-              <Select value={formStudentId} onValueChange={setFormStudentId}>
+              <Select value={formStudentId} onValueChange={selectStudent}>
                 <SelectTrigger id="pay-student" className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all">
                   <SelectValue placeholder="Sélectionner un élève" />
                 </SelectTrigger>
@@ -462,6 +476,16 @@ export default function AdminPayments() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pay-class">Classe</Label>
+              <Input
+                id="pay-class"
+                value={formClassName}
+                placeholder="Sélectionnez un élève"
+                readOnly
+                className="bg-muted text-muted-foreground"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="pay-amount">Montant (USD) *</Label>

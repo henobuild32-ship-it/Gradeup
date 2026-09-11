@@ -79,7 +79,14 @@ export async function GET(request: NextRequest) {
     const payments = await db.payment.findMany({
       where,
       include: {
-        student: { select: { id: true, fullName: true, role: true } },
+        student: {
+          select: {
+            id: true,
+            fullName: true,
+            role: true,
+            classEnrollments: { select: { class: { select: { id: true, name: true } } }, take: 1 },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });

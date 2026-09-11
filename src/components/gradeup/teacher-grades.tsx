@@ -18,7 +18,7 @@ import { Plus, Edit, Trash2, GraduationCap, Filter, Calculator, Sparkles, Check,
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { CourseInfo, GradeInfo, UserInfo } from '@/lib/types';
-import { isSecondaryClass } from '@/lib/grade-service';
+import { isSecondaryClass } from '@/lib/grade-cycle';
 import { cacheJson, fetchJsonWithCache, queueOrFetch } from '@/lib/offline-sync';
 
 const SECONDARY_PERIODS: { value: string; label: string }[] = [

@@ -10,8 +10,8 @@ export async function GET(request: NextRequest) {
     const teacherId = searchParams.get('teacherId');
     const classId = searchParams.get('classId');
 
-    if (!schoolId) {
-      return NextResponse.json({ error: 'schoolId is required' }, { status: 400 });
+    if (!schoolId || schoolId !== auth.schoolId) {
+      return NextResponse.json({ error: 'schoolId invalide' }, { status: 400 });
     }
 
     const where: Record<string, unknown> = { schoolId };
@@ -164,4 +164,3 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-

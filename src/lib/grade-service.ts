@@ -14,6 +14,7 @@
 
 import { db } from '@/lib/db';
 import { syncStudentReport } from '@/lib/grade-sync';
+export { isSecondaryClass } from '@/lib/grade-cycle';
 
 /** Périodes RDC du secondaire (EB/Humanités). */
 export const PERIODS_SECONDARY = ['P1', 'P2', 'EX1', 'P3', 'P4', 'EX2'] as const;
@@ -31,14 +32,6 @@ export function isPeriodKey(value: string | undefined | null): boolean {
  *  - EB / Humanités (secondaire) → périodes P1..EX2.
  *  - Maternelle / Primaire      → trimestres T1..T3 (notes directes).
  */
-export function isSecondaryClass(classInfo: { cycle?: string; level?: string } | null | undefined): boolean {
-  if (!classInfo) return false;
-  const cycle = (classInfo.cycle || '').toLowerCase();
-  const level = (classInfo.level || '').toLowerCase();
-  return cycle === 'eb' || cycle === 'humanites' || cycle === 'secondaire'
-    || level.includes('humanit') || level.includes('eb') || level.includes('7e') || level.includes('8e');
-}
-
 /** Convertit une période du cahier (P1, EX1...) en trimestre académique (1, 2). */
 export function periodToTrimester(period: string): string {
   if (period === 'P1' || period === 'P2' || period === 'EX1') return '1';

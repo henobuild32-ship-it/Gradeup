@@ -140,13 +140,22 @@ export default function AdminCards() {
   };
 
   const fetchUsersList = useCallback(async () => {
+    if (!user?.schoolId) {
+      setUsersList([]);
+      return;
+    }
     try {
       setLoading(true);
       const res = await fetch(`/api/users?schoolId=${user?.schoolId}&role=${cardRole}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Erreur lors du chargement des cartes');
+      }
       const data = await res.json();
       setUsersList(Array.isArray(data.users) ? data.users : []);
-    } catch {
-      toast.error(cardRole === 'STUDENT' ? 'Erreur lors du chargement des élèves' : 'Erreur lors du chargement des enseignants');
+    } catch (error: unknown) {
+      setUsersList([]);
+      toast.error(error instanceof Error ? error.message : cardRole === 'STUDENT' ? 'Erreur lors du chargement des élèves' : 'Erreur lors du chargement des enseignants');
     } finally {
       setLoading(false);
     }
