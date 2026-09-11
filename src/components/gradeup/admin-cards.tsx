@@ -84,6 +84,7 @@ export default function AdminCards() {
   // Payment states
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentPhone, setPaymentPhone] = useState('');
 
   // Check if payment was successful on mount (from URL params)
   useEffect(() => {
@@ -104,6 +105,10 @@ export default function AdminCards() {
   }, []);
 
   const handleInitiatePayment = async () => {
+    if (!/^\+243\d{9}$/.test(paymentPhone.replace(/\s/g, ''))) {
+      toast.error('Saisissez un numéro congolais valide au format +243XXXXXXXXX.');
+      return;
+    }
     setPaymentLoading(true);
     try {
       const successUrl = `${window.location.origin}/api/payments/geniuspay/success?schoolId=${user?.schoolId}&action=generate-single&userId=new-card`;
@@ -115,6 +120,12 @@ export default function AdminCards() {
         body: JSON.stringify({
           amount: 10,
           currency: 'USD',
+          paymentMethod: 'pawapay',
+          customer: {
+            name: user?.fullName || 'Administrateur GradeUp',
+            phone: paymentPhone.replace(/\s/g, ''),
+            country: 'CD',
+          },
           description: 'GradeUp - Création de carte d\'identité scolaire',
           successUrl,
           cancelUrl,
@@ -562,7 +573,10 @@ export default function AdminCards() {
       )}
 
       {/* Dialog de paiement */}
-      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+      <Dialog open={showPaymentDialog} onOpenChange={(open) => {
+        setShowPaymentDialog(open);
+        if (open) setPaymentPhone(user?.phone || '');
+      }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl">
@@ -584,6 +598,25 @@ export default function AdminCards() {
             </div>
 
             <div className="space-y-2">
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950">
+                <p className="font-semibold">Paiement Mobile Money RDC</p>
+                <p className="mt-1 text-xs leading-relaxed text-blue-800">
+                  Le prix de la carte est fixé à 10 USD. GeniusPay traite le paiement par PawaPay avec votre numéro RDC et peut convertir automatiquement le montant en XOF pour votre solde marchand. Vérifiez le montant final affiché par GeniusPay avant de confirmer.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="card-payment-phone">Numéro Mobile Money RDC *</Label>
+                <Input
+                  id="card-payment-phone"
+                  type="tel"
+                  inputMode="tel"
+                  placeholder="+243XXXXXXXXX"
+                  value={paymentPhone}
+                  onChange={(event) => setPaymentPhone(event.target.value)}
+                  disabled={paymentLoading}
+                />
+                <p className="text-xs text-muted-foreground">Format requis : +243 suivi de 9 chiffres.</p>
+              </div>
               <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
                 <IdCard className="h-5 w-5 text-blue-500 shrink-0" />
                 <div>

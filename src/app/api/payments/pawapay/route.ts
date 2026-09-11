@@ -10,12 +10,19 @@ const STUDENT_CARD_PRICE_USD = Number(process.env.STUDENT_CARD_PRICE_USD || 10);
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { amount, currency, description, successUrl, cancelUrl } = body;
+    const { amount, currency, paymentMethod, customer, description, successUrl, cancelUrl } = body;
 
     const parsedAmount = Number(amount);
     if (!Number.isFinite(parsedAmount) || parsedAmount !== STUDENT_CARD_PRICE_USD || currency !== 'USD' || !successUrl || !cancelUrl) {
       return NextResponse.json(
         { error: 'Le prix de la carte scolaire est fixé à 10 USD.' },
+        { status: 400 }
+      );
+    }
+    const customerPhone = typeof customer?.phone === 'string' ? customer.phone.replace(/\s/g, '') : '';
+    if (paymentMethod !== 'pawapay' || !/^\+243\d{9}$/.test(customerPhone) || customer?.country !== 'CD') {
+      return NextResponse.json(
+        { error: 'Un numéro Mobile Money RDC valide au format +243XXXXXXXXX est requis.' },
         { status: 400 }
       );
     }
@@ -45,6 +52,12 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         amount: parsedAmount,
         currency,
+        payment_method: 'pawapay',
+        customer: {
+          name: typeof customer.name === 'string' ? customer.name.slice(0, 120) : 'Administrateur GradeUp',
+          phone: customerPhone,
+          country: 'CD',
+        },
         description: description ?? 'GradeUp payment',
         success_url: successUrl,
         error_url: cancelUrl,
@@ -65,16 +78,6 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await response.json();
-    const returnedCurrency = data?.data?.currency || data?.currency;
-    if (returnedCurrency && returnedCurrency !== 'USD') {
-      return NextResponse.json(
-        {
-          error: 'GeniusPay a créé cette transaction dans une devise différente de USD.',
-          details: `Devise retournée : ${returnedCurrency}. Activez USD pour votre compte marchand GeniusPay ou utilisez un moyen de paiement compatible USD.`,
-        },
-        { status: 422 }
-      );
-    }
     const redirectUrl =
       data?.data?.checkout_url ||
       data?.data?.payment_url ||
