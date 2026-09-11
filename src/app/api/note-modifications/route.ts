@@ -70,6 +70,15 @@ export async function POST(req: NextRequest) {
     if (auth.role === 'STUDENT' && grade.studentId !== auth.userId) {
       return NextResponse.json({ error: 'Vous ne pouvez pas demander de modification pour cette note.' }, { status: 403 });
     }
+    if (auth.role === 'TEACHER') {
+      const course = await db.course.findUnique({
+        where: { id: grade.courseId },
+        select: { teacherId: true },
+      });
+      if (course?.teacherId !== auth.userId) {
+        return NextResponse.json({ error: 'Vous ne pouvez demander une modification que pour vos propres cours.' }, { status: 403 });
+      }
+    }
 
     const finalOld = oldValue as number ?? grade.score;
     const finalNew = newValue;

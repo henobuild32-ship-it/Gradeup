@@ -81,7 +81,7 @@ export default function AdminNoteModifications() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erreur');
-      toast.success(action === 'APPROVED' ? 'Demande approuvée — note mise à jour' : 'Demande rejetée');
+      toast.success(action === 'APPROVED' ? 'Demande approuvée — le professeur peut maintenant appliquer la correction' : 'Demande rejetée');
       setReview(null);
       load();
     } catch (error: unknown) {

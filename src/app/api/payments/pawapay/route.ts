@@ -65,6 +65,16 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await response.json();
+    const returnedCurrency = data?.data?.currency || data?.currency;
+    if (returnedCurrency && returnedCurrency !== 'USD') {
+      return NextResponse.json(
+        {
+          error: 'GeniusPay a créé cette transaction dans une devise différente de USD.',
+          details: `Devise retournée : ${returnedCurrency}. Activez USD pour votre compte marchand GeniusPay ou utilisez un moyen de paiement compatible USD.`,
+        },
+        { status: 422 }
+      );
+    }
     const redirectUrl =
       data?.data?.checkout_url ||
       data?.data?.payment_url ||

@@ -14,7 +14,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Edit, Trash2, GraduationCap, Filter, Calculator, Sparkles, Check, Zap, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Plus, Edit, Trash2, GraduationCap, Filter, Calculator, Sparkles, Check, Zap, RefreshCw, AlertTriangle, PenLine, CheckCircle2, Clock, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { CourseInfo, GradeInfo, UserInfo } from '@/lib/types';
@@ -35,6 +35,18 @@ const PRIMARY_TRIMESTERS: { value: string; label: string }[] = [
   { value: '2', label: 'Trimestre 2' },
   { value: '3', label: 'Trimestre 3' },
 ];
+
+interface NoteModification {
+  id: string;
+  noteId: string;
+  newValue: number;
+  newMax: number;
+  reason: string;
+  requestStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | 'APPLIED';
+  createdAt: string;
+  student?: { fullName: string };
+  course?: { name: string };
+}
 
 function gradePeriodLabel(key: string): string {
   const found = SECONDARY_PERIODS.find((p) => p.value === key);
@@ -70,6 +82,8 @@ export default function TeacherGrades() {
   const [formReason, setFormReason] = useState('');
   const [gradeHistoryList, setGradeHistoryList] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [modificationRequests, setModificationRequests] = useState<NoteModification[]>([]);
+  const [applyingRequestId, setApplyingRequestId] = useState<string | null>(null);
 
   // Sync state: tracks the last auto-sync event for the banner
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
@@ -130,6 +144,18 @@ export default function TeacherGrades() {
     }
   }, [user, courses]);
 
+  const fetchModificationRequests = useCallback(async () => {
+    if (!user?.schoolId) return;
+    try {
+      const response = await fetch(`/api/note-modifications?schoolId=${user.schoolId}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Erreur de chargement');
+      setModificationRequests(Array.isArray(data.noteModifications) ? data.noteModifications : []);
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Impossible de charger vos demandes de modification.');
+    }
+  }, [user?.schoolId]);
+
   // Cycle RDC : secondaire → périodes P1..EX2 ; Maternelle/Primaire → trimestres.
   const selectedCourse = courses.find((c) => c.id === filterCourseId) || null;
   const selectedIsSecondary = selectedCourse ? isSecondaryClass(selectedCourse.class ?? null) : false;
@@ -166,6 +192,10 @@ export default function TeacherGrades() {
   useEffect(() => {
     fetchGrades();
   }, [fetchGrades]);
+
+  useEffect(() => {
+    fetchModificationRequests();
+  }, [fetchModificationRequests]);
 
   useEffect(() => {
     if (formCourseId) fetchStudents(formCourseId);
@@ -320,16 +350,32 @@ export default function TeacherGrades() {
         reason: formReason.trim(),
       };
 
-      const url = editingGrade ? `/api/grades/${editingGrade.id}` : '/api/grades';
-      const method = editingGrade ? 'PUT' : 'POST';
-      const res = editingGrade
-        ? await fetch(url, {
-            method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          })
-        : await queueOrFetch(url, {
-        method,
+      if (editingGrade) {
+        const requestResponse = await fetch('/api/note-modifications', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            noteId: editingGrade.id,
+            oldValue: editingGrade.score,
+            newValue: score,
+            oldMax: editingGrade.maxScore,
+            newMax: maxScore,
+            reason: formReason.trim(),
+          }),
+        });
+        const requestData = await requestResponse.json();
+        if (!requestResponse.ok) {
+          throw new Error(requestData.error || 'Erreur lors de la demande de modification');
+        }
+        toast.success('Demande envoyée à l’administrateur. La note reste inchangée jusqu’à son approbation.');
+        setDialogOpen(false);
+        resetForm();
+        fetchModificationRequests();
+        return;
+      }
+
+      const res = await queueOrFetch('/api/grades', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
@@ -350,7 +396,7 @@ export default function TeacherGrades() {
       }
 
       const studentName = students.find(s => s.id === formStudentId)?.fullName || 'Élève';
-      toast.success(editingGrade ? 'Note modifiée avec succès' : 'Note ajoutée avec succès');
+      toast.success('Note ajoutée avec succès');
       setDialogOpen(false);
       resetForm();
       fetchGrades();
@@ -361,6 +407,37 @@ export default function TeacherGrades() {
       toast.error('Erreur lors de l\'enregistrement');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const applyApprovedModification = async (request: NoteModification) => {
+    const grade = grades.find((item) => item.id === request.noteId);
+    if (!grade) {
+      toast.error('Rechargez les notes avant d’appliquer cette correction.');
+      return;
+    }
+    setApplyingRequestId(request.id);
+    try {
+      const response = await fetch(`/api/grades/${grade.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          score: request.newValue,
+          maxScore: request.newMax,
+          comment: grade.comment,
+          reason: request.reason,
+          approvedModificationId: request.id,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Impossible d’appliquer la correction.');
+      toast.success('Correction approuvée appliquée et bulletin synchronisé.');
+      fetchGrades();
+      fetchModificationRequests();
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Impossible d’appliquer la correction.');
+    } finally {
+      setApplyingRequestId(null);
     }
   };
 
@@ -536,6 +613,40 @@ export default function TeacherGrades() {
         </div>
       </div>
 
+      {modificationRequests.length > 0 && (
+        <Card className="border-amber-200 bg-amber-50/40">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <PenLine className="h-4 w-4 text-amber-700" />
+              Mes demandes de correction
+            </CardTitle>
+            <CardDescription>Une correction ne peut être appliquée qu’après approbation de l’administrateur.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {modificationRequests.slice(0, 5).map((request) => (
+              <div key={request.id} className="flex flex-col gap-2 rounded-lg border bg-background p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate">{request.student?.fullName || 'Élève'} · {request.course?.name || 'Cours'}</p>
+                  <p className="text-xs text-muted-foreground">Correction demandée : {request.newValue}/{request.newMax} · {request.reason}</p>
+                </div>
+                {request.requestStatus === 'PENDING' ? (
+                  <Badge variant="outline" className="w-fit border-amber-300 bg-amber-50 text-amber-800"><Clock className="mr-1 h-3 w-3" /> En attente</Badge>
+                ) : request.requestStatus === 'REJECTED' ? (
+                  <Badge variant="outline" className="w-fit border-red-300 bg-red-50 text-red-700"><XCircle className="mr-1 h-3 w-3" /> Refusée</Badge>
+                ) : request.requestStatus === 'APPLIED' ? (
+                  <Badge variant="outline" className="w-fit border-emerald-300 bg-emerald-50 text-emerald-700"><CheckCircle2 className="mr-1 h-3 w-3" /> Appliquée</Badge>
+                ) : (
+                  <Button size="sm" onClick={() => applyApprovedModification(request)} disabled={applyingRequestId === request.id}>
+                    <CheckCircle2 className={`mr-1 h-4 w-4 ${applyingRequestId === request.id ? 'animate-pulse' : ''}`} />
+                    {applyingRequestId === request.id ? 'Application...' : 'Appliquer la correction'}
+                  </Button>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {/* No courses assigned */}
       {!loading && courses.length === 0 && (
         <Alert className="border-amber-200 bg-amber-50 text-amber-800">
@@ -639,6 +750,7 @@ export default function TeacherGrades() {
                     const score = gridScores[student.id] || '';
                     const comment = gridComments[student.id] || '';
                     const hasGrade = score !== '';
+                    const existingGrade = grades.find((grade) => grade.studentId === student.id && grade.courseId === filterCourseId && grade.trimester === filterTrimester);
                      
                     return (
                       <TableRow key={student.id} className="hover:bg-muted/10">
@@ -655,6 +767,8 @@ export default function TeacherGrades() {
                             value={score}
                             onChange={(e) => setGridScores({ ...gridScores, [student.id]: e.target.value })}
                             onBlur={() => handleAutoSave(student.id, score, comment)}
+                            disabled={!!existingGrade}
+                            title={existingGrade ? 'Utilisez la liste des notes pour demander une correction.' : undefined}
                           />
                         </TableCell>
                         <TableCell>
@@ -667,7 +781,11 @@ export default function TeacherGrades() {
                           />
                         </TableCell>
                         <TableCell className="text-center">
-                          {hasGrade ? (
+                          {existingGrade ? (
+                            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => openEditDialog(existingGrade)}>
+                              <PenLine className="mr-1 h-3 w-3" /> Demander
+                            </Button>
+                          ) : hasGrade ? (
                             <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 gap-1"><Check className="w-3 h-3" /> Validé</Badge>
                           ) : (
                             <Badge variant="outline" className="text-muted-foreground bg-muted/40">À saisir</Badge>
@@ -684,6 +802,7 @@ export default function TeacherGrades() {
                 const score = gridScores[student.id] || '';
                 const comment = gridComments[student.id] || '';
                 const hasGrade = score !== '';
+                const existingGrade = grades.find((grade) => grade.studentId === student.id && grade.courseId === filterCourseId && grade.trimester === filterTrimester);
                 return (
                   <div key={student.id} className="rounded-xl border border-border bg-background/80 p-3 shadow-sm">
                     <div className="flex items-start justify-between gap-2">
@@ -691,7 +810,11 @@ export default function TeacherGrades() {
                         <p className="font-semibold text-sm">{student.fullName}</p>
                         <p className="text-xs text-muted-foreground">Saisie rapide</p>
                       </div>
-                      {hasGrade ? (
+                      {existingGrade ? (
+                        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => openEditDialog(existingGrade)}>
+                          <PenLine className="mr-1 h-3 w-3" /> Demander
+                        </Button>
+                      ) : hasGrade ? (
                         <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 gap-1"><Check className="w-3 h-3" /> Validé</Badge>
                       ) : (
                         <Badge variant="outline" className="text-muted-foreground bg-muted/40">À saisir</Badge>
@@ -709,6 +832,8 @@ export default function TeacherGrades() {
                         value={score}
                         onChange={(e) => setGridScores({ ...gridScores, [student.id]: e.target.value })}
                         onBlur={() => handleAutoSave(student.id, score, comment)}
+                        disabled={!!existingGrade}
+                        title={existingGrade ? 'Utilisez le bouton Demander pour une correction.' : undefined}
                       />
                       <Input
                         placeholder="Appréciation"

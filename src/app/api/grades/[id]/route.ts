@@ -60,7 +60,7 @@ export async function PUT(
     }
     const { id } = await params;
     const body = await request.json();
-    const { score, maxScore, trimester, comment, reason } = body;
+    const { score, maxScore, trimester, comment, reason, approvedModificationId } = body;
     const modifiedBy = (auth as { fullName?: string; userId: string }).fullName || auth.userId;
 
     const existing = await db.grade.findUnique({ where: { id } });
@@ -71,7 +71,6 @@ export async function PUT(
     if (auth.role === 'TEACHER' && existing.teacherId !== auth.userId) {
       return NextResponse.json({ error: "Vous n'êtes pas le professeur de ce cours" }, { status: 403 });
     }
-
     try {
       await assertYearOpen(existing.schoolId);
     } catch (e: any) {
@@ -85,6 +84,22 @@ export async function PUT(
         { error: `La note doit être comprise entre 0 et ${newMax}` },
         { status: 400 }
       );
+    }
+    if (auth.role === 'TEACHER') {
+      if (!approvedModificationId) {
+        return NextResponse.json({ error: 'Soumettez une demande de modification et attendez son approbation avant de changer une note.' }, { status: 403 });
+      }
+      const request = await db.noteModification.findUnique({ where: { id: approvedModificationId } });
+      if (
+        !request
+        || request.noteId !== existing.id
+        || request.modifierId !== auth.userId
+        || request.requestStatus !== 'APPROVED'
+        || request.newValue !== newScore
+        || request.newMax !== newMax
+      ) {
+        return NextResponse.json({ error: 'Cette correction n’est pas approuvée ou ne correspond pas à la demande validée.' }, { status: 403 });
+      }
     }
 
     // ── Note de période (P1..EX2) : modifier la note dans le cahier (source unique) ──
@@ -144,6 +159,12 @@ export async function PUT(
           teacher: { select: { id: true, fullName: true, role: true } },
         },
       });
+      if (auth.role === 'TEACHER' && approvedModificationId) {
+        await db.noteModification.update({
+          where: { id: approvedModificationId },
+          data: { requestStatus: 'APPLIED' },
+        });
+      }
       return NextResponse.json({ grade, fromCahier: true });
     }
 
@@ -186,6 +207,12 @@ export async function PUT(
 
     // ── Auto-sync: recompute and update the student's report card ───────────
     syncStudentReport(existing.schoolId, existing.studentId, updatedTrimester).catch(() => {});
+    if (auth.role === 'TEACHER' && approvedModificationId) {
+      await db.noteModification.update({
+        where: { id: approvedModificationId },
+        data: { requestStatus: 'APPLIED' },
+      });
+    }
 
     return NextResponse.json({ grade });
   } catch (error: unknown) {
@@ -205,6 +232,9 @@ export async function DELETE(
     const auth = authenticateRequest(request);
     if (auth.role === 'PARENT' || auth.role === 'STUDENT') {
       return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
+    }
+    if (auth.role === 'TEACHER') {
+      return NextResponse.json({ error: 'Un professeur ne peut pas supprimer directement une note. Contactez un administrateur.' }, { status: 403 });
     }
     const { id } = await params;
 

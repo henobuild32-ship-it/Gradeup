@@ -117,7 +117,7 @@ export default function IdCard3D({ user, school, role }: IdCard3DProps) {
     ) : null;
 
   return (
-    <div className="flex flex-col items-center gap-4 w-full max-w-[500px] mx-auto">
+    <div className="flex flex-col items-center gap-4 w-full max-w-[640px] mx-auto">
       <div
         className="relative w-full cursor-pointer"
         style={{ perspective: '1200px', aspectRatio: `${CARD_W}/${CARD_H}` }}
@@ -144,10 +144,10 @@ export default function IdCard3D({ user, school, role }: IdCard3DProps) {
               />
             )}
 
-            <div className="flex-1 flex p-4 gap-5 relative z-10 min-h-0">
+            <div className="flex-1 flex p-3 sm:p-5 gap-3 sm:gap-5 relative z-10 min-h-0">
               {/* Photo */}
               <div className="flex flex-col items-center gap-1.5 shrink-0 self-start">
-                <div className="w-28 h-32 rounded-lg border-2 overflow-hidden bg-slate-100 flex items-center justify-center shadow-sm" style={{ borderColor: color + '40' }}>
+                <div className="w-20 h-24 sm:w-28 sm:h-32 rounded-lg border-2 overflow-hidden bg-slate-100 flex items-center justify-center shadow-sm" style={{ borderColor: color + '40' }}>
                   {user.photoUrl ? (
                     <img src={user.photoUrl} alt={user.fullName} className="w-full h-full object-cover" />
                   ) : (
@@ -165,8 +165,8 @@ export default function IdCard3D({ user, school, role }: IdCard3DProps) {
               {/* Infos */}
               <div className="flex-1 min-w-0 flex flex-col justify-between gap-0.5">
                 <div>
-                  <h2 className="text-sm font-black text-slate-900 leading-tight uppercase truncate">{user.fullName}</h2>
-                  {user.postName && <p className="text-[10px] text-slate-500 truncate">{user.postName}</p>}
+                    <h2 className="text-xs sm:text-sm font-black text-slate-900 leading-tight uppercase truncate">{user.fullName}</h2>
+                    {user.postName && <p className="text-[9px] sm:text-[10px] text-slate-500 truncate">{user.postName}</p>}
                 </div>
 
                 <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] mt-1">
@@ -245,15 +245,15 @@ export default function IdCard3D({ user, school, role }: IdCard3DProps) {
             <div className="shrink-0 w-full" style={{ height: BAND_H, backgroundColor: color }} />
 
             {validLogo ? (
-              <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
-                <div className="w-40 h-40 rounded-2xl border border-slate-200 bg-white flex items-center justify-center p-3 shadow-lg">
+              <div className="flex-1 flex flex-col items-center justify-center gap-3 p-5 sm:p-8">
+                <div className="w-24 h-24 sm:w-36 sm:h-36 rounded-2xl border border-slate-200 bg-white flex items-center justify-center p-3 shadow-lg">
                   <img src={school.logoUrl!} alt={school.name} className="max-w-full max-h-full object-contain" />
                 </div>
-                <h3 className="text-lg font-black text-slate-800 text-center uppercase tracking-wide">{school.name}</h3>
-                <p className="text-[11px] text-slate-400 font-medium">Carte Officielle • GradeUp Platform</p>
+                <h3 className="text-sm sm:text-lg font-black text-slate-800 text-center uppercase tracking-wide">{school.name}</h3>
+                <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium">Carte officielle · GradeUp Platform</p>
               </div>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center gap-3 p-8">
+              <div className="flex-1 flex flex-col items-center justify-center gap-3 p-5 sm:p-8">
                 <School className="w-20 h-20 text-slate-200" />
                 <p className="text-sm text-slate-300 font-medium">{school.name}</p>
                 <p className="text-[11px] text-slate-300">Carte Officielle • GradeUp Platform</p>

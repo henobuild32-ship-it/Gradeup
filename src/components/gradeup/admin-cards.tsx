@@ -426,6 +426,19 @@ export default function AdminCards() {
           }}
           role={cardRole} 
         />
+        <div className="mt-4 w-full rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm">
+          <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">Informations de la carte</p>
+          <div className="grid grid-cols-1 gap-x-4 gap-y-2 text-xs sm:grid-cols-2">
+            <p><span className="text-slate-500">Matricule :</span> <span className="font-semibold">{student.matricule || 'Non attribué'}</span></p>
+            <p><span className="text-slate-500">Statut :</span> <span className="font-semibold">{student.cardId ? 'Carte créée' : 'ID à générer'}</span></p>
+            {cardRole === 'STUDENT' && <p><span className="text-slate-500">Classe :</span> <span className="font-semibold">{student.classEnrollments?.[0]?.class?.name || student.className || 'Non attribuée'}</span></p>}
+            {cardRole === 'TEACHER' && <p><span className="text-slate-500">Spécialité :</span> <span className="font-semibold">{student.specialty || 'Non renseignée'}</span></p>}
+            <p><span className="text-slate-500">Téléphone :</span> <span className="font-semibold">{student.phone || 'Non renseigné'}</span></p>
+            <p><span className="text-slate-500">Email :</span> <span className="font-semibold break-all">{student.email || 'Non renseigné'}</span></p>
+            {cardRole === 'STUDENT' && <p><span className="text-slate-500">Tuteur :</span> <span className="font-semibold">{student.tuteur || 'Non renseigné'}</span></p>}
+            {cardRole === 'STUDENT' && <p><span className="text-slate-500">Contact tuteur :</span> <span className="font-semibold">{student.contactTuteur || student.parentPhone || 'Non renseigné'}</span></p>}
+          </div>
+        </div>
       </div>
     );
   };
