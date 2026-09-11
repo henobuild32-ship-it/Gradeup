@@ -9,24 +9,25 @@ datasource db {
 }
 
 model School {
-  id                 String    @id @default(cuid())
-  name               String
-  email              String    @unique
-  password           String
-  inviteCode         String    @unique
-  currency           String    @default("USD")
-  logoUrl            String    @default("")
-  province           String    @default("")
-  city               String    @default("")
-  commune            String    @default("")
-  schoolCode         String    @default("")
-  color              String    @default("#2563eb")
-  academicYear       String    @default("")
-  subscriptionStatus String    @default("active")
-  subscriptionExpiry DateTime?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-  deletedAt          DateTime?
+  id                   String    @id @default(cuid())
+  name                 String
+  email                String    @unique
+  password             String
+  inviteCode           String    @unique
+  currency             String    @default("USD")
+  logoUrl              String    @default("")
+  province             String    @default("")
+  city                 String    @default("")
+  commune              String    @default("")
+  schoolCode           String    @default("")
+  color                String    @default("#2563eb")
+  academicYear         String    @default("")
+  heureArriveeScolaire String    @default("08:00")
+  subscriptionStatus   String    @default("active")
+  subscriptionExpiry   DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  deletedAt            DateTime?
 
   attendance           Attendance[]
   courses              Course[]
@@ -62,6 +63,20 @@ model School {
 
   @@index([subscriptionStatus])
   @@index([inviteCode])
+}
+
+model PublicReview {
+  id        String   @id @default(cuid())
+  author    String
+  school    String   @default("")
+  message   String
+  rating    Int      @default(5)
+  visitorId String
+  approved  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([approved, createdAt])
+  @@index([visitorId, createdAt])
 }
 
 model SchoolYear {

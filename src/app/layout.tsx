@@ -23,6 +23,21 @@ export const metadata: Metadata = {
   title: "GradeUp – Plateforme Scolaire Intelligente",
   description: "GradeUp est une plateforme intelligente pour gérer votre école, suivre les performances, gérer les paiements et utiliser l'IA Gradie.",
   keywords: ["GradeUp", "école", "school management", "Axion Labs Technologies"],
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://gradeup-trho.vercel.app'),
+  openGraph: {
+    type: 'website',
+    locale: 'fr_FR',
+    title: 'GradeUp – Plateforme Scolaire Intelligente',
+    description: 'Gestion scolaire, notes, présences et bulletins dans une seule application.',
+    siteName: 'GradeUp',
+    images: [{ url: '/logo-gradeup.png', width: 512, height: 512, alt: 'Logo GradeUp' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'GradeUp – Plateforme Scolaire Intelligente',
+    description: 'Gestion scolaire, notes, présences et bulletins.',
+    images: ['/logo-gradeup.png'],
+  },
   authors: [{ name: "Axion Labs Technologies" }],
   icons: {
     icon: "/logo-gradeup.png",

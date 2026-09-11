@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
           logoUrl: true,
           color: true,
           academicYear: true,
+          heureArriveeScolaire: true,
           province: true,
           city: true,
           commune: true,
@@ -54,6 +55,7 @@ export async function GET(request: NextRequest) {
         logoUrl: true,
         color: true,
         academicYear: true,
+        heureArriveeScolaire: true,
         province: true,
         city: true,
         commune: true,
@@ -80,7 +82,7 @@ export async function PUT(request: NextRequest) {
   try {
     const auth = await authenticateRequestActive(request);
     const body = await request.json();
-    const { schoolId, currency, name, email, logoUrl, latitude, longitude } = body;
+    const { schoolId, currency, name, email, logoUrl, latitude, longitude, heureArriveeScolaire } = body;
 
     if (!schoolId) {
       return NextResponse.json({ error: 'schoolId is required' }, { status: 400 });
@@ -103,6 +105,7 @@ export async function PUT(request: NextRequest) {
         ...(logoUrl !== undefined && { logoUrl }),
         ...(latitude !== undefined && { latitude: latitude === '' ? null : parseFloat(latitude) }),
         ...(longitude !== undefined && { longitude: longitude === '' ? null : parseFloat(longitude) }),
+        ...(heureArriveeScolaire !== undefined && { heureArriveeScolaire: /^([01]\d|2[0-3]):[0-5]\d$/.test(heureArriveeScolaire) ? heureArriveeScolaire : existing.heureArriveeScolaire }),
       },
       select: {
         id: true,

@@ -17,7 +17,10 @@ function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 }
 
 const GEO_RADIUS_METERS = 300; // 300m tolerance around school
-const CUTOFF_HOUR = 8; // Before 08h00 = PRESENT, after = RETARD
+function isLate(now: Date, cutoff: string): boolean {
+  const [hour, minute] = cutoff.split(':').map(Number);
+  return now.getHours() > hour || (now.getHours() === hour && now.getMinutes() > minute);
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,7 +41,7 @@ export async function POST(request: NextRequest) {
     // Fetch user and school data
     const [user, school] = await Promise.all([
       db.user.findUnique({ where: { id: userId }, select: { id: true, role: true, schoolId: true } }),
-      db.school.findUnique({ where: { id: schoolId }, select: { id: true, latitude: true, longitude: true } }),
+      db.school.findUnique({ where: { id: schoolId }, select: { id: true, latitude: true, longitude: true, heureArriveeScolaire: true } }),
     ]);
 
     if (!user) return NextResponse.json({ error: 'Utilisateur introuvable' }, { status: 404 });
@@ -89,10 +92,8 @@ export async function POST(request: NextRequest) {
     }
 
     // ─── Determine status ───
-    const hour = now.getHours();
-    const minute = now.getMinutes();
     let statut = 'PRESENT';
-    if (hour > CUTOFF_HOUR || (hour === CUTOFF_HOUR && minute > 0)) {
+    if (isLate(now, school.heureArriveeScolaire || '08:00')) {
       statut = 'RETARD';
     }
 

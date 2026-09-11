@@ -67,7 +67,7 @@ export default function VerifyCardPage() {
         </div>
       </div>
       <a
-        href="https://gradeup.ci"
+        href="https://gradeup-trho.vercel.app"
         target="_blank"
         rel="noopener noreferrer"
         className="mt-6 text-blue-400 hover:text-blue-300 flex items-center gap-2 text-sm"

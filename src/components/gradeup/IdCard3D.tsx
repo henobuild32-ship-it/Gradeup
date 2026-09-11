@@ -4,8 +4,8 @@ import { useState, useRef, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   User, School, BookOpen, GraduationCap, Calendar,
-  Shield, MapPin, Phone, Mail, Hash, Download, RotateCw,
-  Droplets, Heart, FileText, PhoneCall, Users
+  Shield, Phone, Mail, Hash, Download, RotateCw,
+  Droplets, Heart, PhoneCall, Users
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -80,7 +80,7 @@ export default function IdCard3D({ user, school, role }: IdCard3DProps) {
   const validLogo = school.logoUrl && !logoError;
   const color = school.color || '#2563eb';
   const age = getAge(user.birthDate);
-  const qrUrl = `https://gradeup.ci/carte/${user.matricule || user.id}`;
+  const qrUrl = `https://gradeup-trho.vercel.app/carte/${user.matricule || user.id}`;
   const genderLabel = user.gender === 'M' ? 'Masculin' : user.gender === 'F' ? 'Féminin' : user.gender || '';
 
   const handleFlip = () => setIsFlipped(!isFlipped);
@@ -193,7 +193,7 @@ export default function IdCard3D({ user, school, role }: IdCard3DProps) {
                   )}
                 </div>
 
-                <div className="border-t border-slate-100 pt-1 mt-0.5 grid grid-cols-2 gap-x-3 gap-y-0.5">
+                <div className="border-t border-slate-100 pt-1 mt-0.5 grid grid-cols-2 gap-x-3 gap-y-0.5 max-h-[118px] overflow-hidden">
                   <Field icon={Calendar} label="Né(e) le" value={user.birthDate} />
                   {age !== null && <Field icon={Calendar} label="Âge" value={`${age} ans`} />}
                   <Field icon={User} label="Sexe" value={genderLabel} />
@@ -201,12 +201,10 @@ export default function IdCard3D({ user, school, role }: IdCard3DProps) {
                   <Field icon={Shield} label="INE" value={user.ine} />
                   <Field icon={Phone} label="Téléphone" value={user.phone} />
                   <Field icon={Mail} label="Email" value={user.email} />
-                  <Field icon={MapPin} label="Adresse" value={user.address} />
-                  <Field icon={Users} label="Tuteur" value={user.tuteur} />
-                  <Field icon={PhoneCall} label="Contact Tuteur" value={user.contactTuteur} />
-                  <Field icon={Droplets} label="Gp. Sanguin" value={user.bloodType} />
-                  <Field icon={Heart} label="Allergies" value={user.allergies} />
-                  <Field icon={FileText} label="Assurance" value={user.assurance} />
+                  {role === 'STUDENT' && <Field icon={Users} label="Tuteur" value={user.tuteur} />}
+                  {role === 'STUDENT' && <Field icon={PhoneCall} label="Contact" value={user.contactTuteur || user.parentPhone} />}
+                  {role === 'STUDENT' && <Field icon={Droplets} label="Sang" value={user.bloodType} />}
+                  {role === 'STUDENT' && <Field icon={Heart} label="Allergies" value={user.allergies} />}
                 </div>
               </div>
 
@@ -248,7 +246,7 @@ export default function IdCard3D({ user, school, role }: IdCard3DProps) {
 
             {validLogo ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8">
-                <div className="w-40 h-40 rounded-2xl border border-slate-200 bg-white flex items-center justify-center p-2 shadow-lg">
+                <div className="w-40 h-40 rounded-2xl border border-slate-200 bg-white flex items-center justify-center p-3 shadow-lg">
                   <img src={school.logoUrl!} alt={school.name} className="max-w-full max-h-full object-contain" />
                 </div>
                 <h3 className="text-lg font-black text-slate-800 text-center uppercase tracking-wide">{school.name}</h3>

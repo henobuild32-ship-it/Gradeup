@@ -25,7 +25,7 @@
 
 2. **Vérifier la clé API en prod** :
    ```
-   GET https://votre-gradeup.vercel.app/api/debug/env
+   GET https://gradeup-trho.vercel.app/api/debug/env
    ```
    Vous devriez voir :
    ```json

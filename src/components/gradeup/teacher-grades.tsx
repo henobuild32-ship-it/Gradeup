@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { CourseInfo, GradeInfo, UserInfo } from '@/lib/types';
 import { isSecondaryClass } from '@/lib/grade-service';
-import { cacheJson, queueOrFetch, readCachedJson } from '@/lib/offline-sync';
+import { cacheJson, fetchJsonWithCache, queueOrFetch } from '@/lib/offline-sync';
 
 const SECONDARY_PERIODS: { value: string; label: string }[] = [
   { value: 'P1', label: 'P1 — 1ère période (S1)' },
@@ -88,13 +88,11 @@ export default function TeacherGrades() {
     if (!user) return;
     const cacheKey = `/api/courses?schoolId=${user.schoolId}&teacherId=${user.id}`;
     try {
-      const res = await fetch(cacheKey);
-      const data = await res.json();
+      const data = await fetchJsonWithCache<{ courses?: CourseInfo[] }>(cacheKey, { courses: [] });
       await cacheJson(cacheKey, data);
       setCourses(Array.isArray(data.courses) ? data.courses : []);
     } catch {
-      const data = await readCachedJson<{ courses?: CourseInfo[] }>(cacheKey);
-      setCourses(Array.isArray(data?.courses) ? data.courses : []);
+      setCourses([]);
     }
   }, [user]);
 
@@ -105,15 +103,13 @@ export default function TeacherGrades() {
       let url = `/api/grades?schoolId=${user.schoolId}&teacherId=${user.id}`;
       if (filterCourseId) url += `&courseId=${filterCourseId}`;
       if (filterTrimester) url += `&trimester=${filterTrimester}`;
-      const res = await fetch(url);
-      const data = await res.json();
+      const data = await fetchJsonWithCache<{ grades?: GradeInfo[] }>(url, { grades: [] });
       await cacheJson(url, data);
       setGrades(Array.isArray(data.grades) ? data.grades : []);
     } catch {
       const url = `/api/grades?schoolId=${user.schoolId}&teacherId=${user.id}${filterCourseId ? `&courseId=${filterCourseId}` : ''}${filterTrimester ? `&trimester=${filterTrimester}` : ''}`;
-      const data = await readCachedJson<{ grades?: GradeInfo[] }>(url);
-      if (Array.isArray(data?.grades)) setGrades(data.grades);
-      else toast.error('Aucune donnée de notes disponible hors ligne');
+      setGrades([]);
+      toast.error('Impossible de charger les notes : vérifiez la connexion ou les cours attribués.');
     } finally {
       setLoading(false);
     }
@@ -127,8 +123,7 @@ export default function TeacherGrades() {
     try {
       const course = courses.find((c) => c.id === courseId);
       if (!course) return;
-      const res = await fetch(`/api/users?schoolId=${user.schoolId}&role=STUDENT&classId=${course.classId}`);
-      const data = await res.json();
+      const data = await fetchJsonWithCache<{ users?: UserInfo[] }>(`/api/users?schoolId=${user.schoolId}&role=STUDENT&classId=${course.classId}`, { users: [] });
       setStudents(Array.isArray(data.users) ? data.users : []);
     } catch {
       setStudents([]);
@@ -467,7 +462,7 @@ export default function TeacherGrades() {
     const studentMap = new Map<string, { sum: number; count: number }>();
     for (const g of grades) {
       const entry = studentMap.get(g.studentId) || { sum: 0, count: 0 };
-      entry.sum += (g.score / g.maxScore) * 20;
+      entry.sum += g.maxScore > 0 ? (g.score / g.maxScore) * 20 : 0;
       entry.count++;
       studentMap.set(g.studentId, entry);
     }
@@ -480,7 +475,7 @@ export default function TeacherGrades() {
     const studentMap = new Map<string, number[]>();
     for (const g of grades) {
       const list = studentMap.get(g.studentId) || [];
-      list.push((g.score / g.maxScore) * 20);
+      list.push(g.maxScore > 0 ? (g.score / g.maxScore) * 20 : 0);
       studentMap.set(g.studentId, list);
     }
     const studentAverages = Array.from(studentMap.values()).map((scores) => scores.reduce((a, b) => a + b, 0) / scores.length);

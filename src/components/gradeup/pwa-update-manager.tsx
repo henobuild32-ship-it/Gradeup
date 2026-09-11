@@ -13,21 +13,21 @@ export default function PWAUpdateManager() {
   const [available, setAvailable] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [applied, setApplied] = useState(false);
 
   const showUpdateNotification = useCallback(() => {
     if ('Notification' in window && Notification.permission === 'granted') {
-      try {
-        new Notification('🚀 Nouvelle mise à jour GradeUp', {
+      navigator.serviceWorker.ready
+        .then((serviceWorkerRegistration) => serviceWorkerRegistration.showNotification('Nouvelle mise à jour GradeUp', {
           body: `GradeUp ${APP_VERSION_LABEL} est disponible ! Cliquez pour mettre à jour.`,
           icon: '/icon-192x192.png',
           badge: '/icon-192x192.png',
           tag: 'gradeup-update',
           requireInteraction: true,
+          data: { url: '/' },
+        }))
+        .catch(() => {
+          // The in-app update dialog remains available when the OS rejects a notification.
         });
-      } catch {
-        // Notification API may not be available
-      }
     }
   }, []);
 
@@ -100,8 +100,6 @@ export default function PWAUpdateManager() {
   const handleDismiss = () => {
     setAvailable(false);
   };
-
-  if (applied) return null;
 
   return (
     <Dialog open={available} onOpenChange={(open) => !updating && setAvailable(open)}>

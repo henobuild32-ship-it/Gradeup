@@ -30,7 +30,7 @@ async function callOpenRouter(
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
-        'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://gradeup.vercel.app',
+        'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://gradeup-trho.vercel.app',
         'X-Title': 'GradeUp',
       },
       body: JSON.stringify({

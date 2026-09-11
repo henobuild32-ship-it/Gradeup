@@ -8,6 +8,7 @@ import PWAInstallDialog from './pwa-install-dialog';
 import type { UserRole, PageView } from '@/lib/types';
 import { useTheme } from 'next-themes';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -51,6 +52,7 @@ import {
   ArrowRight,
   ShieldCheck,
   Laptop,
+  Star,
 } from 'lucide-react';
 
 const roleDashboardMap: Record<UserRole, PageView> = {
@@ -101,6 +103,14 @@ const roleColors: Record<string, { bg: string; border: string; badge: string; gr
   },
 };
 
+type PublicReview = {
+  id: string;
+  author: string;
+  school: string;
+  message: string;
+  rating: number;
+};
+
 function PasswordStrengthIndicator({ password }: { password: string }) {
   if (!password) return null;
 
@@ -141,10 +151,68 @@ export default function AuthPage() {
   const { isInstallable, installPWA } = usePWAInstall();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [reviews, setReviews] = useState<PublicReview[]>([]);
+  const [reviewAuthor, setReviewAuthor] = useState('');
+  const [reviewSchool, setReviewSchool] = useState('');
+  const [reviewMessage, setReviewMessage] = useState('');
+  const [reviewRating, setReviewRating] = useState(5);
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    fetch('/api/reviews')
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Impossible de charger les avis');
+        return response.json() as Promise<{ reviews: PublicReview[] }>;
+      })
+      .then((data) => setReviews(data.reviews))
+      .catch(() => {
+        // Reviews are promotional content; a failure must not block authentication.
+      });
+  }, []);
+
+  const submitReview = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSubmittingReview(true);
+    try {
+      const storageKey = 'gradeup-review-visitor-id';
+      let visitorId = localStorage.getItem(storageKey);
+      if (!visitorId) {
+        visitorId = crypto.randomUUID();
+        localStorage.setItem(storageKey, visitorId);
+      }
+      const response = await fetch('/api/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          author: reviewAuthor,
+          school: reviewSchool,
+          message: reviewMessage,
+          rating: reviewRating,
+          visitorId,
+        }),
+      });
+      const data = await response.json() as { review?: PublicReview; error?: string };
+      if (!response.ok || !data.review) throw new Error(data.error || 'Impossible de publier votre avis.');
+      setReviews((current) => [data.review!, ...current].slice(0, 12));
+      setReviewAuthor('');
+      setReviewSchool('');
+      setReviewMessage('');
+      setReviewRating(5);
+      toast({ title: 'Merci pour votre avis', description: 'Votre témoignage est maintenant visible.' });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Avis non publié',
+        description: error instanceof Error ? error.message : 'Veuillez réessayer plus tard.',
+      });
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -662,6 +730,10 @@ export default function AuthPage() {
       <div className="mt-3 text-[11px] text-muted-foreground/80">
         © {new Date().getFullYear()} GradeUp ERP. Tous droits réservés.
       </div>
+      <nav aria-label="Liens légaux" className="mt-3 flex justify-center gap-4 text-[11px] font-medium">
+        <a href="/faq" className="hover:text-primary hover:underline">FAQ</a>
+        <a href="/confidentialite" className="hover:text-primary hover:underline">Confidentialité</a>
+      </nav>
     </footer>
   );
 
@@ -750,7 +822,7 @@ export default function AuthPage() {
       <div className="min-h-screen flex flex-col bg-background text-foreground transition-colors overflow-x-hidden selection:bg-primary/20">
         {renderHeader()}
 
-        <main className="flex-1 flex flex-col">
+        <main className="flex-1 flex flex-col pb-20 lg:pb-0">
           {/* HERO SECTION */}
           <section className="relative px-4 sm:px-8 pt-12 pb-16 lg:pt-20 lg:pb-24 overflow-hidden border-b border-border/40">
             {/* Ambient Background Decorative Blobs */}
@@ -964,6 +1036,51 @@ export default function AuthPage() {
             </div>
           </section>
 
+          <section className="border-t border-border/40 bg-muted/30 px-4 py-16 sm:px-8">
+            <div className="mx-auto max-w-6xl space-y-8">
+              <div className="mx-auto max-w-2xl text-center space-y-3">
+                <Badge variant="outline" className="gap-1.5 border-amber-500/30 px-3 py-1 text-amber-700 dark:text-amber-300">
+                  <Star className="h-3.5 w-3.5 fill-current" />
+                  Avis vérifiés
+                </Badge>
+                <h2 className="text-3xl font-extrabold tracking-tight">Les retours des écoles comptent</h2>
+                <p className="text-muted-foreground">
+                  GradeUp ne publie pas de faux avis. Les témoignages apparaissent ici après validation avec l’établissement concerné.
+                </p>
+              </div>
+              {reviews.length > 0 && (
+                <div className="grid gap-4 md:grid-cols-3">
+                  {reviews.slice(0, 3).map((review) => (
+                    <article key={review.id} className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
+                      <div className="mb-4 flex gap-1 text-amber-500" aria-label={`${review.rating} étoiles sur 5`}>
+                        {Array.from({ length: 5 }).map((_, index) => <Star key={index} className={`h-4 w-4 ${index < review.rating ? 'fill-current' : 'text-muted'}`} />)}
+                      </div>
+                      <p className="text-sm leading-relaxed text-muted-foreground">&ldquo;{review.message}&rdquo;</p>
+                      <p className="mt-4 text-sm font-bold">{review.author}</p>
+                      {review.school && <p className="text-xs text-muted-foreground">{review.school}</p>}
+                    </article>
+                  ))}
+                </div>
+              )}
+              <form onSubmit={submitReview} className="mx-auto grid max-w-2xl gap-3 rounded-2xl border border-border/60 bg-card p-5 text-left shadow-sm sm:grid-cols-2">
+                <Input value={reviewAuthor} onChange={(event) => setReviewAuthor(event.target.value)} placeholder="Votre nom" minLength={2} maxLength={80} required />
+                <Input value={reviewSchool} onChange={(event) => setReviewSchool(event.target.value)} placeholder="Établissement (facultatif)" maxLength={100} />
+                <div className="flex items-center gap-1 sm:col-span-2" aria-label="Votre note">
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <button key={index} type="button" onClick={() => setReviewRating(index + 1)} className="rounded p-1 text-amber-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label={`${index + 1} étoiles`}>
+                      <Star className={`h-5 w-5 ${index < reviewRating ? 'fill-current' : ''}`} />
+                    </button>
+                  ))}
+                </div>
+                <Textarea value={reviewMessage} onChange={(event) => setReviewMessage(event.target.value)} placeholder="Partagez votre expérience avec GradeUp (20 caractères minimum)." minLength={20} maxLength={800} required className="min-h-24 sm:col-span-2" />
+                <Button type="submit" disabled={submittingReview} className="sm:col-span-2">
+                  {submittingReview ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageCircle className="mr-2 h-4 w-4" />}
+                  Publier mon avis
+                </Button>
+              </form>
+            </div>
+          </section>
+
           {/* BOTTOM CTA */}
           <section className="px-4 sm:px-8 py-16 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 text-white text-center">
             <div className="max-w-4xl mx-auto space-y-6">
@@ -994,6 +1111,15 @@ export default function AuthPage() {
         </main>
 
         {renderFooter()}
+        <div className="fixed inset-x-3 bottom-3 z-50 lg:hidden">
+          <Button
+            onClick={() => setView('register-school')}
+            className="h-12 w-full rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-base font-bold text-white shadow-xl shadow-indigo-600/30"
+          >
+            Créer mon établissement
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
       </div>
     );
   }

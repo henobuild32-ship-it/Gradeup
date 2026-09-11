@@ -33,6 +33,7 @@ interface ConfigData {
   currency: string;
   logoUrl?: string;
   createdAt: string;
+  heureArriveeScolaire?: string;
 }
 
 const currencies = [
@@ -49,6 +50,7 @@ export default function AdminConfig() {
   const [selectedCurrency, setSelectedCurrency] = useState('USD');
   const [logoUrl, setLogoUrl] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [arrivalTime, setArrivalTime] = useState('08:00');
 
   useEffect(() => {
     if (user?.schoolId) {
@@ -64,6 +66,7 @@ export default function AdminConfig() {
         setConfig(data.config);
         setSelectedCurrency(data.config.currency || 'USD');
         setLogoUrl(data.config.logoUrl || '');
+        setArrivalTime(data.config.heureArriveeScolaire || '08:00');
       }
     } catch {
       toast.error('Erreur lors du chargement de la configuration');
@@ -83,6 +86,7 @@ export default function AdminConfig() {
         body: JSON.stringify({
           schoolId: user?.schoolId,
           currency: selectedCurrency,
+          heureArriveeScolaire: arrivalTime,
         }),
       });
       const data = await res.json();
@@ -272,9 +276,23 @@ export default function AdminConfig() {
                 </p>
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="school-arrival-time">Heure officielle d&apos;arrivée</Label>
+                <Input
+                  id="school-arrival-time"
+                  type="time"
+                  value={arrivalTime}
+                  onChange={(event) => setArrivalTime(event.target.value)}
+                  className="max-w-xs"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Toute présence enregistrée après cette heure sera signalée comme retard.
+                </p>
+              </div>
+
               <Button
                 onClick={handleSave}
-                disabled={saving || selectedCurrency === config?.currency}
+                disabled={saving || (selectedCurrency === config?.currency && arrivalTime === (config?.heureArriveeScolaire || '08:00'))}
                 className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-blue-500/20 animate-scale-in"
               >
                 {saving ? (
