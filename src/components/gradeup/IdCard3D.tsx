@@ -79,7 +79,8 @@ export default function IdCard3D({ user, school, role }: IdCard3DProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [logoError, setLogoError] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
+  const frontRef = useRef<HTMLDivElement>(null);
+  const backRef = useRef<HTMLDivElement>(null);
 
   const validLogo = school.logoUrl && !logoError;
   const color = school.color || '#2563eb';
@@ -90,26 +91,48 @@ export default function IdCard3D({ user, school, role }: IdCard3DProps) {
   const handleFlip = () => setIsFlipped(!isFlipped);
 
   const handleDownload = useCallback(async () => {
-    if (!cardRef.current) return;
+    if (!frontRef.current || !backRef.current) return;
     setDownloading(true);
     try {
-      const dataUrl = await toPng(cardRef.current, {
+      const name = user.fullName.replace(/\s+/g, '-').toLowerCase();
+      const id = user.matricule || user.cardId || user.id;
+      const options = {
         cacheBust: true,
         pixelRatio: 3,
+        backgroundColor: '#ffffff',
         style: { transform: 'none', borderRadius: '0' },
-      });
+      };
+      const [front, back] = await Promise.all([toPng(frontRef.current, options), toPng(backRef.current, options)]);
+      const frontImage = new Image();
+      const backImage = new Image();
+      await Promise.all([
+        new Promise<void>((resolve, reject) => { frontImage.onload = () => resolve(); frontImage.onerror = () => reject(new Error('recto')); frontImage.src = front; }),
+        new Promise<void>((resolve, reject) => { backImage.onload = () => resolve(); backImage.onerror = () => reject(new Error('verso')); backImage.src = back; }),
+      ]);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(frontImage.width, backImage.width);
+      canvas.height = frontImage.height + backImage.height + 24;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('canvas');
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(frontImage, 0, 0);
+      context.drawImage(backImage, 0, frontImage.height + 24);
+      const combined = canvas.toDataURL('image/png');
       const link = document.createElement('a');
-      const name = user.fullName.replace(/\s+/g, '-').toLowerCase();
-      link.download = `carte-${name}-${user.matricule || user.id}.png`;
-      link.href = dataUrl;
+      link.download = `carte-${name}-${id}-recto-verso.png`;
+      link.href = combined;
+      link.rel = 'noopener';
+      document.body.appendChild(link);
       link.click();
-      toast.success('Carte téléchargée avec succès !');
+      link.remove();
+      toast.success('Carte recto-verso téléchargée en une seule image.');
     } catch {
       toast.error('Erreur lors du téléchargement');
     } finally {
       setDownloading(false);
     }
-  }, [user, cardRef]);
+  }, [user]);
 
   const Field = ({ icon: Icon, label, value }: { icon: any; label: string; value?: string | null }) =>
     value ? (
@@ -128,12 +151,12 @@ export default function IdCard3D({ user, school, role }: IdCard3DProps) {
         onClick={handleFlip}
       >
         <div
-          ref={cardRef}
           className="relative w-full h-full transition-transform duration-700 ease-out"
           style={{ transformStyle: 'preserve-3d', transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
         >
           {/* ────────── RECTO ────────── */}
           <div
+            ref={frontRef}
             className="absolute inset-0 rounded-xl overflow-hidden shadow-2xl bg-white border border-slate-200 flex flex-col"
             style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
           >
@@ -230,6 +253,7 @@ export default function IdCard3D({ user, school, role }: IdCard3DProps) {
 
           {/* ────────── VERSO ────────── */}
           <div
+            ref={backRef}
             className="absolute inset-0 rounded-xl overflow-hidden shadow-2xl bg-white border border-slate-200 flex flex-col"
             style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
           >
