@@ -23,7 +23,6 @@ interface CardUser {
   phone?: string;
   parentPhone?: string;
   parentEmail?: string;
-  address?: string;
   academicYear?: string;
   section?: string;
   photoUrl?: string;
@@ -38,6 +37,11 @@ interface CardUser {
   roleLabel?: string;
   className?: string;
   courseName?: string;
+  specialty?: string;
+  qualification?: string;
+  address?: string;
+  cardIssuedDate?: string;
+  cardExpiryDate?: string;
 }
 
 interface CardSchool {
@@ -177,11 +181,11 @@ export default function IdCard3D({ user, school, role }: IdCard3DProps) {
                       <span className="text-slate-800 font-semibold truncate">{user.className}</span>
                     </div>
                   )}
-                  {role === 'TEACHER' && user.courseName && (
+                  {role === 'TEACHER' && user.specialty && (
                     <div className="flex items-center gap-1.5">
                       <BookOpen className="w-3 h-3 shrink-0" style={{ color }} />
-                      <span className="text-slate-500">Matière :</span>
-                      <span className="text-slate-800 font-semibold truncate">{user.courseName}</span>
+                      <span className="text-slate-500">Spécialité :</span>
+                      <span className="text-slate-800 font-semibold truncate">{user.specialty}</span>
                     </div>
                   )}
                   {user.section && (
@@ -243,6 +247,9 @@ export default function IdCard3D({ user, school, role }: IdCard3DProps) {
                 {school.email && <p className="flex items-center gap-1.5"><Mail className="w-3 h-3" style={{ color }} />{school.email}</p>}
                 <p className="flex items-center gap-1.5"><Shield className="w-3 h-3" style={{ color }} />Valide : {user.cardExpiryDate || school.academicYear || user.academicYear || 'année scolaire en cours'}</p>
                 <p className="font-semibold text-slate-700">Vérification : {user.matricule || user.cardId || user.id}</p>
+                {user.address && <p>Adresse : {user.address}</p>}
+                {user.qualification && <p>Qualification : {user.qualification}</p>}
+                {user.cardIssuedDate && <p>Émise le : {user.cardIssuedDate}</p>}
               </div>
               <div className="hidden sm:flex flex-col items-center gap-1">
                 <div className="bg-white p-1 rounded-lg shadow-md border border-slate-200">

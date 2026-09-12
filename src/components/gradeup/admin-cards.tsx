@@ -426,6 +426,10 @@ export default function AdminCards() {
             roleLabel: cardRole === 'STUDENT' ? 'Élève' : 'Enseignant',
             className: student.classEnrollments?.[0]?.class?.name || student.className,
             courseName: student.section,
+            specialty: student.specialty,
+            qualification: student.qualification,
+            address: student.address,
+            cardIssuedDate: student.cardIssuedDate,
             ine: student.cardId || student.id.slice(-8),
           }} 
           school={{
