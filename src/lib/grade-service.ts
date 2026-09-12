@@ -168,7 +168,13 @@ export async function recomputeStudentPeriodGrade(params: {
   if (existingGrade) {
     await db.grade.update({
       where: { id: existingGrade.id },
-      data: { score: averagePeriodScore, maxScore: periodMaxScore, teacherId, ...(comment !== undefined && { comment }) },
+      data: {
+        score: averagePeriodScore,
+        maxScore: periodMaxScore,
+        teacherId,
+        evaluationDate: studentMarks.reduce((latest, mark) => mark.evaluation.date > latest ? mark.evaluation.date : latest, studentMarks[0].evaluation.date),
+        ...(comment !== undefined && { comment }),
+      },
     });
   } else {
     await db.grade.create({
@@ -180,6 +186,7 @@ export async function recomputeStudentPeriodGrade(params: {
         score: averagePeriodScore,
         maxScore: periodMaxScore,
         trimester: period,
+        evaluationDate: studentMarks.reduce((latest, mark) => mark.evaluation.date > latest ? mark.evaluation.date : latest, studentMarks[0].evaluation.date),
         comment: comment ?? `Moyenne automatique - ${period}`,
       },
     });

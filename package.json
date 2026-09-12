@@ -12,6 +12,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset"
+    ,"verify:grade-flow": "node scripts/verify-grade-promotion-flow.js"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

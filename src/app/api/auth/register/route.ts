@@ -45,14 +45,6 @@ export async function POST(request: NextRequest) {
 
     // === MODE: create-school (Admin creates a school) ===
     if (mode === 'create-school') {
-      const parsed = registerSchema.safeParse({ gender, dateOfBirth, specialty, phone, qualification });
-      if (!parsed.success) {
-        return NextResponse.json(
-          { error: parsed.error.issues[0]?.message || 'Champs obligatoires manquants.' },
-          { status: 400 }
-        );
-      }
-      const g = parsed.data.gender;
       if (!fullName || !schoolName || !email || !password) {
         return NextResponse.json(
           { error: 'Veuillez remplir tous les champs.' },
@@ -96,8 +88,6 @@ export async function POST(request: NextRequest) {
           password: await hashPassword(password),
           role: 'ADMIN',
           parentCode: parentCodeVal,
-          gender: g,
-          birthDate: parsed.data.dateOfBirth.toISOString(),
         },
         include: {
           school: true,

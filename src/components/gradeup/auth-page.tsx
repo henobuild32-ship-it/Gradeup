@@ -535,14 +535,6 @@ export default function AuthPage() {
       toast({ title: 'Mot de passe trop court', description: 'Le mot de passe doit comporter au moins 4 caractères.', variant: 'destructive' });
       return;
     }
-    if (!regAdminGender) {
-      toast({ title: 'Sexe obligatoire', description: 'Veuillez sélectionner votre sexe (M ou F).', variant: 'destructive' });
-      return;
-    }
-    if (!regAdminBirthDate.trim()) {
-      toast({ title: 'Date de naissance requise', description: 'Veuillez renseigner votre date de naissance.', variant: 'destructive' });
-      return;
-    }
     setRegLoading(true);
     try {
       const res = await fetch('/api/auth/register', {
@@ -554,8 +546,6 @@ export default function AuthPage() {
           schoolName: `${regSchoolName.trim()} (${regSchoolType})`,
           email: regEmail.trim(),
           password: regPassword,
-          gender: regAdminGender,
-          dateOfBirth: regAdminBirthDate,
         }),
       });
       const data = await res.json();
@@ -1726,55 +1716,6 @@ export default function AuthPage() {
                   </div>
 
                   <PasswordStrengthIndicator password={regPassword} />
-
-                  {/* Sexe M/F obligatoire */}
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-bold">
-                      Sexe <span className="text-destructive">*</span>
-                    </Label>
-                    <RadioGroup
-                      value={regAdminGender}
-                      onValueChange={(v) => setRegAdminGender(v as 'M' | 'F')}
-                      className="grid grid-cols-2 gap-2"
-                    >
-                      <Label
-                        htmlFor="reg-gender-m"
-                        className={`flex items-center justify-center gap-2 h-11 rounded-xl border font-semibold text-sm cursor-pointer transition-all ${
-                          regAdminGender === 'M'
-                            ? 'border-primary bg-primary/10 text-primary'
-                            : 'border-border/60 hover:bg-muted text-muted-foreground'
-                        }`}
-                      >
-                        <RadioGroupItem value="M" id="reg-gender-m" className="sr-only" />
-                        <User className="w-4 h-4" /> Masculin
-                      </Label>
-                      <Label
-                        htmlFor="reg-gender-f"
-                        className={`flex items-center justify-center gap-2 h-11 rounded-xl border font-semibold text-sm cursor-pointer transition-all ${
-                          regAdminGender === 'F'
-                            ? 'border-primary bg-primary/10 text-primary'
-                            : 'border-border/60 hover:bg-muted text-muted-foreground'
-                        }`}
-                      >
-                        <RadioGroupItem value="F" id="reg-gender-f" className="sr-only" />
-                        <User className="w-4 h-4" /> Féminin
-                      </Label>
-                    </RadioGroup>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="reg-birthdate" className="text-xs font-bold">
-                      Date de Naissance <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="reg-birthdate"
-                      type="date"
-                      value={regAdminBirthDate}
-                      onChange={(e) => setRegAdminBirthDate(e.target.value)}
-                      className="h-11 rounded-xl"
-                      required
-                    />
-                  </div>
 
                   <Button
                     type="submit"

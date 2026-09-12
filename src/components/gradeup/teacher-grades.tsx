@@ -67,6 +67,8 @@ export default function TeacherGrades() {
 
   const [filterCourseId, setFilterCourseId] = useState<string>('');
   const [filterTrimester, setFilterTrimester] = useState<string>('1');
+  const [periodFrom, setPeriodFrom] = useState('');
+  const [periodTo, setPeriodTo] = useState('');
 
   // Quick grading grid states
   const [gridStudents, setGridStudents] = useState<UserInfo[]>([]);
@@ -119,6 +121,8 @@ export default function TeacherGrades() {
       let url = `/api/grades?schoolId=${user.schoolId}&teacherId=${user.id}`;
       if (filterCourseId) url += `&courseId=${filterCourseId}`;
       if (filterTrimester) url += `&trimester=${filterTrimester}`;
+      if (periodFrom) url += `&from=${periodFrom}`;
+      if (periodTo) url += `&to=${periodTo}`;
       const data = await fetchJsonWithCache<{ grades?: GradeInfo[] }>(url, { grades: [] });
       await cacheJson(url, data);
       setGrades(Array.isArray(data.grades) ? data.grades : []);
@@ -129,7 +133,12 @@ export default function TeacherGrades() {
     } finally {
       setLoading(false);
     }
-  }, [user, filterCourseId, filterTrimester]);
+  }, [user, filterCourseId, filterTrimester, periodFrom, periodTo]);
+
+  const printPeriod = () => {
+    if (!grades.length) { toast.error('Aucune note dans cette période.'); return; }
+    window.print();
+  };
 
   const fetchStudents = useCallback(async (courseId: string) => {
     if (!user || !courseId) {
@@ -532,6 +541,22 @@ export default function TeacherGrades() {
     }
   };
 
+  const changeGradeStatus = async (id: string, status: 'SUBMITTED' | 'VALIDATED') => {
+    try {
+      const response = await fetch(`/api/grades/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Action impossible');
+      toast.success(status === 'SUBMITTED' ? 'Note soumise pour validation.' : 'Note validée.');
+      fetchGrades();
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Action impossible');
+    }
+  };
+
   const getStudentName = (studentId: string) => {
     return grades.find((g) => g.studentId === studentId)?.student?.fullName || 'Inconnu';
   };
@@ -679,6 +704,10 @@ export default function TeacherGrades() {
               <option key={c.id} value={c.id}>{c.name} — {c.class?.name}</option>
             ))}
           </select>
+
+          <Input type="date" value={periodFrom} onChange={(e) => setPeriodFrom(e.target.value)} className="w-full sm:w-40" aria-label="Date de début" />
+          <Input type="date" value={periodTo} onChange={(e) => setPeriodTo(e.target.value)} className="w-full sm:w-40" aria-label="Date de fin exclusive" />
+          <Button type="button" variant="outline" onClick={printPeriod} className="gap-2"><span aria-hidden="true">🖨</span> Imprimer la période</Button>
 
           {/* iOS native style select menu for Période / Trimestre */}
           <select
@@ -889,6 +918,7 @@ export default function TeacherGrades() {
                         <TableHead className="text-center">Note max</TableHead>
                         <TableHead>Trimestre</TableHead>
                         <TableHead className="hidden sm:table-cell">Commentaire</TableHead>
+                        <TableHead className="text-center">Statut</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -925,8 +955,12 @@ export default function TeacherGrades() {
                             <TableCell className="hidden sm:table-cell max-w-[200px] truncate text-muted-foreground text-xs">
                               {grade.comment || '—'}
                             </TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant={grade.status === 'VALIDATED' ? 'default' : 'outline'}>{grade.status || 'DRAFT'}</Badge>
+                            </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1">
+                                {grade.status !== 'SUBMITTED' && grade.status !== 'VALIDATED' && <Button variant="outline" size="sm" onClick={() => changeGradeStatus(grade.id, 'SUBMITTED')}>Soumettre</Button>}
                                 <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-blue-50 hover:text-blue-600 transition-colors" onClick={() => openEditDialog(grade)}>
                                   <Edit className="h-3.5 w-3.5" />
                                 </Button>

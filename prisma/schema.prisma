@@ -148,6 +148,7 @@ model User {
   classEnrollments              EnrolledClass[]
   gradesStudent                 Grade[]                @relation("GradeStudent")
   gradesTeacher                 Grade[]                @relation("GradeTeacher")
+  validatedGrades               Grade[]                @relation("GradeValidator")
   gradeHistoriesModified        GradeHistory[]         @relation("GradeHistoryModifier")
   homework                      Homework[]
   lessons                       Lesson[]
@@ -306,6 +307,10 @@ model Grade {
   period         String    @default("")
   month          Int?
   typeEvaluation String    @default("Interrogation")
+  evaluationDate DateTime  @default(now())
+  status         String    @default("DRAFT")
+  validatedAt    DateTime?
+  validatedById  String?
   dateEncodage   String    @default("")
   heureEncodage  String    @default("")
   schoolYearId   String    @default("")
@@ -320,6 +325,7 @@ model Grade {
   teacher       User               @relation("GradeTeacher", fields: [teacherId], references: [id], onDelete: Restrict)
   history       GradeHistory[]
   modifications NoteModification[]
+  validatedBy   User?              @relation("GradeValidator", fields: [validatedById], references: [id], onDelete: SetNull)
 
   @@index([schoolId, courseId, studentId, trimester])
   @@index([studentId, trimester])
@@ -327,6 +333,8 @@ model Grade {
   @@index([teacherId, trimester])
   @@index([studentId, period])
   @@index([schoolId, schoolYearId])
+  @@index([schoolId, evaluationDate])
+  @@index([schoolId, status])
 }
 
 model SyncOperation {

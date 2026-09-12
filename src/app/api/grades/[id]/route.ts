@@ -17,7 +17,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    authenticateRequest(request);
+    const auth = authenticateRequest(request);
     const { id } = await params;
 
     const grade = await db.grade.findUnique({
@@ -35,8 +35,15 @@ export async function GET(
       },
     });
 
-    if (!grade) {
+    if (!grade || grade.schoolId !== auth.schoolId) {
       return NextResponse.json({ error: 'Grade not found' }, { status: 404 });
+    }
+    if (auth.role === 'STUDENT' && grade.studentId !== auth.userId) {
+      return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
+    }
+    if (auth.role === 'PARENT') {
+      const student = await db.user.findFirst({ where: { id: grade.studentId, parentId: auth.userId, schoolId: auth.schoolId }, select: { id: true } });
+      if (!student) return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
     }
 
     return NextResponse.json({ grade });
@@ -60,7 +67,7 @@ export async function PUT(
     }
     const { id } = await params;
     const body = await request.json();
-    const { score, maxScore, trimester, comment, reason, approvedModificationId } = body;
+    const { score, maxScore, trimester, comment, evaluationDate, reason, approvedModificationId } = body;
     const modifiedBy = (auth as { fullName?: string; userId: string }).fullName || auth.userId;
 
     const existing = await db.grade.findUnique({ where: { id } });
@@ -177,6 +184,7 @@ export async function PUT(
         ...(maxScore !== undefined && { maxScore: parseFloat(maxScore) }),
         ...(trimester !== undefined && { trimester }),
         ...(comment !== undefined && { comment }),
+        ...(evaluationDate !== undefined && { evaluationDate: new Date(evaluationDate) }),
       },
       include: {
         course: {
@@ -221,6 +229,44 @@ export async function PUT(
     }
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const auth = authenticateRequest(request);
+    if (!['TEACHER', 'ADMIN'].includes(auth.role)) {
+      return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 });
+    }
+    const { id } = await params;
+    const body = await request.json() as { status?: string };
+    if (!body.status || !['SUBMITTED', 'VALIDATED'].includes(body.status)) {
+      return NextResponse.json({ error: 'Statut invalide' }, { status: 400 });
+    }
+    const grade = await db.grade.findUnique({ where: { id } });
+    if (!grade || grade.schoolId !== auth.schoolId) {
+      return NextResponse.json({ error: 'Note introuvable' }, { status: 404 });
+    }
+    if (auth.role === 'TEACHER' && grade.teacherId !== auth.userId) {
+      return NextResponse.json({ error: 'Vous n’êtes pas le professeur de cette note' }, { status: 403 });
+    }
+    if (body.status === 'VALIDATED' && auth.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Seul un administrateur peut valider une note' }, { status: 403 });
+    }
+    const updated = await db.grade.update({
+      where: { id },
+      data: {
+        status: body.status,
+        ...(body.status === 'VALIDATED' ? { validatedAt: new Date(), validatedById: auth.userId } : { validatedAt: null, validatedById: null }),
+      },
+    });
+    return NextResponse.json({ grade: updated });
+  } catch (error: unknown) {
+    if (error instanceof AuthError) return NextResponse.json({ error: error.message }, { status: error.status });
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Erreur serveur' }, { status: 500 });
   }
 }
 

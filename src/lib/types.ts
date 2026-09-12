@@ -105,6 +105,8 @@ export interface GradeInfo {
   score: number;
   maxScore: number;
   trimester: string;
+  status?: 'DRAFT' | 'SUBMITTED' | 'VALIDATED' | string;
+  evaluationDate?: string;
   comment: string;
   createdAt: string;
   course?: CourseInfo;
@@ -339,6 +341,7 @@ export type PageView =
   | 'admin-coefficients'
   | 'admin-passages'
   | 'admin-note-modifications'
+  | 'admin-grade-validation'
   | 'auto-report-sync'
   | 'cahier-cotation'
   | 'admin-cotation-rules'

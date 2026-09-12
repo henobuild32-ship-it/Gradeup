@@ -63,6 +63,9 @@ export async function POST(req: NextRequest) {
     if (!studentId || !targetClassId || !result) {
       return NextResponse.json({ error: 'studentId, targetClassId et result sont requis.' }, { status: 400 });
     }
+    if (!['PROMOTED', 'REDOUBLE', 'LEAVING'].includes(result)) {
+      return NextResponse.json({ error: 'Résultat de passage invalide.' }, { status: 400 });
+    }
 
     // Vérifie l'élève et les classes
     const student = await db.user.findFirst({ where: { id: studentId, schoolId: auth.schoolId, role: 'STUDENT' } });
@@ -76,7 +79,7 @@ export async function POST(req: NextRequest) {
     const sourceClass = sourceClassId
       ? await db.schoolClass.findFirst({ where: { id: sourceClassId, schoolId: auth.schoolId, deletedAt: null } })
       : null;
-    const currentEnrollment = await db.enrolledClass.findFirst({ where: { userId: studentId }, select: { classId: true } });
+    const currentEnrollment = await db.enrolledClass.findFirst({ where: { userId: studentId, class: { schoolId: auth.schoolId, deletedAt: null } }, select: { classId: true } });
     const effectiveSourceClassId = sourceClass?.id || currentEnrollment?.classId;
     if (!effectiveSourceClassId) return NextResponse.json({ error: 'Classe source introuvable pour cet élève.' }, { status: 400 });
     const effectiveSourceClass = sourceClass || await db.schoolClass.findFirst({ where: { id: effectiveSourceClassId, schoolId: auth.schoolId, deletedAt: null } });

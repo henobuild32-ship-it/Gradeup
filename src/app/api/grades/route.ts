@@ -21,6 +21,8 @@ export async function GET(request: NextRequest) {
     const courseId = searchParams.get('courseId');
     const trimester = searchParams.get('trimester');
     const teacherId = searchParams.get('teacherId');
+    const from = searchParams.get('from');
+    const to = searchParams.get('to');
 
     if (!schoolId || (schoolId !== auth.schoolId && auth.role !== 'PARENT')) {
       return NextResponse.json({ error: 'schoolId invalide' }, { status: 400 });
@@ -55,6 +57,12 @@ export async function GET(request: NextRequest) {
           : trimester === '2'
           ? { in: ['2', 'P3', 'P4', 'EX2'] }
           : trimester;
+    }
+    if (from || to) {
+      where.evaluationDate = {
+        ...(from && { gte: new Date(`${from}T00:00:00.000Z`) }),
+        ...(to && { lt: new Date(`${to}T00:00:00.000Z`) }),
+      };
     }
 
     const grades = await db.grade.findMany({
@@ -228,6 +236,7 @@ export async function POST(request: NextRequest) {
         maxScore: parsedMax,
         trimester: trimester || '1',
         comment: comment || '',
+        evaluationDate: evaluationDate ? new Date(evaluationDate) : new Date(),
       },
       include: {
         course: { select: { id: true, name: true } },
