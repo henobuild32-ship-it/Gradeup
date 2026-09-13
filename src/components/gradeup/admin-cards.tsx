@@ -85,6 +85,8 @@ export default function AdminCards() {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentPhone, setPaymentPhone] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'pawapay' | 'card'>('pawapay');
+  const [paymentAuthorized, setPaymentAuthorized] = useState(false);
 
   // Check if payment was successful on mount (from URL params)
   useEffect(() => {
@@ -92,6 +94,7 @@ export default function AdminCards() {
       const params = new URLSearchParams(window.location.search);
       const paymentStatus = params.get('payment');
       if (paymentStatus === 'success') {
+        setPaymentAuthorized(true);
         setShowPaymentDialog(false);
         toast.success('✅ Paiement de 10 USD réussi ! Vous pouvez maintenant créer la carte.', { duration: 5000 });
         window.history.replaceState({}, '', window.location.pathname);
@@ -105,7 +108,7 @@ export default function AdminCards() {
   }, []);
 
   const handleInitiatePayment = async () => {
-    if (!/^\+243\d{9}$/.test(paymentPhone.replace(/\s/g, ''))) {
+    if (paymentMethod === 'pawapay' && !/^\+243\d{9}$/.test(paymentPhone.replace(/\s/g, ''))) {
       toast.error('Saisissez un numéro congolais valide au format +243XXXXXXXXX.');
       return;
     }
@@ -120,7 +123,7 @@ export default function AdminCards() {
         body: JSON.stringify({
           amount: 10,
           currency: 'USD',
-          paymentMethod: 'pawapay',
+          paymentMethod,
           customer: {
             name: user?.fullName || 'Administrateur GradeUp',
             phone: paymentPhone.replace(/\s/g, ''),
@@ -351,7 +354,8 @@ export default function AdminCards() {
           body: JSON.stringify({ 
             schoolId: user?.schoolId, 
             role: cardRole,
-            useFreeCard: true,
+            useFreeCard: !paymentAuthorized,
+            paymentAuthorized,
             ...formData 
           }),
         });
@@ -497,9 +501,9 @@ export default function AdminCards() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={openCreateModal} className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-md">
+            <Button onClick={() => setShowPaymentDialog(true)} className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-md">
               <CreditCard className="w-4 h-4 mr-2" />
-              Nouvelle Carte gratuite
+              Nouvelle Carte — 10 USD
             </Button>
             <Button variant="outline" onClick={() => generateCards('generate-all')} disabled={generating || usersList.length === 0}>
               <RefreshCw className={`w-4 h-4 mr-2 ${generating ? 'animate-spin' : ''}`} />
@@ -582,7 +586,7 @@ export default function AdminCards() {
         setShowPaymentDialog(open);
         if (open) setPaymentPhone(user?.phone || '');
       }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl">
               <div className="p-1.5 rounded-lg bg-emerald-50">
@@ -605,10 +609,18 @@ export default function AdminCards() {
             <div className="space-y-2">
               <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950">
                 <p className="font-semibold">Paiement Mobile Money RDC</p>
-                <p className="mt-1 text-xs leading-relaxed text-blue-800">
-                  Le prix de la carte est fixé à 10 USD. GeniusPay traite le paiement par PawaPay avec votre numéro RDC et peut convertir automatiquement le montant en XOF pour votre solde marchand. Vérifiez le montant final affiché par GeniusPay avant de confirmer.
+                <p className="mt-1 text-xs leading-relaxed text-blue-800 break-words">
+                  Vous payez 10 USD. Avec Mobile Money, le montant sera débité en francs congolais selon le taux affiché par GeniusPay. Avec une carte Visa, le paiement reste en USD.
                 </p>
               </div>
+              <div className="space-y-2">
+                <Label>Mode de paiement</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <Button type="button" variant={paymentMethod === 'pawapay' ? 'default' : 'outline'} onClick={() => setPaymentMethod('pawapay')} className="h-auto whitespace-normal py-2">Mobile Money RDC</Button>
+                  <Button type="button" variant={paymentMethod === 'card' ? 'default' : 'outline'} onClick={() => setPaymentMethod('card')} className="h-auto whitespace-normal py-2">Carte Visa / bancaire</Button>
+                </div>
+              </div>
+              {paymentMethod === 'pawapay' && (
               <div className="space-y-1.5">
                 <Label htmlFor="card-payment-phone">Numéro Mobile Money RDC *</Label>
                 <Input
@@ -622,6 +634,7 @@ export default function AdminCards() {
                 />
                 <p className="text-xs text-muted-foreground">Format requis : +243 suivi de 9 chiffres.</p>
               </div>
+              )}
               <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
                 <IdCard className="h-5 w-5 text-blue-500 shrink-0" />
                 <div>
@@ -656,7 +669,7 @@ export default function AdminCards() {
               ) : (
                 <>
                   <CreditCard className="h-4 w-4 mr-2" />
-                  Payer 10 USD
+                  Payer 10 USD avec GeniusPay
                 </>
               )}
             </Button>

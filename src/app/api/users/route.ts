@@ -174,6 +174,7 @@ export async function POST(request: NextRequest) {
       cardIssuedDate,
       cardExpiryDate,
       useFreeCard,
+      paymentAuthorized,
     } = body;
 
     if (!schoolId || !fullName || !password || !role) {
@@ -189,15 +190,18 @@ export async function POST(request: NextRequest) {
     }
 
     const freeCardField = role === 'STUDENT' ? 'freeStudentCardUsed' : role === 'TEACHER' ? 'freeTeacherCardUsed' : null;
-    if (useFreeCard !== true || !freeCardField) {
+    if (paymentAuthorized === true) {
+      // GeniusPay has redirected the admin back after payment.
+    } else if (useFreeCard !== true || !freeCardField) {
       return NextResponse.json({ error: 'Création gratuite disponible uniquement pour un élève ou un professeur.' }, { status: 400 });
-    }
-    const claimed = await db.user.updateMany({
-      where: { id: auth.userId, schoolId, role: 'ADMIN', [freeCardField]: false },
-      data: { [freeCardField]: true },
-    });
-    if (claimed.count !== 1) {
-      return NextResponse.json({ error: `La carte gratuite ${role === 'STUDENT' ? 'élève' : 'professeur'} a déjà été utilisée.` }, { status: 409 });
+    } else {
+      const claimed = await db.user.updateMany({
+        where: { id: auth.userId, schoolId, role: 'ADMIN', [freeCardField]: false },
+        data: { [freeCardField]: true },
+      });
+      if (claimed.count !== 1) {
+        return NextResponse.json({ error: `La carte gratuite ${role === 'STUDENT' ? 'élève' : 'professeur'} a déjà été utilisée.` }, { status: 409 });
+      }
     }
 
     const existing = await db.user.findFirst({

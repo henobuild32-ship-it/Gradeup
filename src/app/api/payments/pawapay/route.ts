@@ -20,9 +20,9 @@ export async function POST(request: NextRequest) {
       );
     }
     const customerPhone = typeof customer?.phone === 'string' ? customer.phone.replace(/\s/g, '') : '';
-    if (paymentMethod !== 'pawapay' || !/^\+243\d{9}$/.test(customerPhone) || customer?.country !== 'CD') {
+    if (!['pawapay', 'card'].includes(paymentMethod) || (paymentMethod === 'pawapay' && (!/^\+243\d{9}$/.test(customerPhone) || customer?.country !== 'CD'))) {
       return NextResponse.json(
-        { error: 'Un numéro Mobile Money RDC valide au format +243XXXXXXXXX est requis.' },
+        { error: paymentMethod === 'card' ? 'Les informations de carte seront saisies sur GeniusPay.' : 'Un numéro Mobile Money RDC valide au format +243XXXXXXXXX est requis.' },
         { status: 400 }
       );
     }
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         amount: parsedAmount,
         currency,
-        payment_method: 'pawapay',
+        payment_method: paymentMethod,
         customer: {
           name: typeof customer.name === 'string' ? customer.name.slice(0, 120) : 'Administrateur GradeUp',
           phone: customerPhone,
