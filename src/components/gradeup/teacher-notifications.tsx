@@ -180,11 +180,11 @@ export default function TeacherNotifications() {
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         {(notif as any).title && (
-                          <h4 className={`text-sm font-semibold mb-0.5 ${notif.read ? 'text-muted-foreground' : 'text-foreground'}`}>
+                          <h4 className={`max-w-full break-words whitespace-normal text-sm font-semibold mb-0.5 ${notif.read ? 'text-muted-foreground' : 'text-foreground'}`}>
                             {(notif as any).title}
                           </h4>
                         )}
-                        <p className={`text-xs leading-relaxed break-words ${notif.read ? 'text-muted-foreground' : 'text-foreground font-medium'}`}>
+                        <p className={`max-w-full break-words whitespace-normal text-xs leading-relaxed ${notif.read ? 'text-muted-foreground' : 'text-foreground font-medium'}`}>
                           {notif.message}
                         </p>
                       </div>

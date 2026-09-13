@@ -289,6 +289,19 @@ const pageTitles: Record<PageView, string> = {
   'help': 'Centre d\'aide',
 };
 
+const pageHelp: Partial<Record<PageView, string>> = {
+  'admin-dashboard': 'Consultez les indicateurs principaux de votre établissement.',
+  'admin-users': 'Gérez les comptes, rôles et informations des utilisateurs.',
+  'admin-notifications': 'Consultez et gérez les notifications envoyées dans l’établissement.',
+  'teacher-dashboard': 'Retrouvez un résumé de vos cours et activités.',
+  'teacher-grades': 'Ajoutez les notes. Au primaire, le trimestre est calculé depuis la date.',
+  'teacher-notifications': 'Consultez vos notifications et marquez-les comme lues.',
+  'student-grades': 'Consultez vos notes et moyennes par période.',
+  'student-notifications': 'Consultez les informations envoyées par votre établissement.',
+  'parent-grades': 'Suivez les notes et moyennes de vos enfants.',
+  'parent-notifications': 'Consultez les informations concernant vos enfants.',
+};
+
 interface AppLayoutProps {
   children: React.ReactNode;
 }
@@ -730,7 +743,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
               {/* Centered Large-style Title */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <h2 className="text-sm font-semibold text-foreground tracking-tight select-none">
+                  <h2 className="max-w-[55vw] truncate text-sm font-semibold text-foreground tracking-tight select-none">
                   {pageTitles[currentPage] || 'GradeUp'}
                 </h2>
               </div>
@@ -800,10 +813,20 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 </Tooltip>
 
                 <div className="flex items-center gap-2">
-                  <h2 className="text-base font-semibold text-foreground relative">
+                  <h2 className="min-w-0 max-w-[min(55vw,28rem)] truncate text-base font-semibold text-foreground relative">
                     {pageTitles[currentPage] || 'Tableau de bord'}
                     <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full" />
                   </h2>
+                  {pageHelp[currentPage] && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-amber-500 hover:text-amber-600" aria-label="Aide de cet onglet">
+                          <Lightbulb className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-xs whitespace-normal break-words">{pageHelp[currentPage]}</TooltipContent>
+                    </Tooltip>
+                  )}
                   <kbd className="hidden md:inline-flex items-center gap-1 px-2 py-1 text-[10px] font-mono text-muted-foreground bg-muted rounded-md border border-border">
                     Ctrl K
                   </kbd>
@@ -817,7 +840,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="relative hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 hover:brightness-110 active:scale-[0.97]"
+                      className="relative shrink-0 hover:bg-blue-50 hover:text-blue-600 transition-all duration-200 hover:brightness-110 active:scale-[0.97]"
                       onClick={() => {
                         const notifPage = `${user.role.toLowerCase()}-notifications` as PageView;
                         setCurrentPage(notifPage);

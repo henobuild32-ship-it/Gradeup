@@ -12,6 +12,14 @@ import {
   upsertCahierMark,
 } from '@/lib/grade-service';
 
+function primaryTrimesterForDate(value: string | Date | undefined): string {
+  const date = value ? new Date(value) : new Date();
+  const month = date.getUTCMonth() + 1;
+  if (month >= 9 && month <= 11) return '1';
+  if (month === 12 || month <= 2) return '2';
+  return '3';
+}
+
 export async function GET(request: NextRequest) {
   try {
     const auth = authenticateRequest(request);
@@ -155,6 +163,7 @@ export async function POST(request: NextRequest) {
         coefficient: true,
         maxScore: true,
         name: true,
+        class: { select: { cycle: true } },
       },
     });
     if (!course) {
@@ -172,6 +181,12 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Primaire : le trimestre est toujours dérivé de la date de l'évaluation.
+    const isPrimary = !['EB', 'Humanites', 'Secondaire'].includes(course.class.cycle);
+    const effectiveTrimester = isPrimary
+      ? primaryTrimesterForDate(evaluationDate)
+      : (trimester || period || 'P1');
 
     // ── Saisie rapide via période RDC (P1..EX2) : alimente le cahier ──
     if (isPeriodKey(period ?? trimester)) {
@@ -234,7 +249,7 @@ export async function POST(request: NextRequest) {
         teacherId: effectiveTeacherId,
         score: parsedScore,
         maxScore: parsedMax,
-        trimester: trimester || '1',
+        trimester: effectiveTrimester,
         comment: comment || '',
         evaluationDate: evaluationDate ? new Date(evaluationDate) : new Date(),
       },
@@ -245,7 +260,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    syncStudentReport(schoolId, studentId, trimester || '1').catch(() => {});
+    syncStudentReport(schoolId, studentId, effectiveTrimester).catch(() => {});
 
     // Trigger real-time and push notifications for student & parent
     try {

@@ -351,6 +351,7 @@ export default function AdminCards() {
           body: JSON.stringify({ 
             schoolId: user?.schoolId, 
             role: cardRole,
+            useFreeCard: true,
             ...formData 
           }),
         });
@@ -496,9 +497,9 @@ export default function AdminCards() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => setShowPaymentDialog(true)} className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-md">
+            <Button onClick={openCreateModal} className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-md">
               <CreditCard className="w-4 h-4 mr-2" />
-              Nouvelle Carte (10 USD)
+              Nouvelle Carte gratuite
             </Button>
             <Button variant="outline" onClick={() => generateCards('generate-all')} disabled={generating || usersList.length === 0}>
               <RefreshCw className={`w-4 h-4 mr-2 ${generating ? 'animate-spin' : ''}`} />

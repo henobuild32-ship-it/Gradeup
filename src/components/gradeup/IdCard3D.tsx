@@ -100,6 +100,7 @@ export default function IdCard3D({ user, school, role }: IdCard3DProps) {
         cacheBust: true,
         pixelRatio: 3,
         backgroundColor: '#ffffff',
+        fetchRequestInit: { mode: 'cors' as RequestMode, credentials: 'omit' as RequestCredentials },
         style: { transform: 'none', borderRadius: '0' },
       };
       const [front, back] = await Promise.all([toPng(frontRef.current, options), toPng(backRef.current, options)]);
@@ -127,8 +128,9 @@ export default function IdCard3D({ user, school, role }: IdCard3DProps) {
       link.click();
       link.remove();
       toast.success('Carte recto-verso téléchargée en une seule image.');
-    } catch {
-      toast.error('Erreur lors du téléchargement');
+    } catch (error) {
+      console.error('[IdCard3D] download failed', error);
+      toast.error('Téléchargement impossible. Vérifiez que les images de la carte sont accessibles.');
     } finally {
       setDownloading(false);
     }
@@ -176,7 +178,7 @@ export default function IdCard3D({ user, school, role }: IdCard3DProps) {
               <div className="flex flex-col items-center gap-1.5 shrink-0 self-start">
                 <div className="w-20 h-24 sm:w-28 sm:h-32 rounded-lg border-2 overflow-hidden bg-slate-100 flex items-center justify-center shadow-sm" style={{ borderColor: color + '40' }}>
                   {user.photoUrl ? (
-                    <img src={user.photoUrl} alt={user.fullName} className="w-full h-full object-cover" />
+                    <img crossOrigin="anonymous" src={user.photoUrl} alt={user.fullName} className="w-full h-full object-cover" />
                   ) : (
                     <div className="flex flex-col items-center gap-1 text-slate-400">
                       <User className="w-8 h-8" />
@@ -241,7 +243,7 @@ export default function IdCard3D({ user, school, role }: IdCard3DProps) {
             <div className="shrink-0 flex items-center justify-between px-4 py-1.5 border-t border-slate-100 bg-slate-50/80">
               <div className="flex items-center gap-1.5 min-w-0">
                 {validLogo ? (
-                  <img src={school.logoUrl!} alt="" className="w-4 h-4 object-contain rounded" onError={() => setLogoError(true)} />
+                  <img crossOrigin="anonymous" src={school.logoUrl!} alt="" className="w-4 h-4 object-contain rounded" onError={() => setLogoError(true)} />
                 ) : (
                   <School className="w-4 h-4 shrink-0" style={{ color }} />
                 )}
@@ -259,10 +261,10 @@ export default function IdCard3D({ user, school, role }: IdCard3DProps) {
           >
             <div className="shrink-0 w-full" style={{ height: BAND_H, backgroundColor: color }} />
 
-            <div className="flex-1 grid grid-cols-[auto_1fr] items-center gap-4 p-5 sm:p-8">
+            <div className="relative flex-1 flex items-center gap-4 p-5 sm:p-8 pr-28 sm:pr-44">
               <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-2xl border border-slate-200 bg-white flex items-center justify-center p-3 shadow-lg">
                 {validLogo ? (
-                  <img src={school.logoUrl!} alt={school.name} className="max-w-full max-h-full object-contain" />
+                  <img crossOrigin="anonymous" src={school.logoUrl!} alt={school.name} className="max-w-full max-h-full object-contain" />
                 ) : <School className="w-16 h-16 text-slate-300" />}
               </div>
               <div className="min-w-0 space-y-2 text-[10px] sm:text-[11px] text-slate-600">
@@ -275,7 +277,7 @@ export default function IdCard3D({ user, school, role }: IdCard3DProps) {
                 {user.qualification && <p>Qualification : {user.qualification}</p>}
                 {user.cardIssuedDate && <p>Émise le : {user.cardIssuedDate}</p>}
               </div>
-              <div className="hidden sm:flex flex-col items-center gap-1">
+              <div className="hidden sm:flex absolute right-6 top-1/2 -translate-y-1/2 flex-col items-center gap-1">
                 <div className="bg-white p-1 rounded-lg shadow-md border border-slate-200">
                   <QRCodeSVG value={qrUrl} size={70} level="M" />
                 </div>
@@ -290,11 +292,11 @@ export default function IdCard3D({ user, school, role }: IdCard3DProps) {
 
       {/* Actions */}
       <div className="flex flex-wrap gap-2 justify-center w-full max-w-[400px]">
-        <Button variant="outline" size="sm" onClick={handleFlip} className="gap-1.5 border-slate-300">
+        <Button variant="outline" size="sm" onClick={(event) => { event.stopPropagation(); handleFlip(); }} className="gap-1.5 border-slate-300">
           <RotateCw className="w-4 h-4" />
           Retourner
         </Button>
-        <Button variant="default" size="sm" onClick={handleDownload} disabled={downloading} className="gap-1.5" style={{ backgroundColor: color }}>
+        <Button variant="default" size="sm" onClick={(event) => { event.stopPropagation(); void handleDownload(); }} disabled={downloading} className="gap-1.5" style={{ backgroundColor: color }}>
           <Download className="w-4 h-4" />
           {downloading ? 'Téléchargement...' : 'Télécharger PNG'}
         </Button>

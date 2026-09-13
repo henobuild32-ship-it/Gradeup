@@ -99,44 +99,46 @@ model SchoolYear {
 }
 
 model User {
-  id             String    @id @default(cuid())
-  schoolId       String
-  fullName       String
-  email          String    @default("")
-  password       String
-  role           String    @default("STUDENT")
-  photoUrl       String    @default("")
-  parentCode     String    @unique
-  active         Boolean   @default(true)
-  parentId       String?
-  phone          String    @default("")
-  parentPhone    String    @default("")
-  parentPhone2   String    @default("")
-  cardId         String?   @unique
-  postName       String    @default("")
-  gender         Gender    @default(M)
-  specialty      String    @default("")
-  qualification  String    @default("")
-  birthDate      String    @default("")
-  matricule      String    @default("")
-  academicYear   String    @default("")
-  section        String    @default("")
-  bloodType      String    @default("")
-  nationality    String    @default("")
-  address        String    @default("")
-  parentEmail    String    @default("")
-  cardIssuedDate String    @default("")
-  cardExpiryDate String    @default("")
-  ine            String    @default("")
-  tuteur         String    @default("")
-  contactTuteur  String    @default("")
-  allergies      String    @default("")
-  assurance      String    @default("")
-  aiPreferences  String    @default("{}")
-  isTitulaire    Boolean   @default(false)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  deletedAt      DateTime?
+  id                  String    @id @default(cuid())
+  schoolId            String
+  fullName            String
+  email               String    @default("")
+  password            String
+  role                String    @default("STUDENT")
+  photoUrl            String    @default("")
+  parentCode          String    @unique
+  active              Boolean   @default(true)
+  parentId            String?
+  phone               String    @default("")
+  parentPhone         String    @default("")
+  parentPhone2        String    @default("")
+  cardId              String?   @unique
+  postName            String    @default("")
+  gender              Gender    @default(M)
+  specialty           String    @default("")
+  qualification       String    @default("")
+  birthDate           String    @default("")
+  matricule           String    @default("")
+  academicYear        String    @default("")
+  section             String    @default("")
+  bloodType           String    @default("")
+  nationality         String    @default("")
+  address             String    @default("")
+  parentEmail         String    @default("")
+  cardIssuedDate      String    @default("")
+  cardExpiryDate      String    @default("")
+  freeStudentCardUsed Boolean   @default(false)
+  freeTeacherCardUsed Boolean   @default(false)
+  ine                 String    @default("")
+  tuteur              String    @default("")
+  contactTuteur       String    @default("")
+  allergies           String    @default("")
+  assurance           String    @default("")
+  aiPreferences       String    @default("{}")
+  isTitulaire         Boolean   @default(false)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
 
   conversations                 AiConversation[]
   attendanceStudent             Attendance[]           @relation("AttendanceStudent")

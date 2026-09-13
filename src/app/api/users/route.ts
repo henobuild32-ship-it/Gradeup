@@ -173,6 +173,7 @@ export async function POST(request: NextRequest) {
       assurance,
       cardIssuedDate,
       cardExpiryDate,
+      useFreeCard,
     } = body;
 
     if (!schoolId || !fullName || !password || !role) {
@@ -185,6 +186,18 @@ export async function POST(request: NextRequest) {
     // Admin uniquement, et admin de la même école
     if (auth.role !== 'ADMIN' || auth.schoolId !== schoolId) {
       return NextResponse.json({ error: 'Accès non autorisé. Action réservée aux administrateurs.' }, { status: 403 });
+    }
+
+    const freeCardField = role === 'STUDENT' ? 'freeStudentCardUsed' : role === 'TEACHER' ? 'freeTeacherCardUsed' : null;
+    if (useFreeCard !== true || !freeCardField) {
+      return NextResponse.json({ error: 'Création gratuite disponible uniquement pour un élève ou un professeur.' }, { status: 400 });
+    }
+    const claimed = await db.user.updateMany({
+      where: { id: auth.userId, schoolId, role: 'ADMIN', [freeCardField]: false },
+      data: { [freeCardField]: true },
+    });
+    if (claimed.count !== 1) {
+      return NextResponse.json({ error: `La carte gratuite ${role === 'STUDENT' ? 'élève' : 'professeur'} a déjà été utilisée.` }, { status: 409 });
     }
 
     const existing = await db.user.findFirst({
@@ -262,6 +275,8 @@ export async function POST(request: NextRequest) {
       parentCodeVal = generateParentCode();
     }
 
+    const issued = new Date().toISOString().slice(0, 10);
+    const expiry = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const user = await db.user.create({
       data: {
         schoolId,
@@ -289,8 +304,9 @@ export async function POST(request: NextRequest) {
         contactTuteur: contactTuteur || '',
         allergies: allergies || '',
         assurance: assurance || '',
-        cardIssuedDate: cardIssuedDate || '',
-        cardExpiryDate: cardExpiryDate || '',
+        cardId: `${(fullName.trim().charAt(0) || 'X').toUpperCase()}${Date.now().toString().slice(-8)}`,
+        cardIssuedDate: issued,
+        cardExpiryDate: expiry,
         parentId: parentId || null,
         parentCode: parentCodeVal,
         isTitulaire: !!isTitulaire,

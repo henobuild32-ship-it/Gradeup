@@ -177,6 +177,13 @@ export default function TeacherGrades() {
   const dialogIsSecondary = dialogCourse ? isSecondaryClass(dialogCourse.class ?? null) : false;
   const dialogPeriodOptions = dialogIsSecondary ? SECONDARY_PERIODS : PRIMARY_TRIMESTERS;
 
+  const autoPrimaryTrimester = useMemo(() => {
+    const month = new Date(`${formEvaluationDate}T00:00:00Z`).getUTCMonth() + 1;
+    if (month >= 9 && month <= 11) return '1';
+    if (month === 12 || month <= 2) return '2';
+    return '3';
+  }, [formEvaluationDate]);
+
   // Quand un cours du secondaire est choisi, basculer sur une période RDC.
   useEffect(() => {
     if (!selectedCourse || !selectedIsSecondary) {
@@ -221,6 +228,10 @@ export default function TeacherGrades() {
       setFormTrimester(now.getMonth() < 2 || now.getMonth() > 7 ? 'P1' : 'P3');
     }
   }, [dialogCourse, dialogIsSecondary, formTrimester]);
+
+  useEffect(() => {
+    if (dialogCourse && !dialogIsSecondary && !editingGrade) setFormTrimester(autoPrimaryTrimester);
+  }, [dialogCourse, dialogIsSecondary, editingGrade, autoPrimaryTrimester]);
 
   // Load students for grid mode when course/trimester changes
   useEffect(() => {
@@ -358,8 +369,8 @@ export default function TeacherGrades() {
         maxScore,
         evaluationTitle: formEvaluationTitle.trim() || undefined,
         evaluationDate: formEvaluationDate || undefined,
-        trimester: formTrimester,
-        period: formTrimester,
+      trimester: dialogIsSecondary ? formTrimester : autoPrimaryTrimester,
+      period: dialogIsSecondary ? formTrimester : undefined,
         comment: formComment.trim(),
         modifiedBy: user.id,
         reason: formReason.trim(),
@@ -400,7 +411,7 @@ export default function TeacherGrades() {
         toast.info('Note enregistrée hors ligne. Elle sera synchronisée au retour du réseau.');
         setDialogOpen(false);
         resetForm();
-        showSyncBanner(studentName, formTrimester, parseFloat(formScore) / parseFloat(formMaxScore) * 20);
+        showSyncBanner(studentName, dialogIsSecondary ? formTrimester : autoPrimaryTrimester, parseFloat(formScore) / parseFloat(formMaxScore) * 20);
         return;
       }
 
@@ -417,7 +428,7 @@ export default function TeacherGrades() {
       fetchGrades();
 
       // Show sync banner
-      showSyncBanner(studentName, formTrimester, parseFloat(formScore) / parseFloat(formMaxScore) * 20);
+      showSyncBanner(studentName, dialogIsSecondary ? formTrimester : autoPrimaryTrimester, parseFloat(formScore) / parseFloat(formMaxScore) * 20);
     } catch {
       toast.error('Erreur lors de l\'enregistrement');
     } finally {
@@ -1057,6 +1068,11 @@ export default function TeacherGrades() {
                 ))}
               </select>
             </div>
+            {!editingGrade && !dialogIsSecondary && (
+              <p className="text-xs text-muted-foreground rounded-md bg-muted/50 px-3 py-2">
+                Trimestre déterminé automatiquement par la date : <strong>{gradePeriodLabel(autoPrimaryTrimester)}</strong>.
+              </p>
+            )}
             <div className="space-y-2">
               <Label>Élève *</Label>
               <select
@@ -1103,7 +1119,8 @@ export default function TeacherGrades() {
                 </div>
               </div>
             )}
-            <div className="space-y-2">
+            {(!editingGrade || dialogIsSecondary) && (
+              <div className="space-y-2">
               <Label>{dialogIsSecondary ? 'Période *' : 'Trimestre *'}</Label>
               <select
                 value={formTrimester}
@@ -1114,7 +1131,13 @@ export default function TeacherGrades() {
                   <option key={p.value} value={p.value}>{p.label}</option>
                 ))}
               </select>
-            </div>
+              </div>
+            )}
+            {!editingGrade && !dialogIsSecondary && (
+              <p className="text-xs text-muted-foreground rounded-md bg-muted/50 px-3 py-2">
+                Trimestre déterminé automatiquement par la date : <strong>{gradePeriodLabel(autoPrimaryTrimester)}</strong>.
+              </p>
+            )}
              <div className="space-y-2">
               <Label>Commentaire</Label>
               <Textarea placeholder="Commentaire sur la performance..." value={formComment} onChange={(e) => setFormComment(e.target.value)} rows={2} className="focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-xs" />
