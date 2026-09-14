@@ -14,7 +14,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Edit, Trash2, GraduationCap, Filter, Calculator, Sparkles, Check, Zap, RefreshCw, AlertTriangle, PenLine, CheckCircle2, Clock, XCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, GraduationCap, Filter, Calculator, Sparkles, Check, Zap, RefreshCw, AlertTriangle, PenLine, CheckCircle2, Clock, XCircle, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { CourseInfo, GradeInfo, UserInfo } from '@/lib/types';
@@ -87,6 +87,9 @@ export default function TeacherGrades() {
   const [gradeHistoryList, setGradeHistoryList] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [modificationRequests, setModificationRequests] = useState<NoteModification[]>([]);
+  const [closures, setClosures] = useState<{ scope: string; key: string }[]>([]);
+  const [closingKey, setClosingKey] = useState<string | null>(null);
+  const [schoolYearId, setSchoolYearId] = useState('');
   const [applyingRequestId, setApplyingRequestId] = useState<string | null>(null);
 
   // Sync state: tracks the last auto-sync event for the banner
@@ -171,6 +174,35 @@ export default function TeacherGrades() {
   const selectedCourse = courses.find((c) => c.id === filterCourseId) || null;
   const selectedIsSecondary = selectedCourse ? isSecondaryClass(selectedCourse.class ?? null) : false;
   const periodOptions = selectedIsSecondary ? SECONDARY_PERIODS : PRIMARY_TRIMESTERS;
+  const closureKey = filterTrimester || '1';
+  const currentScope = selectedIsSecondary ? (filterTrimester.startsWith('P') || filterTrimester.startsWith('EX') ? 'MONTH' : 'SEMESTER') : 'TRIMESTER';
+  const isClosed = closures.some((c) => c.scope === currentScope && c.key === closureKey);
+
+  const closeCurrentPeriod = async () => {
+    if (!user?.schoolId || !schoolYearId || isClosed) return;
+    setClosingKey(`${currentScope}:${closureKey}`);
+    try {
+      const res = await fetch('/api/academic-closures', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ schoolYearId, scope: currentScope, key: closureKey }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Échec de la clôture');
+      setClosures((prev) => [...prev, { scope: currentScope, key: closureKey }]);
+      toast.success('Période clôturée');
+    } catch (error: unknown) { toast.error(error instanceof Error ? error.message : 'Échec de la clôture'); }
+    finally { setClosingKey(null); }
+  };
+
+  useEffect(() => {
+    if (!user?.schoolId) return;
+    fetch(`/api/school-years?schoolId=${user.schoolId}`).then((r) => r.json()).then((d) => {
+      const year = (d.years || []).find((y: { status: string }) => y.status === 'OPEN') || d.years?.[0];
+      if (year) setSchoolYearId(year.id);
+    }).catch(() => {});
+  }, [user?.schoolId]);
+
+  useEffect(() => {
+    if (!schoolYearId) return;
+    fetch(`/api/academic-closures?schoolYearId=${schoolYearId}`).then((r) => r.json()).then((d) => setClosures(d.closures || [])).catch(() => {});
+  }, [schoolYearId]);
 
   // Cycle du cours sélectionné dans le dialog d'ajout/modification.
   const dialogCourse = courses.find((c) => c.id === formCourseId) || null;
@@ -474,7 +506,8 @@ export default function TeacherGrades() {
     if (scoreStr === '') return;
     
     const key = `${studentId}-${filterCourseId}-${filterTrimester}`;
-    if (lastSaved.current[key] === scoreStr) return;
+    const saveFingerprint = `${scoreStr}|${commentStr.trim()}`;
+    if (lastSaved.current[key] === saveFingerprint) return;
 
     const score = parseFloat(scoreStr);
     if (isNaN(score)) return;
@@ -510,14 +543,14 @@ export default function TeacherGrades() {
       });
 
       if (!res) {
-        lastSaved.current[key] = scoreStr;
+        lastSaved.current[key] = saveFingerprint;
         const studentName = gridStudents.find(s => s.id === studentId)?.fullName || 'Élève';
         toast.info(`Note de ${studentName} mise en attente hors ligne`);
         return;
       }
 
       if (res.ok) {
-        lastSaved.current[key] = scoreStr;
+        lastSaved.current[key] = saveFingerprint;
         const studentName = gridStudents.find(s => s.id === studentId)?.fullName || 'Élève';
         toast.success(`Note de ${studentName} enregistrée`);
         // Refresh local grades query
@@ -730,6 +763,10 @@ export default function TeacherGrades() {
               <option key={p.value} value={p.value}>{p.label}</option>
             ))}
           </select>
+          <Button type="button" variant={isClosed ? 'secondary' : 'destructive'} onClick={closeCurrentPeriod} disabled={isClosed || !!closingKey} className="gap-2">
+            <Lock className="h-4 w-4" />
+            {isClosed ? 'Période clôturée' : closingKey ? 'Clôture...' : `Clôturer ${currentScope === 'MONTH' ? 'la période' : currentScope === 'SEMESTER' ? 'le semestre' : 'le trimestre'}`}
+          </Button>
 
           {!filterCourseId && (
             <div className="w-full sm:ml-auto flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-muted-foreground">
@@ -1184,7 +1221,7 @@ export default function TeacherGrades() {
           <DialogFooter>
             <Button variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }} className="hover:scale-[1.02] active:scale-[0.98] transition-all">Annuler</Button>
             <Button className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:scale-[1.02] active:scale-[0.98] transition-transform" onClick={handleSubmit} disabled={submitting || !formCourseId || !formStudentId || !formScore || !formTrimester}>
-              {submitting ? 'Enregistrement...' : editingGrade ? 'Modifier' : 'Ajouter'}
+              {submitting ? 'Enregistrement...' : editingGrade ? 'Confirmer la modification' : 'Enregistrer la note'}
             </Button>
           </DialogFooter>
         </DialogContent>

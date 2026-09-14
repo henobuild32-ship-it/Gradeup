@@ -187,6 +187,8 @@ export async function POST(request: NextRequest) {
     const effectiveTrimester = isPrimary
       ? primaryTrimesterForDate(evaluationDate)
       : (trimester || period || 'P1');
+    const evaluation = evaluationDate ? new Date(evaluationDate) : new Date();
+    const week = Math.ceil((((evaluation.getTime() - new Date(Date.UTC(evaluation.getUTCFullYear(), 0, 1)).getTime()) / 86400000) + 1) / 7);
 
     // ── Saisie rapide via période RDC (P1..EX2) : alimente le cahier ──
     if (isPeriodKey(period ?? trimester)) {
@@ -250,8 +252,10 @@ export async function POST(request: NextRequest) {
         score: parsedScore,
         maxScore: parsedMax,
         trimester: effectiveTrimester,
+        month: evaluation.getUTCMonth() + 1,
+        week,
         comment: comment || '',
-        evaluationDate: evaluationDate ? new Date(evaluationDate) : new Date(),
+        evaluationDate: evaluation,
       },
       include: {
         course: { select: { id: true, name: true } },
