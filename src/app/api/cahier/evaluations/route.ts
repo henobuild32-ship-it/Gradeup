@@ -5,6 +5,7 @@ import {
   recomputeStudentPeriodGrade,
   recomputeEvaluationGrades,
 } from '@/lib/grade-service';
+import { assertGradePeriodOpen } from '@/lib/academic-closures';
 
 /**
  * GET /api/cahier/evaluations
@@ -36,7 +37,6 @@ export async function GET(request: NextRequest) {
     if (!course || (auth.role === 'TEACHER' && course.teacherId !== auth.userId)) {
       return NextResponse.json({ error: 'Vous n’êtes pas autorisé à consulter ce cahier.' }, { status: 403 });
     }
-
     // 1. Fetch all students enrolled in the class
     const enrollments = await db.enrolledClass.findMany({
       where: { classId },
@@ -113,6 +113,13 @@ export async function POST(request: NextRequest) {
     if (!course || (auth.role === 'TEACHER' && course.teacherId !== auth.userId)) {
       return NextResponse.json({ error: 'Vous n’êtes pas autorisé à créer cette évaluation.' }, { status: 403 });
     }
+    const evaluationDate = date ? new Date(date) : new Date();
+    try {
+      const schoolYear = await db.schoolYear.findFirst({ where: { schoolId, status: { not: 'CLOSED' } }, orderBy: { createdAt: 'desc' }, select: { id: true } });
+      await assertGradePeriodOpen({ schoolId, schoolYearId: schoolYear?.id, date: evaluationDate, trimester: period || 'P1' });
+    } catch (error: unknown) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : 'Période clôturée' }, { status: 423 });
+    }
 
     const evaluation = await db.cahierEvaluation.create({
       data: {
@@ -123,7 +130,7 @@ export async function POST(request: NextRequest) {
         maxScore: maxScore ? parseFloat(maxScore) : 20,
         trimester: period,
         teacherId: auth.role === 'TEACHER' ? auth.userId : (teacherId || course.teacherId),
-        date: date ? new Date(date) : new Date(),
+        date: evaluationDate,
       },
     });
 
@@ -165,6 +172,19 @@ export async function PUT(request: NextRequest) {
 
     if (auth.schoolId !== evaluation.schoolId) {
       return NextResponse.json({ error: 'Évaluation hors de votre établissement' }, { status: 403 });
+    }
+    if (auth.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'La modification des cotations existantes est réservée à l’administrateur.' }, { status: 403 });
+    }
+    const course = await db.course.findUnique({ where: { id: evaluation.courseId }, select: { teacherId: true } });
+    if (auth.role === 'TEACHER' && course?.teacherId !== auth.userId) {
+      return NextResponse.json({ error: 'Vous n’êtes pas le professeur de ce cours.' }, { status: 403 });
+    }
+    try {
+      const schoolYear = await db.schoolYear.findFirst({ where: { schoolId: evaluation.schoolId, status: { not: 'CLOSED' } }, orderBy: { createdAt: 'desc' }, select: { id: true } });
+      await assertGradePeriodOpen({ schoolId: evaluation.schoolId, schoolYearId: schoolYear?.id, date: evaluation.date, trimester: evaluation.trimester });
+    } catch (error: unknown) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : 'Période clôturée' }, { status: 423 });
     }
 
     // Les enseignants saisissent les notes initiales depuis le module Notes.
@@ -255,6 +275,12 @@ export async function PATCH(request: NextRequest) {
           { status: 403 }
         );
       }
+    }
+    try {
+      const schoolYear = await db.schoolYear.findFirst({ where: { schoolId: evaluation.schoolId, status: { not: 'CLOSED' } }, orderBy: { createdAt: 'desc' }, select: { id: true } });
+      await assertGradePeriodOpen({ schoolId: evaluation.schoolId, schoolYearId: schoolYear?.id, date: date ? new Date(date) : evaluation.date, trimester: evaluation.trimester });
+    } catch (error: unknown) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : 'Période clôturée' }, { status: 423 });
     }
 
     const data: Record<string, unknown> = {};

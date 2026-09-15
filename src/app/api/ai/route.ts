@@ -229,7 +229,26 @@ Réponds avec rigueur et bienveillance.`;
 
 // ─── Collecte du contexte scolaire ────────────────────────────────────────────
 
+const schoolContextCache = new Map<string, { expiresAt: number; value: string }>();
+const SCHOOL_CONTEXT_TTL_MS = 20_000;
+
 async function buildSchoolContext(
+  role: string,
+  userId: string,
+  schoolId: string,
+  userName: string,
+  userPreferences: Record<string, string>,
+): Promise<string> {
+  const key = `${schoolId}:${userId}:${role}`;
+  const cached = schoolContextCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+  const value = await buildSchoolContextUncached(role, userId, schoolId, userName, userPreferences);
+  schoolContextCache.set(key, { expiresAt: Date.now() + SCHOOL_CONTEXT_TTL_MS, value });
+  return value;
+}
+
+async function buildSchoolContextUncached(
   role: string,
   userId: string,
   schoolId: string,
@@ -516,7 +535,10 @@ export async function POST(request: NextRequest) {
     .join('\n');
 
   // ─── Construire le contexte scolaire ────────────────────────────────────────
-  const schoolContext = await buildSchoolContext(role, userId, schoolId, userName, userPreferences);
+  const [schoolContext, memories] = await Promise.all([
+    buildSchoolContext(role, userId, schoolId, userName, userPreferences),
+    loadMemories(userId),
+  ]);
 
   // ─── Ajouter les documents partagés ─────────────────────────────────────────
   let fullContext = schoolContext;
@@ -536,7 +558,6 @@ export async function POST(request: NextRequest) {
   let systemPrompt = buildSystemPrompt(userName, role, fullContext, isFirstMessage, preferencesStr);
 
   // ─── Mémoire long terme de l'utilisateur ─────────────────────────────────────
-  const memories = await loadMemories(userId);
   if (memories.length > 0) {
     systemPrompt += `\n\nMÉMOIRE À LONG TERME (informations clés à garder en mémoire sur l'utilisateur et son contexte) :
 ${memories.join('\n')}

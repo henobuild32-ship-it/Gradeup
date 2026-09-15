@@ -133,6 +133,7 @@ export const useAppStore = create<AppState>()(
         user: state.user,
         currentPage: state.currentPage,
         sidebarOpen: state.sidebarOpen,
+        chatMessages: state.chatMessages,
       }),
     }
   )

@@ -69,6 +69,8 @@ export default function TeacherGrades() {
   const [filterTrimester, setFilterTrimester] = useState<string>('1');
   const [periodFrom, setPeriodFrom] = useState('');
   const [periodTo, setPeriodTo] = useState('');
+  const [timeGrouping, setTimeGrouping] = useState<'ALL' | 'DAY' | 'WEEK' | 'MONTH' | 'TRIMESTER' | 'SEMESTER' | 'YEAR'>('ALL');
+  const [timeValue, setTimeValue] = useState('');
 
   // Quick grading grid states
   const [gridStudents, setGridStudents] = useState<UserInfo[]>([]);
@@ -126,6 +128,8 @@ export default function TeacherGrades() {
       if (filterTrimester) url += `&trimester=${filterTrimester}`;
       if (periodFrom) url += `&from=${periodFrom}`;
       if (periodTo) url += `&to=${periodTo}`;
+      if (timeGrouping !== 'ALL') url += `&groupBy=${timeGrouping}`;
+      if (timeValue) url += `&groupValue=${encodeURIComponent(timeValue)}`;
       const data = await fetchJsonWithCache<{ grades?: GradeInfo[] }>(url, { grades: [] });
       await cacheJson(url, data);
       setGrades(Array.isArray(data.grades) ? data.grades : []);
@@ -136,7 +140,7 @@ export default function TeacherGrades() {
     } finally {
       setLoading(false);
     }
-  }, [user, filterCourseId, filterTrimester, periodFrom, periodTo]);
+  }, [user, filterCourseId, filterTrimester, periodFrom, periodTo, timeGrouping, timeValue]);
 
   const printPeriod = () => {
     if (!grades.length) { toast.error('Aucune note dans cette période.'); return; }
@@ -174,12 +178,15 @@ export default function TeacherGrades() {
   const selectedCourse = courses.find((c) => c.id === filterCourseId) || null;
   const selectedIsSecondary = selectedCourse ? isSecondaryClass(selectedCourse.class ?? null) : false;
   const periodOptions = selectedIsSecondary ? SECONDARY_PERIODS : PRIMARY_TRIMESTERS;
-  const closureKey = filterTrimester || '1';
-  const currentScope = selectedIsSecondary ? (filterTrimester.startsWith('P') || filterTrimester.startsWith('EX') ? 'MONTH' : 'SEMESTER') : 'TRIMESTER';
+  const currentScope = timeGrouping !== 'ALL' ? timeGrouping : (selectedIsSecondary ? (filterTrimester.startsWith('P') || filterTrimester.startsWith('EX') ? 'MONTH' : 'SEMESTER') : 'TRIMESTER');
+  const closureKey = timeGrouping !== 'ALL' && timeValue
+    ? timeValue
+    : filterTrimester || '1';
   const isClosed = closures.some((c) => c.scope === currentScope && c.key === closureKey);
 
   const closeCurrentPeriod = async () => {
     if (!user?.schoolId || !schoolYearId || isClosed) return;
+    if (!window.confirm(`Voulez-vous vraiment clôturer cette période (${currentScope.toLowerCase()}) ? Les notes ne pourront plus être ajoutées ou modifiées.`)) return;
     setClosingKey(`${currentScope}:${closureKey}`);
     try {
       const res = await fetch('/api/academic-closures', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ schoolYearId, scope: currentScope, key: closureKey }) });
@@ -525,6 +532,7 @@ export default function TeacherGrades() {
         trimester: filterTrimester,
         period: filterTrimester,
         comment: commentStr.trim(),
+        quickSave: true,
       };
 
       const url = matchingGrade ? `/api/grades/${matchingGrade.id}` : '/api/grades';
@@ -751,6 +759,26 @@ export default function TeacherGrades() {
 
           <Input type="date" value={periodFrom} onChange={(e) => setPeriodFrom(e.target.value)} className="w-full sm:w-40" aria-label="Date de début" />
           <Input type="date" value={periodTo} onChange={(e) => setPeriodTo(e.target.value)} className="w-full sm:w-40" aria-label="Date de fin exclusive" />
+          <select
+            value={timeGrouping}
+            onChange={(e) => { setTimeGrouping(e.target.value as typeof timeGrouping); setTimeValue(''); }}
+            className="w-full sm:w-40 h-10 border border-input rounded-lg px-3 bg-background text-sm font-medium"
+            aria-label="Regrouper les notes par"
+          >
+            <option value="ALL">Toutes les périodes</option>
+            <option value="DAY">Jour</option>
+            <option value="WEEK">Semaine</option>
+            <option value="MONTH">Mois</option>
+            <option value="TRIMESTER">Trimestre</option>
+            <option value="SEMESTER">Semestre</option>
+            <option value="YEAR">Année</option>
+          </select>
+          {timeGrouping === 'DAY' && <Input type="date" value={timeValue} onChange={(e) => setTimeValue(e.target.value)} className="w-full sm:w-40" aria-label="Jour à consulter" />}
+          {timeGrouping === 'MONTH' && <Input type="month" value={timeValue} onChange={(e) => setTimeValue(e.target.value)} className="w-full sm:w-40" aria-label="Mois à consulter" />}
+          {timeGrouping === 'YEAR' && <Input type="number" min="2000" max="2100" placeholder="2026" value={timeValue} onChange={(e) => setTimeValue(e.target.value)} className="w-full sm:w-28" aria-label="Année à consulter" />}
+          {timeGrouping === 'WEEK' && <Input placeholder="2026-W38" value={timeValue} onChange={(e) => setTimeValue(e.target.value)} className="w-full sm:w-32" aria-label="Semaine à consulter" />}
+          {timeGrouping === 'TRIMESTER' && <select value={timeValue} onChange={(e) => setTimeValue(e.target.value)} className="w-full sm:w-32 h-10 border border-input rounded-lg px-3 bg-background text-sm"><option value="">Choisir T</option><option value="1">Trimestre 1</option><option value="2">Trimestre 2</option><option value="3">Trimestre 3</option></select>}
+          {timeGrouping === 'SEMESTER' && <select value={timeValue} onChange={(e) => setTimeValue(e.target.value)} className="w-full sm:w-32 h-10 border border-input rounded-lg px-3 bg-background text-sm"><option value="">Choisir S</option><option value="1">Semestre 1</option><option value="2">Semestre 2</option></select>}
           <Button type="button" variant="outline" onClick={printPeriod} className="gap-2"><span aria-hidden="true">🖨</span> Imprimer la période</Button>
 
           {/* iOS native style select menu for Période / Trimestre */}

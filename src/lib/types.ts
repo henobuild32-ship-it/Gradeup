@@ -107,6 +107,8 @@ export interface GradeInfo {
   trimester: string;
   status?: 'DRAFT' | 'SUBMITTED' | 'VALIDATED' | string;
   evaluationDate?: string;
+  month?: number | null;
+  week?: number | null;
   comment: string;
   createdAt: string;
   course?: CourseInfo;

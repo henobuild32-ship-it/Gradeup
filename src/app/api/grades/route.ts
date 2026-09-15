@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 import { syncStudentReport } from '@/lib/grade-sync';
 import { assertYearOpen } from '@/lib/year-status';
+import { assertGradePeriodOpen, calendarWeek } from '@/lib/academic-closures';
 import { resolveClassCoefficients } from '@/lib/coefficient-resolver';
 import {
   ensureQuickEvaluation,
@@ -20,6 +21,34 @@ function primaryTrimesterForDate(value: string | Date | undefined): string {
   return '3';
 }
 
+function addDateRange(where: Record<string, unknown>, start: Date, end: Date) {
+  where.evaluationDate = { gte: start, lt: end };
+}
+
+function applyTimeFilter(where: Record<string, unknown>, groupBy: string | null, groupValue: string | null) {
+  if (!groupBy || groupBy === 'ALL' || !groupValue) return;
+  if (groupBy === 'DAY') {
+    const start = new Date(`${groupValue}T00:00:00.000Z`);
+    if (!Number.isNaN(start.getTime())) addDateRange(where, start, new Date(start.getTime() + 86400000));
+  } else if (groupBy === 'MONTH' && /^\d{4}-\d{2}$/.test(groupValue)) {
+    const start = new Date(`${groupValue}-01T00:00:00.000Z`);
+    if (!Number.isNaN(start.getTime())) addDateRange(where, start, new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1)));
+  } else if (groupBy === 'YEAR' && /^\d{4}$/.test(groupValue)) {
+    const start = new Date(`${groupValue}-01-01T00:00:00.000Z`);
+    addDateRange(where, start, new Date(Date.UTC(start.getUTCFullYear() + 1, 0, 1)));
+  } else if (groupBy === 'WEEK') {
+    const match = /^(\d{4})-W(\d{1,2})$/.exec(groupValue);
+    if (match) {
+      const start = new Date(Date.UTC(Number(match[1]), 0, 1 + (Number(match[2]) - 1) * 7));
+      addDateRange(where, start, new Date(start.getTime() + 7 * 86400000));
+    }
+  } else if (groupBy === 'TRIMESTER') {
+    where.trimester = groupValue === '1' ? { in: ['1', 'P1', 'P2', 'EX1'] } : groupValue === '2' ? { in: ['2', 'P3', 'P4', 'EX2'] } : groupValue;
+  } else if (groupBy === 'SEMESTER') {
+    where.trimester = groupValue === '1' ? { in: ['1', 'P1', 'P2', 'EX1'] } : { in: ['2', 'P3', 'P4', 'EX2'] };
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const auth = authenticateRequest(request);
@@ -31,6 +60,8 @@ export async function GET(request: NextRequest) {
     const teacherId = searchParams.get('teacherId');
     const from = searchParams.get('from');
     const to = searchParams.get('to');
+    const groupBy = searchParams.get('groupBy');
+    const groupValue = searchParams.get('groupValue');
 
     if (!schoolId || (schoolId !== auth.schoolId && auth.role !== 'PARENT')) {
       return NextResponse.json({ error: 'schoolId invalide' }, { status: 400 });
@@ -72,6 +103,7 @@ export async function GET(request: NextRequest) {
         ...(to && { lt: new Date(`${to}T00:00:00.000Z`) }),
       };
     }
+    applyTimeFilter(where, groupBy, groupValue);
 
     const grades = await db.grade.findMany({
       where,
@@ -188,7 +220,17 @@ export async function POST(request: NextRequest) {
       ? primaryTrimesterForDate(evaluationDate)
       : (trimester || period || 'P1');
     const evaluation = evaluationDate ? new Date(evaluationDate) : new Date();
-    const week = Math.ceil((((evaluation.getTime() - new Date(Date.UTC(evaluation.getUTCFullYear(), 0, 1)).getTime()) / 86400000) + 1) / 7);
+    const week = calendarWeek(evaluation);
+    const activeYear = await db.schoolYear.findFirst({
+      where: { schoolId, status: { not: 'CLOSED' } },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+    try {
+      await assertGradePeriodOpen({ schoolId, schoolYearId: activeYear?.id, date: evaluation, trimester: effectiveTrimester });
+    } catch (error: unknown) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : 'Période clôturée' }, { status: 423 });
+    }
 
     // ── Saisie rapide via période RDC (P1..EX2) : alimente le cahier ──
     if (isPeriodKey(period ?? trimester)) {

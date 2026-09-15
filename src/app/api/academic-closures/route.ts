@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 
-const ALLOWED = new Set(['WEEK', 'MONTH', 'SEMESTER', 'TRIMESTER', 'YEAR']);
+const ALLOWED = new Set(['DAY', 'WEEK', 'MONTH', 'SEMESTER', 'TRIMESTER', 'YEAR']);
 
 export async function GET(req: NextRequest) {
   try {
@@ -21,9 +21,11 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const auth = authenticateRequest(req);
-    if (auth.role !== 'ADMIN') return NextResponse.json({ error: 'Action réservée aux administrateurs.' }, { status: 403 });
+    if (!['ADMIN', 'TEACHER'].includes(auth.role)) return NextResponse.json({ error: 'Action réservée aux administrateurs et enseignants.' }, { status: 403 });
     const { schoolYearId, scope, key } = await req.json();
     if (!schoolYearId || !ALLOWED.has(scope) || !key) return NextResponse.json({ error: 'schoolYearId, scope et key sont requis.' }, { status: 400 });
+    const schoolYear = await db.schoolYear.findFirst({ where: { id: schoolYearId, schoolId: auth.schoolId }, select: { id: true } });
+    if (!schoolYear) return NextResponse.json({ error: 'Année scolaire invalide.' }, { status: 400 });
     const closure = await db.academicClosure.upsert({
       where: { schoolId_schoolYearId_scope_key: { schoolId: auth.schoolId, schoolYearId, scope, key } },
       update: { closedById: auth.userId, closedAt: new Date() },

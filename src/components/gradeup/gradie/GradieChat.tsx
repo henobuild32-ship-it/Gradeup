@@ -724,6 +724,8 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
   const recognitionRef = useRef<any>(null);
   const readerRef = useRef<ReadableStreamDefaultReader | null>(null);
   const attachInputRef = useRef<HTMLInputElement>(null);
+  const stopRequestedRef = useRef(false);
+  const activeConversationIdKey = `gradeup-gradie-active-${userId}`;
 
   // ── Attach / upload document ─────────────────────────────────────────────────
   const handleAttachFile = async (file: File) => {
@@ -738,7 +740,6 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
       if (res.ok) {
         const data = await res.json();
         convId = data.conversation.id;
-        await loadConversation(convId!);
       }
     }
     if (!convId) {
@@ -863,10 +864,17 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
       if (res.ok) {
         const data = await res.json();
         setActiveConversation(data.conversation);
+        localStorage.setItem(activeConversationIdKey, id);
       }
     } catch { setError('Impossible de charger la conversation.'); }
     finally { setIsLoading(false); }
-  }, [userId]);
+  }, [userId, activeConversationIdKey]);
+
+  // Restore the open conversation after a refresh instead of showing an empty chat.
+  useEffect(() => {
+    const savedId = localStorage.getItem(activeConversationIdKey);
+    if (savedId) loadConversation(savedId);
+  }, [activeConversationIdKey, loadConversation]);
 
   // ── Create conversation ─────────────────────────────────────────────────────
   const createNewConversation = async () => {
@@ -891,6 +899,7 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
     setInput('');
     setError(null);
     setStopRequested(false);
+    stopRequestedRef.current = false;
     recordSearch(msg);
 
     let convId = activeConversation?.id;
@@ -957,14 +966,17 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
       readerRef.current = reader;
       const decoder = new TextDecoder();
       let acc = '';
+      let pendingSse = '';
 
       while (true) {
-        if (stopRequested) { reader.cancel(); break; }
+        if (stopRequestedRef.current) { await reader.cancel(); break; }
         const { done, value } = await reader.read();
         if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n').filter((l) => l.startsWith('data:'));
+        pendingSse += decoder.decode(value, { stream: true });
+        const lines = pendingSse.split('\n');
+        pendingSse = lines.pop() || '';
         for (const line of lines) {
+          if (!line.startsWith('data:')) continue;
           const json = line.replace(/^data:\s*/, '').trim();
           try {
             const p = JSON.parse(json);
@@ -1024,6 +1036,7 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
 
   const stopGeneration = () => {
     setStopRequested(true);
+    stopRequestedRef.current = true;
     readerRef.current?.cancel().catch(() => {});
   };
 
@@ -1140,6 +1153,7 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
               }
               setConversations([]);
               setActiveConversation(null);
+              localStorage.removeItem(activeConversationIdKey);
               if (cleared > 0) toast.success(`${cleared} conversation(s) supprimée(s).`);
               else toast.error('Aucune conversation supprimée.');
             })();
@@ -1171,6 +1185,7 @@ export default function GradieChat({ userId, schoolId, userRole, userName }: Gra
               if (res.ok) {
                 setConversations(p => p.filter(c => c.id !== activeConversation.id));
                 setActiveConversation(null);
+                localStorage.removeItem(activeConversationIdKey);
                 toast.success('Conversation supprimée.');
               } else {
                 toast.error('Échec de la suppression de la conversation.');

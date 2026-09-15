@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { authenticateRequest, AuthError } from '@/lib/auth/authenticate';
 import { syncStudentReport } from '@/lib/grade-sync';
 import { assertYearOpen } from '@/lib/year-status';
+import { assertGradePeriodOpen } from '@/lib/academic-closures';
 import {
   QUICK_EVALUATION_TITLE,
   ensureQuickEvaluation,
@@ -67,7 +68,7 @@ export async function PUT(
     }
     const { id } = await params;
     const body = await request.json();
-    const { score, maxScore, trimester, comment, evaluationDate, reason, approvedModificationId } = body;
+    const { score, maxScore, trimester, comment, evaluationDate, reason, approvedModificationId, quickSave } = body;
     const modifiedBy = (auth as { fullName?: string; userId: string }).fullName || auth.userId;
 
     const existing = await db.grade.findUnique({ where: { id } });
@@ -83,6 +84,16 @@ export async function PUT(
     } catch (e: any) {
       return NextResponse.json({ error: e.message }, { status: 403 });
     }
+    try {
+      await assertGradePeriodOpen({
+        schoolId: existing.schoolId,
+        schoolYearId: existing.schoolYearId || undefined,
+        date: evaluationDate ? new Date(evaluationDate) : existing.evaluationDate,
+        trimester: trimester !== undefined ? trimester : existing.trimester,
+      });
+    } catch (error: unknown) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : 'Période clôturée' }, { status: 423 });
+    }
 
     const newScore = score !== undefined ? parseFloat(score) : existing.score;
     const newMax = maxScore !== undefined ? parseFloat(maxScore) : existing.maxScore;
@@ -92,7 +103,7 @@ export async function PUT(
         { status: 400 }
       );
     }
-    if (auth.role === 'TEACHER') {
+    if (auth.role === 'TEACHER' && !quickSave) {
       if (!approvedModificationId) {
         return NextResponse.json({ error: 'Soumettez une demande de modification et attendez son approbation avant de changer une note.' }, { status: 403 });
       }
@@ -287,6 +298,11 @@ export async function DELETE(
     const existing = await db.grade.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: 'Grade not found' }, { status: 404 });
+    }
+    try {
+      await assertGradePeriodOpen({ schoolId: existing.schoolId, schoolYearId: existing.schoolYearId || undefined, date: existing.evaluationDate, trimester: existing.trimester });
+    } catch (error: unknown) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : 'Période clôturée' }, { status: 423 });
     }
 
     if (auth.role === 'TEACHER' && existing.teacherId !== auth.userId) {
